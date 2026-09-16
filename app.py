@@ -371,11 +371,29 @@ tab_ai, tab_rising, tab_new, tab_chart = st.tabs([
 # ====================================================
 with tab_ai:
     candidates = []
-    if not df_rising.empty:
-        # 상위 후보군 종합 검증
-        pool = pd.concat([df_rising.head(35), df_volume.head(25)]).drop_duplicates(subset=["code"]).head(35)
 
-        progress_bar = st.progress(0, text="종목별 수급 및 상승 확률 정밀 분석 중...")
+    # 🎯 선택된 투자 스타일에 따라 종목 풀(Pool)과 가중치 전략 동적 분기
+    if "신규상장" in preset_style:
+        strategy_key = "신규상장"
+        # 신규상장주 목록(df_new)에서 거래대금 유입 및 반등 종목 엄선
+        if not df_new.empty:
+            pool = df_new[df_new["price"] > 0].sort_values(by="trade_value_억", ascending=False).head(30)
+        else:
+            pool = pd.DataFrame()
+    elif "단타" in preset_style:
+        strategy_key = "단타"
+        # 당일 7% 이상 급등주 및 거래대금 상위 종목에서 가장 폭발력 있는 주도주 선별
+        hot_rise = df_rising[df_rising["change_rate"] >= 7.0].head(25) if not df_rising.empty else pd.DataFrame()
+        pool = pd.concat([hot_rise, df_volume.head(25)]).drop_duplicates(subset=["code"]).head(35)
+    else:
+        # 🛡️ 안정적인 스윙형 (기본):
+        strategy_key = "스윙"
+        # 2%~14% 사이 안정권 진입 종목 + 거래대금 상위 종목에서 큰손 수급 유입주 선별
+        swing_rise = df_rising[(df_rising["change_rate"] >= 2.0) & (df_rising["change_rate"] <= 14.0)].head(25) if not df_rising.empty else pd.DataFrame()
+        pool = pd.concat([swing_rise, df_volume.head(20)]).drop_duplicates(subset=["code"]).head(35)
+
+    if not pool.empty:
+        progress_bar = st.progress(0, text=f"[{preset_style}] 맞춤 수급 및 상승 확률 정밀 분석 중...")
         total_items = len(pool)
 
         for idx, (_, row) in enumerate(pool.iterrows()):
@@ -393,9 +411,10 @@ with tab_ai:
             item_dict = {
                 "change_rate": float(row.get("change_rate", 0.0)),
                 "trade_value_억": float(row.get("trade_value_억", 0.0)),
+                "days_since_listing": int(row.get("days_since_listing", 90)),
             }
 
-            quant_res = calculate_quant_score(item_dict, signals, investor_df)
+            quant_res = calculate_quant_score(item_dict, signals, investor_df, strategy=strategy_key)
             pred_res = predictor.predict_probability(ohlcv_ind, quant_score=quant_res["total_score"])
 
             candidates.append({
@@ -435,7 +454,7 @@ with tab_ai:
             <div style="background:{vip_bg}; border:2px solid {vip_border}; border-radius:12px; padding:18px 22px; margin-bottom:22px; box-shadow:0 4px 6px -1px rgba(0,0,0,0.06);">
                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
                     <div>
-                        <span style="background:#16A34A; color:white; font-size:0.85rem; font-weight:bold; padding:4px 12px; border-radius:20px;">🏆 오늘의 AI 강력 추천 1위 (원픽)</span>
+                        <span style="background:#16A34A; color:white; font-size:0.85rem; font-weight:bold; padding:4px 12px; border-radius:20px;">🏆 [{preset_style}] AI 추천 1위 (원픽)</span>
                         <div style="margin-top:10px;">
                             <span style="font-size:1.55rem; font-weight:900; color:{vip_text};">{top1['name']}</span>
                             <span style="color:#64748B; font-size:1rem; margin-left:8px;">({top1['code']} / {top1['market']})</span>
