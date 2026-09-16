@@ -35,63 +35,120 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-st.markdown(
-    """
-    <style>
-    .main-title {
-        font-size: 2.2rem;
-        font-weight: 800;
-        background: linear-gradient(90deg, #1E88E5 0%, #00E676 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin-bottom: 0.2rem;
-    }
-    .sub-title {
-        font-size: 0.95rem;
-        color: #9E9E9E;
-        margin-bottom: 1.5rem;
-    }
-    .metric-card {
-        background-color: #1E222D;
-        border-radius: 10px;
-        padding: 15px;
-        border: 1px solid #2A2E39;
-    }
-    .grade-s {
-        background-color: #D32F2F;
-        color: white;
-        padding: 3px 8px;
-        border-radius: 5px;
-        font-weight: bold;
-    }
-    .grade-a {
-        background-color: #E65100;
-        color: white;
-        padding: 3px 8px;
-        border-radius: 5px;
-        font-weight: bold;
-    }
-    .grade-b {
-        background-color: #1565C0;
-        color: white;
-        padding: 3px 8px;
-        border-radius: 5px;
-        font-weight: bold;
-    }
-    .badge-tag {
-        background-color: #263238;
-        color: #80CBC4;
-        padding: 2px 6px;
-        border-radius: 4px;
-        font-size: 0.8rem;
-        margin-right: 4px;
-        display: inline-block;
-        margin-bottom: 3px;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+# ----------------------------------------------------
+# 2. 사이드바 테마 및 제어판 (낮/밤 모드)
+# ----------------------------------------------------
+with st.sidebar:
+    st.markdown("### 🎨 화면 테마")
+    theme_mode = st.radio(
+        "테마 모드 선택",
+        ["☀️ 낮 모드 (화이트)", "🌙 밤 모드 (다크)"],
+        index=0,
+        horizontal=True,
+    )
+    is_dark = "밤 모드" in theme_mode
+
+# 테마에 따른 동적 CSS 주입
+if not is_dark:
+    # ☀️ 낮 모드 (깔끔한 화이트 테마)
+    st.markdown(
+        """
+        <style>
+        .stApp {
+            background-color: #FFFFFF;
+            color: #0F172A;
+        }
+        [data-testid="stSidebar"] {
+            background-color: #F8FAFC;
+            border-right: 1px solid #E2E8F0;
+        }
+        .main-title {
+            font-size: 2.2rem;
+            font-weight: 800;
+            background: linear-gradient(90deg, #1D4ED8 0%, #059669 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.2rem;
+        }
+        .sub-title {
+            font-size: 0.95rem;
+            color: #64748B;
+            margin-bottom: 1.5rem;
+        }
+        .recommend-card {
+            background-color: #F8FAFC;
+            border: 1px solid #E2E8F0;
+            border-radius: 8px;
+            padding: 14px;
+            margin-bottom: 10px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+        .stock-title {
+            color: #0F172A;
+            font-size: 1.15rem;
+            font-weight: bold;
+        }
+        .stock-meta {
+            color: #64748B;
+            margin-left: 6px;
+        }
+        .signal-desc {
+            color: #334155;
+            font-size: 0.9rem;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+else:
+    # 🌙 밤 모드 (다크 테마)
+    st.markdown(
+        """
+        <style>
+        .stApp {
+            background-color: #0E1117;
+            color: #FFFFFF;
+        }
+        [data-testid="stSidebar"] {
+            background-color: #161B22;
+        }
+        .main-title {
+            font-size: 2.2rem;
+            font-weight: 800;
+            background: linear-gradient(90deg, #60A5FA 0%, #34D399 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.2rem;
+        }
+        .sub-title {
+            font-size: 0.95rem;
+            color: #9CA3AF;
+            margin-bottom: 1.5rem;
+        }
+        .recommend-card {
+            background-color: #1E222D;
+            border: 1px solid #374151;
+            border-radius: 8px;
+            padding: 14px;
+            margin-bottom: 10px;
+        }
+        .stock-title {
+            color: #FFFFFF;
+            font-size: 1.15rem;
+            font-weight: bold;
+        }
+        .stock-meta {
+            color: #9CA3AF;
+            margin-left: 6px;
+        }
+        .signal-desc {
+            color: #D1D5DB;
+            font-size: 0.9rem;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 # ----------------------------------------------------
@@ -261,11 +318,11 @@ with tab_ai:
             with st.container():
                 st.markdown(
                     f"""
-                    <div style="background:#1E222D; border:1px solid #374151; border-radius:8px; padding:12px; margin-bottom:10px;">
+                    <div class="recommend-card">
                         <div style="display:flex; justify-content:space-between; align-items:center;">
                             <div>
-                                <span style="font-size:1.2rem; font-weight:bold; color:#FFFFFF;">#{r['rank']} {r['name']}</span>
-                                <span style="color:#9CA3AF; margin-left:8px;">({r['code']} / {r['market']})</span>
+                                <span class="stock-title">#{r['rank']} {r['name']}</span>
+                                <span class="stock-meta">({r['code']} / {r['market']})</span>
                                 <span style="margin-left:10px; font-weight:bold; color:{'#EF4444' if r['change_rate'] > 0 else '#3B82F6'}; font-size:1.1rem;">
                                     {r['price']:,}원 ({r['change_rate']:+.2f}%)
                                 </span>
@@ -280,7 +337,7 @@ with tab_ai:
                             </div>
                         </div>
                         <div style="margin-top:8px;">
-                            <span style="color:#D1D5DB; font-size:0.9rem;">📌 <b>주요 시그널:</b> {r['signals']}</span>
+                            <span class="signal-desc">📌 <b>주요 시그널:</b> {r['signals']}</span>
                         </div>
                     </div>
                     """,
@@ -439,7 +496,7 @@ with tab_chart:
         fig.update_layout(
             height=720,
             xaxis_rangeslider_visible=False,
-            template="plotly_dark",
+            template="plotly_dark" if is_dark else "plotly_white",
             margin=dict(l=10, r=10, t=40, b=10),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         )
@@ -476,7 +533,7 @@ with tab_chart:
             inv_fig.update_layout(
                 height=280,
                 barmode="group",
-                template="plotly_dark",
+                template="plotly_dark" if is_dark else "plotly_white",
                 margin=dict(l=10, r=10, t=20, b=10),
             )
             st.plotly_chart(inv_fig, use_container_width=True)
