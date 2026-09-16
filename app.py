@@ -48,19 +48,33 @@ with st.sidebar:
     )
     is_dark = "밤 모드" in theme_mode
 
-# 테마에 따른 동적 CSS 주입
+# 크롬 브라우저 오번역 방지 및 테마별 완벽 대비 스타일 주입
 if not is_dark:
     # ☀️ 낮 모드 (깔끔한 화이트 테마)
     st.markdown(
         """
+        <meta name="google" content="notranslate">
         <style>
         .stApp {
-            background-color: #FFFFFF;
-            color: #0F172A;
+            background-color: #F8FAFC !important;
+            color: #0F172A !important;
+        }
+        header[data-testid="stHeader"] {
+            background-color: #F8FAFC !important;
         }
         [data-testid="stSidebar"] {
-            background-color: #F8FAFC;
-            border-right: 1px solid #E2E8F0;
+            background-color: #FFFFFF !important;
+            border-right: 1px solid #E2E8F0 !important;
+        }
+        [data-testid="stSidebar"] label,
+        [data-testid="stSidebar"] p,
+        [data-testid="stSidebar"] span,
+        [data-testid="stSidebar"] div {
+            color: #1E293B !important;
+        }
+        [data-testid="stSidebar"] .stCaption, 
+        [data-testid="stSidebar"] small {
+            color: #64748B !important;
         }
         .main-title {
             font-size: 2.2rem;
@@ -72,45 +86,79 @@ if not is_dark:
         }
         .sub-title {
             font-size: 0.95rem;
-            color: #64748B;
+            color: #64748B !important;
             margin-bottom: 1.5rem;
         }
+        [data-testid="stMetricLabel"] * {
+            color: #475569 !important;
+            font-weight: 600 !important;
+        }
+        [data-testid="stMetricValue"] * {
+            color: #0F172A !important;
+            font-weight: 800 !important;
+        }
+        button[data-baseweb="tab"] p, button[data-baseweb="tab"] span {
+            color: #64748B !important;
+        }
+        button[data-baseweb="tab"][aria-selected="true"] p, button[data-baseweb="tab"][aria-selected="true"] span {
+            color: #1D4ED8 !important;
+            font-weight: bold !important;
+        }
         .recommend-card {
-            background-color: #F8FAFC;
-            border: 1px solid #E2E8F0;
-            border-radius: 8px;
-            padding: 14px;
-            margin-bottom: 10px;
+            background-color: #FFFFFF !important;
+            border: 1px solid #E2E8F0 !important;
+            border-radius: 10px;
+            padding: 14px 18px;
+            margin-bottom: 12px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.04);
         }
         .stock-title {
-            color: #0F172A;
+            color: #0F172A !important;
             font-size: 1.15rem;
-            font-weight: bold;
+            font-weight: 800;
         }
         .stock-meta {
-            color: #64748B;
+            color: #64748B !important;
             margin-left: 6px;
         }
         .signal-desc {
-            color: #334155;
-            font-size: 0.9rem;
+            color: #334155 !important;
+            font-size: 0.92rem;
         }
         </style>
         """,
         unsafe_allow_html=True,
     )
 else:
-    # 🌙 밤 모드 (다크 테마)
+    # 🌙 밤 모드 (선명한 다크 테마)
     st.markdown(
         """
+        <meta name="google" content="notranslate">
         <style>
         .stApp {
-            background-color: #0E1117;
-            color: #FFFFFF;
+            background-color: #0B0E14 !important;
+            color: #F1F5F9 !important;
+        }
+        header[data-testid="stHeader"] {
+            background-color: #0B0E14 !important;
         }
         [data-testid="stSidebar"] {
-            background-color: #161B22;
+            background-color: #151A23 !important;
+            border-right: 1px solid #242D3D !important;
+        }
+        [data-testid="stSidebar"] label,
+        [data-testid="stSidebar"] p,
+        [data-testid="stSidebar"] span,
+        [data-testid="stSidebar"] div {
+            color: #E2E8F0 !important;
+        }
+        [data-testid="stSidebar"] [data-testid="stWidgetLabel"] p {
+            color: #F8FAFC !important;
+            font-weight: 700 !important;
+        }
+        [data-testid="stSidebar"] .stCaption, 
+        [data-testid="stSidebar"] small {
+            color: #94A3B8 !important;
         }
         .main-title {
             font-size: 2.2rem;
@@ -122,28 +170,43 @@ else:
         }
         .sub-title {
             font-size: 0.95rem;
-            color: #9CA3AF;
+            color: #94A3B8 !important;
             margin-bottom: 1.5rem;
         }
+        [data-testid="stMetricLabel"] * {
+            color: #94A3B8 !important;
+            font-weight: 600 !important;
+        }
+        [data-testid="stMetricValue"] * {
+            color: #F8FAFC !important;
+            font-weight: 800 !important;
+        }
+        button[data-baseweb="tab"] p, button[data-baseweb="tab"] span {
+            color: #94A3B8 !important;
+        }
+        button[data-baseweb="tab"][aria-selected="true"] p, button[data-baseweb="tab"][aria-selected="true"] span {
+            color: #38BDF8 !important;
+            font-weight: bold !important;
+        }
         .recommend-card {
-            background-color: #1E222D;
-            border: 1px solid #374151;
-            border-radius: 8px;
-            padding: 14px;
-            margin-bottom: 10px;
+            background-color: #151A23 !important;
+            border: 1px solid #242D3D !important;
+            border-radius: 10px;
+            padding: 14px 18px;
+            margin-bottom: 12px;
         }
         .stock-title {
-            color: #FFFFFF;
+            color: #FFFFFF !important;
             font-size: 1.15rem;
-            font-weight: bold;
+            font-weight: 800;
         }
         .stock-meta {
-            color: #9CA3AF;
+            color: #94A3B8 !important;
             margin-left: 6px;
         }
         .signal-desc {
-            color: #D1D5DB;
-            font-size: 0.9rem;
+            color: #CBD5E1 !important;
+            font-size: 0.92rem;
         }
         </style>
         """,
