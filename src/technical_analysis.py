@@ -84,10 +84,10 @@ def analyze_stock_signals(df: pd.DataFrame) -> Dict[str, Any]:
     if pd.notna(sma5) and pd.notna(sma20) and pd.notna(sma60):
         if pd.notna(sma120) and sma5 > sma20 > sma60 > sma120:
             bullish_alignment = True
-            signals.append("완전 정배열 (5>20>60>120)")
+            signals.append("초강력 정배열 (탄탄한 중장기 상승 추세)")
         elif sma5 > sma20 > sma60:
             short_alignment = True
-            signals.append("단기 정배열 (5>20>60)")
+            signals.append("단기 상승 궤도 안착 (5일선 위 순항)")
 
     # 2. 골든크로스 판별
     prev_sma5 = prev.get("sma5", 0)
@@ -95,7 +95,7 @@ def analyze_stock_signals(df: pd.DataFrame) -> Dict[str, Any]:
     golden_cross_5_20 = False
     if prev_sma5 <= prev_sma20 and sma5 > sma20:
         golden_cross_5_20 = True
-        signals.append("5일/20일 골든크로스")
+        signals.append("골든크로스 발생 (상승 전환 신호)")
 
     # 3. 볼린저 밴드 상단 돌파
     bb_upper = latest.get("bb_upper", 0)
@@ -103,30 +103,30 @@ def analyze_stock_signals(df: pd.DataFrame) -> Dict[str, Any]:
     bb_breakout = False
     if close >= bb_upper and bb_upper > 0:
         bb_breakout = True
-        signals.append("볼린저밴드 상단 돌파")
+        signals.append("저항선 돌파 (강한 상승 탄력)")
 
     # 4. RSI 진단
     rsi = round(float(latest.get("rsi14", 50)), 1)
     prev_rsi = round(float(prev.get("rsi14", 50)), 1)
     if prev_rsi < 30 and rsi >= 30:
-        signals.append("RSI 과매도 탈출 (반등 시그널)")
+        signals.append("바닥 찍고 반등 시작 (과매도 탈출)")
     elif 55 <= rsi <= 70:
-        signals.append("RSI 모멘텀 상승 가속 구간")
+        signals.append("안정적 상승 가속 구간")
     elif rsi > 75:
-        signals.append("RSI 과열 주의 (차익실현 경계)")
+        signals.append("단기 과열 (추격 매수 주의)")
 
     # 5. MACD 시그널
     macd_hist = round(float(latest.get("macd_hist", 0)), 2)
     prev_macd_hist = round(float(prev.get("macd_hist", 0)), 2)
     if prev_macd_hist <= 0 and macd_hist > 0:
-        signals.append("MACD 영선 상향돌파 (골든크로스)")
+        signals.append("상승 모멘텀 전환 (MACD 양수 진입)")
 
     # 6. 거래량 급증 판별
     vol_ratio_20d = latest.get("vol_ratio_20d", 1.0)
     volume_surge = False
     if vol_ratio_20d >= 2.0:
         volume_surge = True
-        signals.append(f"20일 평균대비 거래량 {round(vol_ratio_20d * 100)}% 폭발")
+        signals.append(f"거래량 {round(vol_ratio_20d * 100)}% 폭발 (시장 주목)")
 
     return {
         "signals": signals,
