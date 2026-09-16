@@ -20,6 +20,7 @@ from naver_collector import (
     fetch_top_rising_stocks,
     fetch_top_volume_stocks,
 )
+from landing_page import render_landing_page
 from prediction_model import predictor
 from quant_scorer import calculate_quant_score
 from technical_analysis import analyze_stock_signals, compute_technical_indicators
@@ -35,11 +36,33 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+# 세션 상태 초기화 (첫 방문 시 소개/가이드 페이지를 디폴트로)
+if "current_page" not in st.session_state:
+    st.session_state["current_page"] = "intro"
+
 
 # ----------------------------------------------------
-# 2. 사이드바 (초보자 친화적 단일 구성)
+# 2. 사이드바 (내비게이션 & 테마 & 조건 제어)
 # ----------------------------------------------------
 with st.sidebar:
+    st.markdown("### 🧭 메뉴 이동")
+    page_options = ["🏠 서비스 소개 및 가이드", "🚀 AI 급등주 분석 레이더"]
+    cur_page_idx = 0 if st.session_state.get("current_page", "intro") == "intro" else 1
+
+    selected_menu = st.radio(
+        "이동할 메뉴를 선택하세요",
+        page_options,
+        index=cur_page_idx,
+        label_visibility="collapsed",
+    )
+    if "서비스 소개" in selected_menu and st.session_state["current_page"] != "intro":
+        st.session_state["current_page"] = "intro"
+        st.rerun()
+    elif "급등주 분석" in selected_menu and st.session_state["current_page"] != "dashboard":
+        st.session_state["current_page"] = "dashboard"
+        st.rerun()
+
+    st.markdown("---")
     st.markdown("### 🎨 화면 테마")
     theme_mode = st.radio(
         "테마 모드 선택",
@@ -49,43 +72,57 @@ with st.sidebar:
     )
     is_dark = "밤 모드" in theme_mode
 
-    st.markdown("---")
-    st.markdown("### 🎯 나의 투자 스타일 (초보자 원클릭)")
-    preset_style = st.radio(
-        "원하는 투자 방식을 골라보세요",
-        [
-            "🛡️ 안정적인 스윙형 (추천)",
-            "⚡ 화끈한 급등 단타형",
-            "🚀 신규상장 턴어라운드형",
-        ],
-        index=0,
-    )
-
-    # 프리셋에 따른 기본값 및 초보자 가이드
-    if "안정적인 스윙형" in preset_style:
-        def_change = 3.0
-        def_months = 12
-        preset_guide = "💡 **추천 이유**: 외국인·기관이 매수하고 차트가 안정적인 상승 초입에 진입한 종목으로, 물릴 위험이 적고 가장 안전합니다."
-    elif "화끈한 급등 단타형" in preset_style:
-        def_change = 8.0
-        def_months = 12
-        preset_guide = "💡 **추천 이유**: 오늘 시장의 거래대금이 강하게 몰린 주도주로, 탄력이 매우 좋고 빠른 단기 수익을 노립니다."
-    else:
-        def_change = 2.0
-        def_months = 6
-        preset_guide = "💡 **추천 이유**: 최근 상장 후 충분히 바닥을 다지고 강하게 반등하는 신규 성장주를 포착합니다."
-
-    st.info(preset_guide)
-
-    # 고급 세부 조절 (원하는 사람만 열기)
-    with st.expander("🛠️ 세부 조건 직접 조절하기", expanded=False):
-        market_filter = st.selectbox("시장 구분", ["전체 (KOSPI + KOSDAQ)", "KOSPI", "KOSDAQ"])
-        min_change_rate = st.slider(
-            "최소 당일 상승률 (%)",
-            min_value=0.0, max_value=25.0, value=def_change, step=0.5,
-            help="너무 높으면 상한가 직전이라 위험하고, 3~5%가 가장 안정적인 진입점입니다."
+    # 대시보드 상태일 때: 투자 스타일 및 상세 조건 슬라이더 표시
+    if st.session_state["current_page"] == "dashboard":
+        st.markdown("---")
+        st.markdown("### 🎯 나의 투자 스타일 (초보자 원클릭)")
+        preset_style = st.radio(
+            "원하는 투자 방식을 골라보세요",
+            [
+                "🛡️ 안정적인 스윙형 (추천)",
+                "⚡ 화끈한 급등 단타형",
+                "🚀 신규상장 턴어라운드형",
+            ],
+            index=0,
         )
-        new_listing_months = st.slider("신규상장 기준 (최근 N개월)", min_value=1, max_value=24, value=def_months)
+
+        # 프리셋에 따른 기본값 및 초보자 가이드
+        if "안정적인 스윙형" in preset_style:
+            def_change = 3.0
+            def_months = 12
+            preset_guide = "💡 **추천 이유**: 외국인·기관이 매수하고 차트가 안정적인 상승 초입에 진입한 종목으로, 물릴 위험이 적고 가장 안전합니다."
+        elif "화끈한 급등 단타형" in preset_style:
+            def_change = 8.0
+            def_months = 12
+            preset_guide = "💡 **추천 이유**: 오늘 시장의 거래대금이 강하게 몰린 주도주로, 탄력이 매우 좋고 빠른 단기 수익을 노립니다."
+        else:
+            def_change = 2.0
+            def_months = 6
+            preset_guide = "💡 **추천 이유**: 최근 상장 후 충분히 바닥을 다지고 강하게 반등하는 신규 성장주를 포착합니다."
+
+        st.info(preset_guide)
+
+        # 고급 세부 조절 (원하는 사람만 열기)
+        with st.expander("🛠️ 세부 조건 직접 조절하기", expanded=False):
+            market_filter = st.selectbox("시장 구분", ["전체 (KOSPI + KOSDAQ)", "KOSPI", "KOSDAQ"])
+            min_change_rate = st.slider(
+                "최소 당일 상승률 (%)",
+                min_value=0.0, max_value=25.0, value=def_change, step=0.5,
+                help="너무 높으면 상한가 직전이라 위험하고, 3~5%가 가장 안정적인 진입점입니다."
+            )
+            new_listing_months = st.slider("신규상장 기준 (최근 N개월)", min_value=1, max_value=24, value=def_months)
+    else:
+        # 소개 페이지일 때 기본값 설정 및 빠른 CTA 버튼
+        preset_style = "🛡️ 안정적인 스윙형 (추천)"
+        market_filter = "전체 (KOSPI + KOSDAQ)"
+        min_change_rate = 3.0
+        new_listing_months = 12
+
+        st.markdown("---")
+        st.markdown("### ⚡ 빠른 이동")
+        if st.button("🚀 급등주 분석 레이더 입장", type="primary", use_container_width=True, key="side_cta_btn"):
+            st.session_state["current_page"] = "dashboard"
+            st.rerun()
 
     st.markdown("---")
     with st.expander("💡 AI 퀀트 점수가 무엇인가요?", expanded=False):
@@ -186,6 +223,74 @@ if not is_dark:
             color: #334155 !important;
             font-size: 0.92rem;
         }
+        .badge-pill {
+            display: inline-block;
+            padding: 5px 14px;
+            border-radius: 9999px;
+            background-color: #EFF6FF !important;
+            color: #1D4ED8 !important;
+            font-weight: 700;
+            font-size: 0.85rem;
+            border: 1px solid #BFDBFE !important;
+            margin-bottom: 12px;
+        }
+        .hero-title {
+            font-size: 2.3rem;
+            font-weight: 900;
+            line-height: 1.35;
+            color: #0F172A !important;
+            margin-bottom: 12px;
+        }
+        .hero-subtitle {
+            font-size: 1.05rem;
+            color: #475569 !important;
+            line-height: 1.6;
+            margin-bottom: 24px;
+        }
+        .feature-card {
+            background-color: #FFFFFF !important;
+            border: 1px solid #E2E8F0 !important;
+            border-radius: 12px;
+            padding: 22px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.04);
+            margin-bottom: 16px;
+        }
+        .feature-title {
+            font-size: 1.15rem;
+            font-weight: 800;
+            color: #0F172A !important;
+            margin-bottom: 8px;
+        }
+        .feature-desc {
+            font-size: 0.93rem;
+            color: #475569 !important;
+            line-height: 1.55;
+        }
+        .step-card {
+            background-color: #FFFFFF !important;
+            border: 1px solid #E2E8F0 !important;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+            margin-bottom: 14px;
+        }
+        .strategy-card {
+            background-color: #FFFFFF !important;
+            border: 1px solid #E2E8F0 !important;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 14px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+        }
+        .cta-banner {
+            background: linear-gradient(135deg, #1E3A8A 0%, #065F46 100%);
+            border-radius: 16px;
+            padding: 36px 24px;
+            text-align: center;
+            color: #FFFFFF !important;
+            margin-top: 32px;
+            margin-bottom: 20px;
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -270,6 +375,72 @@ else:
             color: #CBD5E1 !important;
             font-size: 0.92rem;
         }
+        .badge-pill {
+            display: inline-block;
+            padding: 5px 14px;
+            border-radius: 9999px;
+            background-color: #1E293B !important;
+            color: #60A5FA !important;
+            font-weight: 700;
+            font-size: 0.85rem;
+            border: 1px solid #3B82F6 !important;
+            margin-bottom: 12px;
+        }
+        .hero-title {
+            font-size: 2.3rem;
+            font-weight: 900;
+            line-height: 1.35;
+            color: #F8FAFC !important;
+            margin-bottom: 12px;
+        }
+        .hero-subtitle {
+            font-size: 1.05rem;
+            color: #94A3B8 !important;
+            line-height: 1.6;
+            margin-bottom: 24px;
+        }
+        .feature-card {
+            background-color: #151A23 !important;
+            border: 1px solid #242D3D !important;
+            border-radius: 12px;
+            padding: 22px;
+            margin-bottom: 16px;
+        }
+        .feature-title {
+            font-size: 1.15rem;
+            font-weight: 800;
+            color: #F8FAFC !important;
+            margin-bottom: 8px;
+        }
+        .feature-desc {
+            font-size: 0.93rem;
+            color: #94A3B8 !important;
+            line-height: 1.55;
+        }
+        .step-card {
+            background-color: #151A23 !important;
+            border: 1px solid #242D3D !important;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 14px;
+        }
+        .strategy-card {
+            background-color: #151A23 !important;
+            border: 1px solid #242D3D !important;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 14px;
+        }
+        .cta-banner {
+            background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
+            border: 1px solid #334155;
+            border-radius: 16px;
+            padding: 36px 24px;
+            text-align: center;
+            color: #FFFFFF !important;
+            margin-top: 32px;
+            margin-bottom: 20px;
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -305,10 +476,24 @@ def load_stock_investors(code: str):
 
 
 # ----------------------------------------------------
-# 5. 상단 헤더 및 초보자 3초 매매 가이드 (Aura 스타일)
+# 5. 페이지 라우팅 (소개 페이지 vs 실시간 분석 대시보드)
 # ----------------------------------------------------
-st.markdown('<div class="main-title notranslate" translate="no">📈 Stock Radar : AI 급등주 & 신규상장 분석기</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-title">어려운 차트 공부 없이, 큰손(외인·기관) 수급과 상승 확률 높은 종목만 한눈에 확인하세요!</div>', unsafe_allow_html=True)
+if st.session_state.get("current_page", "intro") == "intro":
+    render_landing_page(is_dark)
+    st.stop()
+
+# ----------------------------------------------------
+# [대시보드] 상단 헤더 및 소개 복귀 버튼
+# ----------------------------------------------------
+head_c1, head_c2 = st.columns([4, 1.2])
+with head_c1:
+    st.markdown('<div class="main-title notranslate" translate="no">📈 Stock Radar : AI 급등주 & 신규상장 분석기</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-title">어려운 차트 공부 없이, 큰손(외인·기관) 수급과 상승 확률 높은 종목만 한눈에 확인하세요!</div>', unsafe_allow_html=True)
+with head_c2:
+    st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
+    if st.button("🏠 서비스 소개 및 가이드", use_container_width=True, key="btn_dash_to_intro"):
+        st.session_state["current_page"] = "intro"
+        st.rerun()
 
 # 초보자 3초 투자 가이드 배너
 with st.expander("🔰 초보자를 위한 3초 투자 가이드 (처음 오셨다면 꼭 읽어보세요!)", expanded=False):
