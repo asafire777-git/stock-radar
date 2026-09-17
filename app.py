@@ -709,6 +709,44 @@ def render_stock_mini_chart(ohlcv_ind: pd.DataFrame, target_name: str = "", is_d
     return fig
 
 
+def format_investor_df(df: pd.DataFrame) -> pd.DataFrame:
+    """수급 데이터프레임을 한글 컬럼명, YYYY-MM-DD 날짜 포맷(시간 제거), 최신순 정렬로 변환"""
+    if df is None or df.empty:
+        return pd.DataFrame()
+    d = df.copy()
+    if "date" not in d.columns:
+        d.insert(0, "date", d.index)
+        d = d.reset_index(drop=True)
+
+    d["date"] = pd.to_datetime(d["date"]).dt.strftime("%Y-%m-%d")
+
+    rename_map = {
+        "date": "일자",
+        "foreign": "외국인(억원)",
+        "institution": "기관(억원)",
+        "retail": "개인(억원)",
+    }
+    cols = [c for c in ["date", "foreign", "institution", "retail"] if c in d.columns]
+    d = d[cols].rename(columns=rename_map)
+    if "일자" in d.columns:
+        d = d.sort_values(by="일자", ascending=False).reset_index(drop=True)
+    return d
+
+
+def display_investor_table(investor_df: pd.DataFrame, rows: int = 5):
+    """외인/기관/개인 순매수 테이블을 한글 컬럼, YYYY-MM-DD 날짜, 상세 해설 캡션과 함께 출력"""
+    if investor_df is None or investor_df.empty:
+        st.info("수급 데이터를 집계 중입니다.")
+        return
+    disp_df = format_investor_df(investor_df.tail(rows))
+    st.dataframe(disp_df, use_container_width=True, hide_index=True)
+    st.caption(
+        "💡 **단위: 억원** | **(+)** 순매수, **(-)** 순매도 | **'0'**은 순매매액 100만원 미만 또는 거래 없는 중립 상태<br>"
+        "⏰ **갱신 조건:** 장중(09:00~15:30) 잠정 집계 순차 반영 → 매일 18:00경 KRX 거래소 최종 확정치 반영",
+        unsafe_allow_html=True,
+    )
+
+
 
 # ----------------------------------------------------
 # 5. 페이지 라우팅 (소개 페이지 vs 실시간 분석 대시보드)
@@ -960,8 +998,8 @@ if selected_search:
                     )
 
                     if not s_inv.empty:
-                        st.caption("최근 5거래일 외국인/기관 순매수 (단위: 억원)")
-                        st.dataframe(s_inv.tail(5), use_container_width=True)
+                        st.markdown("<div style='font-size:0.9rem; font-weight:700; margin-top:10px; margin-bottom:4px;'>👥 최근 5거래일 외국인·기관 순매수 현황</div>", unsafe_allow_html=True)
+                        display_investor_table(s_inv, 5)
 
                 with col_diag2:
                     st.plotly_chart(render_stock_mini_chart(s_ind, search_name, is_dark), use_container_width=True, key=f"search_chart_{search_code}")
@@ -1094,8 +1132,8 @@ with tab_ai:
                 )
 
                 if not top1_inv.empty:
-                    st.caption("최근 5거래일 외국인/기관 순매수 (억원)")
-                    st.dataframe(top1_inv.tail(5), use_container_width=True)
+                    st.markdown("<div style='font-size:0.9rem; font-weight:700; margin-top:10px; margin-bottom:4px;'>👥 최근 5거래일 외국인·기관 순매수 현황</div>", unsafe_allow_html=True)
+                    display_investor_table(top1_inv, 5)
 
             with col_t2:
                 if not top1_ind.empty and len(top1_ind) >= 10:
@@ -1165,8 +1203,8 @@ with tab_ai:
                         )
 
                         if not r_inv.empty:
-                            st.caption("최근 5거래일 외국인/기관 순매수 (억원)")
-                            st.dataframe(r_inv.tail(5), use_container_width=True)
+                            st.markdown("<div style='font-size:0.9rem; font-weight:700; margin-top:10px; margin-bottom:4px;'>👥 최근 5거래일 외국인·기관 순매수 현황</div>", unsafe_allow_html=True)
+                            display_investor_table(r_inv, 5)
 
                     with col_rg2:
                         if not r_ohlcv_ind.empty and len(r_ohlcv_ind) >= 10:
@@ -1363,5 +1401,7 @@ with tab_chart:
                 margin=dict(l=10, r=10, t=20, b=10),
             )
             st.plotly_chart(inv_fig, use_container_width=True)
+            st.markdown("<div style='font-size:0.95rem; font-weight:700; margin-top:16px; margin-bottom:6px;'>📋 최근 10거래일 일별 수급 상세 내역</div>", unsafe_allow_html=True)
+            display_investor_table(investor_df, 10)
     else:
         st.warning(f"선택한 종목({target_code})의 차트 데이터를 불러올 수 없습니다.")
