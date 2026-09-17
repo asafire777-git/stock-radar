@@ -205,6 +205,184 @@ def render_landing_page(is_dark: bool):
     is_authed = st.session_state.get("is_authenticated", False)
     user = st.session_state.get("user_info", {})
 
+    nav_bg = "rgba(15, 23, 42, 0.95)" if is_dark else "rgba(255, 255, 255, 0.96)"
+    nav_border = "1px solid rgba(51, 65, 85, 0.9)" if is_dark else "1px solid rgba(203, 213, 225, 0.95)"
+    btn_bg = "#1E293B" if is_dark else "#F1F5F9"
+    btn_color = "#F8FAFC" if is_dark else "#1E293B"
+    btn_border = "1px solid rgba(71, 85, 105, 0.6)" if is_dark else "1px solid #CBD5E1"
+    shadow = "0 4px 20px rgba(0, 0, 0, 0.45)" if is_dark else "0 4px 20px rgba(0, 0, 0, 0.08)"
+
+    # 대형 Hero & 하단 통합 CTA & 네비게이션 전용 스타일 (최우선 적용)
+    st.markdown(
+        f"""
+        <style>
+        /* 부드러운 스크롤 & 앵커 마커 오프셋 */
+        html {{
+            scroll-behavior: smooth !important;
+        }}
+        .anchor-marker {{
+            scroll-margin-top: 85px !important;
+            height: 1px !important;
+            visibility: hidden !important;
+            display: block !important;
+        }}
+        .landing-anchor-nav {{
+            position: sticky;
+            top: 0px;
+            z-index: 995;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 8px 14px;
+            margin: 4px 0 18px 0;
+            border-radius: 9999px;
+            overflow-x: auto;
+            white-space: nowrap;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            background: {nav_bg} !important;
+            border: {nav_border} !important;
+            box-shadow: {shadow} !important;
+        }}
+        .landing-anchor-nav::-webkit-scrollbar {{
+            display: none;
+        }}
+        .nav-anchor-btn {{
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 7px 14px;
+            border-radius: 9999px;
+            font-size: 0.88rem;
+            font-weight: 700;
+            text-decoration: none !important;
+            transition: all 0.2s ease-in-out;
+            background: {btn_bg} !important;
+            color: {btn_color} !important;
+            border: {btn_border} !important;
+        }}
+        .nav-anchor-btn:hover {{
+            transform: translateY(-1px);
+            border-color: #38BDF8 !important;
+        }}
+
+        /* 차트 스코어 카드 및 비교표 */
+        .chart-score-box {{
+            border-radius: 14px;
+            padding: 20px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }}
+        .comparison-table {{
+            width: 100%;
+            border-collapse: collapse;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-top: 14px;
+        }}
+        .comparison-table th {{
+            padding: 12px 16px;
+            font-weight: 800;
+            font-size: 0.95rem;
+            text-align: left;
+        }}
+        .comparison-table td {{
+            padding: 12px 16px;
+            font-size: 0.88rem;
+            line-height: 1.5;
+            border-top: 1px solid;
+        }}
+        /* Hero & Bottom Grand Banner CTA Buttons */
+        div[class*="st-key-hero_cta_box"] button,
+        div[class*="st-key-bottom_cta_box"] button,
+        div[class*="st-key-hero_cta_btn"] button,
+        div[class*="st-key-bottom_cta_btn"] button,
+        .st-key-hero_cta_box button,
+        .st-key-bottom_cta_box button {{
+            width: 100% !important;
+            min-height: 94px !important;
+            height: auto !important;
+            padding: 18px 24px !important;
+            border-radius: 18px !important;
+            background: linear-gradient(135deg, #1E3A8A 0%, #1D4ED8 35%, #059669 100%) !important;
+            border: 1.5px solid rgba(147, 197, 253, 0.45) !important;
+            box-shadow: 0 10px 28px rgba(30, 58, 138, 0.4), 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+            cursor: pointer !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            justify-content: center !important;
+            text-align: center !important;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        }}
+        div[class*="st-key-hero_cta_box"] button:hover,
+        div[class*="st-key-bottom_cta_box"] button:hover,
+        div[class*="st-key-hero_cta_btn"] button:hover,
+        div[class*="st-key-bottom_cta_btn"] button:hover,
+        .st-key-hero_cta_box button:hover,
+        .st-key-bottom_cta_box button:hover {{
+            transform: translateY(-3px) scale(1.012) !important;
+            background: linear-gradient(135deg, #1D4ED8 0%, #2563EB 35%, #047857 100%) !important;
+            box-shadow: 0 16px 36px rgba(16, 185, 129, 0.55), 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+            border-color: #60A5FA !important;
+        }}
+        div[class*="st-key-hero_cta_box"] button:active,
+        div[class*="st-key-bottom_cta_box"] button:active,
+        .st-key-hero_cta_box button:active,
+        .st-key-bottom_cta_box button:active {{
+            transform: translateY(1px) scale(0.995) !important;
+        }}
+        div[class*="st-key-hero_cta_box"] button div,
+        div[class*="st-key-bottom_cta_box"] button div {{
+            width: 100% !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }}
+        div[class*="st-key-hero_cta_box"] button p,
+        div[class*="st-key-bottom_cta_box"] button p,
+        div[class*="st-key-hero_cta_btn"] button p,
+        div[class*="st-key-bottom_cta_btn"] button p,
+        .st-key-hero_cta_box button p,
+        .st-key-bottom_cta_box button p {{
+            color: #FFFFFF !important;
+            text-align: center !important;
+            margin: 0 !important;
+            line-height: 1.4 !important;
+        }}
+        div[class*="st-key-hero_cta_box"] button p:first-of-type,
+        div[class*="st-key-bottom_cta_box"] button p:first-of-type,
+        div[class*="st-key-hero_cta_btn"] button p:first-of-type,
+        div[class*="st-key-bottom_cta_btn"] button p:first-of-type,
+        .st-key-hero_cta_box button p:first-of-type,
+        .st-key-bottom_cta_box button p:first-of-type {{
+            font-size: 1.38rem !important;
+            font-weight: 900 !important;
+            letter-spacing: -0.4px !important;
+            margin-bottom: 5px !important;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+        }}
+        div[class*="st-key-hero_cta_box"] button p:last-of-type,
+        div[class*="st-key-bottom_cta_box"] button p:last-of-type,
+        div[class*="st-key-hero_cta_btn"] button p:last-of-type,
+        div[class*="st-key-bottom_cta_btn"] button p:last-of-type,
+        .st-key-hero_cta_box button p:last-of-type,
+        .st-key-bottom_cta_box button p:last-of-type {{
+            font-size: 0.94rem !important;
+            font-weight: 500 !important;
+            color: #A7F3D0 !important;
+            opacity: 0.96 !important;
+            letter-spacing: -0.2px !important;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
     # ----------------------------------------------------
     # 0. 상단 글로벌 내비게이션 바 (홈페이지 스타일)
     # ----------------------------------------------------
@@ -249,15 +427,15 @@ def render_landing_page(is_dark: bool):
     # 0-1. 상단 섹션 바로가기 퀵 내비게이션 바 (Sticky Anchor Menu)
     # ----------------------------------------------------
     st.markdown(
-        """
-        <div class="landing-anchor-nav notranslate" translate="no">
-            <a href="#section-hero" class="nav-anchor-btn">🏠 홈</a>
-            <a href="#section-features" class="nav-anchor-btn">✨ 핵심 기능</a>
-            <a href="#section-charts" class="nav-anchor-btn">📊 AI 차트 분석표</a>
-            <a href="#section-guide" class="nav-anchor-btn">🔰 실전 가이드</a>
-            <a href="#section-strategy" class="nav-anchor-btn">🎯 3대 매매 전략</a>
-            <a href="#section-quant" class="nav-anchor-btn">⚡ 100점 배점표</a>
-            <a href="#section-cta" class="nav-anchor-btn">🚀 바로 입장</a>
+        f"""
+        <div class="landing-anchor-nav notranslate" translate="no" style="background: {nav_bg} !important; border: {nav_border} !important; box-shadow: {shadow} !important;">
+            <a href="#section-hero" class="nav-anchor-btn" style="background: {btn_bg} !important; color: {btn_color} !important; border: {btn_border} !important;">🏠 홈</a>
+            <a href="#section-features" class="nav-anchor-btn" style="background: {btn_bg} !important; color: {btn_color} !important; border: {btn_border} !important;">✨ 핵심 기능</a>
+            <a href="#section-charts" class="nav-anchor-btn" style="background: {btn_bg} !important; color: {btn_color} !important; border: {btn_border} !important;">📊 AI 차트 분석표</a>
+            <a href="#section-guide" class="nav-anchor-btn" style="background: {btn_bg} !important; color: {btn_color} !important; border: {btn_border} !important;">🔰 실전 가이드</a>
+            <a href="#section-strategy" class="nav-anchor-btn" style="background: {btn_bg} !important; color: {btn_color} !important; border: {btn_border} !important;">🎯 3대 매매 전략</a>
+            <a href="#section-quant" class="nav-anchor-btn" style="background: {btn_bg} !important; color: {btn_color} !important; border: {btn_border} !important;">⚡ 100점 배점표</a>
+            <a href="#section-cta" class="nav-anchor-btn" style="background: {btn_bg} !important; color: {btn_color} !important; border: {btn_border} !important;">🚀 바로 입장</a>
         </div>
         <div id="section-hero" class="anchor-marker"></div>
         """,
@@ -285,169 +463,6 @@ def render_landing_page(is_dark: bool):
         unsafe_allow_html=True,
     )
 
-    # 대형 Hero & 하단 통합 CTA & 네비게이션 전용 스타일
-    st.markdown(
-        """
-        <style>
-        /* 부드러운 스크롤 & 앵커 마커 오프셋 */
-        html {
-            scroll-behavior: smooth !important;
-        }
-        .anchor-marker {
-            scroll-margin-top: 85px !important;
-            height: 1px !important;
-            visibility: hidden !important;
-            display: block !important;
-        }
-        .landing-anchor-nav {
-            position: sticky;
-            top: 0px;
-            z-index: 995;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            padding: 8px 14px;
-            margin: 4px 0 18px 0;
-            border-radius: 9999px;
-            overflow-x: auto;
-            white-space: nowrap;
-            -webkit-overflow-scrolling: touch;
-            scrollbar-width: none;
-        }
-        .landing-anchor-nav::-webkit-scrollbar {
-            display: none;
-        }
-        .nav-anchor-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-            padding: 7px 14px;
-            border-radius: 9999px;
-            font-size: 0.88rem;
-            font-weight: 700;
-            text-decoration: none !important;
-            transition: all 0.2s ease-in-out;
-        }
-        .nav-anchor-btn:hover {
-            transform: translateY(-1px);
-        }
-
-        /* 차트 스코어 카드 및 비교표 */
-        .chart-score-box {
-            border-radius: 14px;
-            padding: 20px;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-        }
-        .comparison-table {
-            width: 100%;
-            border-collapse: collapse;
-            border-radius: 12px;
-            overflow: hidden;
-            margin-top: 14px;
-        }
-        .comparison-table th {
-            padding: 12px 16px;
-            font-weight: 800;
-            font-size: 0.95rem;
-            text-align: left;
-        }
-        .comparison-table td {
-            padding: 12px 16px;
-            font-size: 0.88rem;
-            line-height: 1.5;
-            border-top: 1px solid;
-        }
-        /* Hero & Bottom Grand Banner CTA Buttons */
-        div[class*="st-key-hero_cta_box"] button,
-        div[class*="st-key-bottom_cta_box"] button,
-        div[class*="st-key-hero_cta_btn"] button,
-        div[class*="st-key-bottom_cta_btn"] button,
-        .st-key-hero_cta_box button,
-        .st-key-bottom_cta_box button {
-            width: 100% !important;
-            min-height: 94px !important;
-            height: auto !important;
-            padding: 18px 24px !important;
-            border-radius: 18px !important;
-            background: linear-gradient(135deg, #1E3A8A 0%, #1D4ED8 35%, #059669 100%) !important;
-            border: 1.5px solid rgba(147, 197, 253, 0.45) !important;
-            box-shadow: 0 10px 28px rgba(30, 58, 138, 0.4), 0 2px 8px rgba(0, 0, 0, 0.15) !important;
-            cursor: pointer !important;
-            display: flex !important;
-            flex-direction: column !important;
-            align-items: center !important;
-            justify-content: center !important;
-            text-align: center !important;
-            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
-        }
-        div[class*="st-key-hero_cta_box"] button:hover,
-        div[class*="st-key-bottom_cta_box"] button:hover,
-        div[class*="st-key-hero_cta_btn"] button:hover,
-        div[class*="st-key-bottom_cta_btn"] button:hover,
-        .st-key-hero_cta_box button:hover,
-        .st-key-bottom_cta_box button:hover {
-            transform: translateY(-3px) scale(1.012) !important;
-            background: linear-gradient(135deg, #1D4ED8 0%, #2563EB 35%, #047857 100%) !important;
-            box-shadow: 0 16px 36px rgba(16, 185, 129, 0.55), 0 4px 12px rgba(0, 0, 0, 0.2) !important;
-            border-color: #60A5FA !important;
-        }
-        div[class*="st-key-hero_cta_box"] button:active,
-        div[class*="st-key-bottom_cta_box"] button:active,
-        .st-key-hero_cta_box button:active,
-        .st-key-bottom_cta_box button:active {
-            transform: translateY(1px) scale(0.995) !important;
-        }
-        div[class*="st-key-hero_cta_box"] button div,
-        div[class*="st-key-bottom_cta_box"] button div {
-            width: 100% !important;
-            display: flex !important;
-            flex-direction: column !important;
-            align-items: center !important;
-            justify-content: center !important;
-        }
-        div[class*="st-key-hero_cta_box"] button p,
-        div[class*="st-key-bottom_cta_box"] button p,
-        div[class*="st-key-hero_cta_btn"] button p,
-        div[class*="st-key-bottom_cta_btn"] button p,
-        .st-key-hero_cta_box button p,
-        .st-key-bottom_cta_box button p {
-            color: #FFFFFF !important;
-            text-align: center !important;
-            margin: 0 !important;
-            line-height: 1.4 !important;
-        }
-        div[class*="st-key-hero_cta_box"] button p:first-of-type,
-        div[class*="st-key-bottom_cta_box"] button p:first-of-type,
-        div[class*="st-key-hero_cta_btn"] button p:first-of-type,
-        div[class*="st-key-bottom_cta_btn"] button p:first-of-type,
-        .st-key-hero_cta_box button p:first-of-type,
-        .st-key-bottom_cta_box button p:first-of-type {
-            font-size: 1.38rem !important;
-            font-weight: 900 !important;
-            letter-spacing: -0.4px !important;
-            margin-bottom: 5px !important;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
-        }
-        div[class*="st-key-hero_cta_box"] button p:last-of-type,
-        div[class*="st-key-bottom_cta_box"] button p:last-of-type,
-        div[class*="st-key-hero_cta_btn"] button p:last-of-type,
-        div[class*="st-key-bottom_cta_btn"] button p:last-of-type,
-        .st-key-hero_cta_box button p:last-of-type,
-        .st-key-bottom_cta_box button p:last-of-type {
-            font-size: 0.94rem !important;
-            font-weight: 500 !important;
-            color: #A7F3D0 !important;
-            opacity: 0.96 !important;
-            letter-spacing: -0.2px !important;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
 
     # Hero 메인 대형 CTA 배너 버튼
     st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
