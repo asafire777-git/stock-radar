@@ -1,4 +1,127 @@
+import pandas as pd
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import streamlit as st
+
+
+def create_showcase_figure(pattern_type: str = "breakout", is_dark: bool = True):
+    """
+    서비스 소개 페이지용 인터랙티브 실전 AI 차트 시뮬레이션 생성 함수
+    - breakout: 횡보 후 20일선 정배열 돌파 + 대량 거래량
+    - pullback: 1차 급등 후 20일선 지지 반등 + 외인/기관 쌍끌이
+    - ipo: 상장 후 바닥 다지기 탈출 첫 장대양봉
+    """
+    dates = pd.date_range(end="2026-03-17", periods=20, freq="B")
+    base_price = 50000
+    opens, closes, highs, lows, vols = [], [], [], [], []
+
+    if pattern_type == "breakout":
+        for i in range(18):
+            o = base_price + (i % 3) * 300 - 400
+            c = o + (i % 2 * 600) - 250
+            h = max(o, c) + 350
+            l = min(o, c) - 300
+            v = 150000 + (i * 8000)
+            opens.append(o); closes.append(c); highs.append(h); lows.append(l); vols.append(v)
+        opens.extend([51200, 53500])
+        closes.extend([53400, 58200])
+        highs.extend([53900, 59000])
+        lows.extend([51000, 53200])
+        vols.extend([750000, 2480000])
+        signal_idx = 18
+        signal_text = "🎯 AI 골든크로스 & 돌파 포착"
+    elif pattern_type == "pullback":
+        for i in range(10):
+            o = 35000 + i * 800
+            c = o + 600
+            h = c + 400
+            l = o - 200
+            v = 300000 + i * 20000
+            opens.append(o); closes.append(c); highs.append(h); lows.append(l); vols.append(v)
+        for i in range(7):
+            o = 43000 - i * 600
+            c = o - 400
+            h = o + 200
+            l = c - 300
+            v = 120000 - i * 10000
+            opens.append(o); closes.append(c); highs.append(h); lows.append(l); vols.append(v)
+        opens.extend([39200, 39600, 41200])
+        closes.extend([39800, 41000, 43500])
+        highs.extend([40100, 41500, 44000])
+        lows.extend([39000, 39400, 41000])
+        vols.extend([280000, 550000, 1420000])
+        signal_idx = 17
+        signal_text = "🎯 AI 20일선 지지 반등 포착"
+    else:  # ipo
+        for i in range(16):
+            o = 22000 - i * 250
+            c = o - 100
+            h = o + 200
+            l = c - 200
+            v = 80000 + i * 2000
+            opens.append(o); closes.append(c); highs.append(h); lows.append(l); vols.append(v)
+        opens.extend([18200, 18500, 19200, 21000])
+        closes.extend([18600, 19100, 20800, 24500])
+        highs.extend([18800, 19300, 21200, 25200])
+        lows.extend([18100, 18400, 19100, 20800])
+        vols.extend([180000, 320000, 950000, 3850000])
+        signal_idx = 17
+        signal_text = "🎯 AI 바닥 턴어라운드 포착"
+
+    df = pd.DataFrame({"Open": opens, "Close": closes, "High": highs, "Low": lows, "Volume": vols}, index=dates)
+    ma5 = df["Close"].rolling(5, min_periods=1).mean()
+    ma20 = df["Close"].rolling(20, min_periods=1).mean()
+
+    bg_color = "#151A23" if is_dark else "#FFFFFF"
+    grid_color = "#242D3D" if is_dark else "#F1F5F9"
+    font_color = "#E2E8F0" if is_dark else "#334155"
+
+    fig = make_subplots(
+        rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.06,
+        row_heights=[0.72, 0.28]
+    )
+
+    fig.add_trace(
+        go.Candlestick(
+            x=df.index, open=df["Open"], high=df["High"], low=df["Low"], close=df["Close"],
+            name="주가(캔들)", increasing_line_color="#EF4444", decreasing_line_color="#3B82F6",
+        ),
+        row=1, col=1
+    )
+
+    fig.add_trace(go.Scatter(x=df.index, y=ma5, name="5일선", line=dict(color="#10B981", width=2)), row=1, col=1)
+    fig.add_trace(go.Scatter(x=df.index, y=ma20, name="20일선", line=dict(color="#F59E0B", width=2.5)), row=1, col=1)
+
+    vol_colors = ["#EF4444" if c >= o else "#3B82F6" for o, c in zip(df["Open"], df["Close"])]
+    vol_colors[-1] = "#F59E0B"
+    fig.add_trace(
+        go.Bar(x=df.index, y=df["Volume"], name="거래량", marker_color=vol_colors),
+        row=2, col=1
+    )
+
+    fig.add_annotation(
+        x=df.index[signal_idx], y=df["High"].iloc[signal_idx],
+        text=signal_text, showarrow=True, arrowhead=2, arrowcolor="#EF4444", arrowsize=1.2,
+        bgcolor="#DC2626", font=dict(color="#FFFFFF", size=11, family="sans-serif"),
+        bordercolor="#FECACA", borderwidth=1, borderpad=4,
+        row=1, col=1
+    )
+
+    fig.update_layout(
+        template="plotly_dark" if is_dark else "plotly_white",
+        plot_bgcolor=bg_color,
+        paper_bgcolor=bg_color,
+        font=dict(color=font_color, family="system-ui, sans-serif"),
+        xaxis_rangeslider_visible=False,
+        margin=dict(l=10, r=10, t=25, b=10),
+        height=390,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        xaxis=dict(gridcolor=grid_color),
+        yaxis=dict(gridcolor=grid_color),
+        xaxis2=dict(gridcolor=grid_color),
+        yaxis2=dict(gridcolor=grid_color),
+    )
+    return fig
 
 
 @st.dialog("🔐 Stock Radar AI 퀀트 멤버십 로그인")
@@ -120,14 +243,33 @@ def render_landing_page(is_dark: bool):
                 if st.button("🔑 간편 로그인", type="primary", key="top_login_btn", use_container_width=True):
                     open_login_modal()
 
-    st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
+
+    # ----------------------------------------------------
+    # 0-1. 상단 섹션 바로가기 퀵 내비게이션 바 (Sticky Anchor Menu)
+    # ----------------------------------------------------
+    st.markdown(
+        """
+        <div class="landing-anchor-nav notranslate" translate="no">
+            <a href="#section-hero" class="nav-anchor-btn">🏠 홈</a>
+            <a href="#section-features" class="nav-anchor-btn">✨ 핵심 기능</a>
+            <a href="#section-charts" class="nav-anchor-btn">📊 AI 차트 분석표</a>
+            <a href="#section-guide" class="nav-anchor-btn">🔰 실전 가이드</a>
+            <a href="#section-strategy" class="nav-anchor-btn">🎯 3대 매매 전략</a>
+            <a href="#section-quant" class="nav-anchor-btn">⚡ 100점 배점표</a>
+            <a href="#section-cta" class="nav-anchor-btn">🚀 바로 입장</a>
+        </div>
+        <div id="section-hero" class="anchor-marker"></div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     # ----------------------------------------------------
     # 1. Hero Section
     # ----------------------------------------------------
     st.markdown(
         """
-        <div style="text-align: center; padding: 25px 10px 10px 10px;">
+        <div style="text-align: center; padding: 20px 10px 10px 10px;">
             <div class="badge-pill notranslate" translate="no">✨ 2026 NEXT-GEN AI QUANT STOCK RADAR</div>
             <h1 class="hero-title notranslate" translate="no">
                 내일의 주도 급등주,<br>
@@ -143,10 +285,82 @@ def render_landing_page(is_dark: bool):
         unsafe_allow_html=True,
     )
 
-    # 대형 Hero & 하단 통합 CTA 전용 스타일
+    # 대형 Hero & 하단 통합 CTA & 네비게이션 전용 스타일
     st.markdown(
         """
         <style>
+        /* 부드러운 스크롤 & 앵커 마커 오프셋 */
+        html {
+            scroll-behavior: smooth !important;
+        }
+        .anchor-marker {
+            scroll-margin-top: 85px !important;
+            height: 1px !important;
+            visibility: hidden !important;
+            display: block !important;
+        }
+        .landing-anchor-nav {
+            position: sticky;
+            top: 0px;
+            z-index: 995;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 8px 14px;
+            margin: 4px 0 18px 0;
+            border-radius: 9999px;
+            overflow-x: auto;
+            white-space: nowrap;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+        .landing-anchor-nav::-webkit-scrollbar {
+            display: none;
+        }
+        .nav-anchor-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 7px 14px;
+            border-radius: 9999px;
+            font-size: 0.88rem;
+            font-weight: 700;
+            text-decoration: none !important;
+            transition: all 0.2s ease-in-out;
+        }
+        .nav-anchor-btn:hover {
+            transform: translateY(-1px);
+        }
+
+        /* 차트 스코어 카드 및 비교표 */
+        .chart-score-box {
+            border-radius: 14px;
+            padding: 20px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-top: 14px;
+        }
+        .comparison-table th {
+            padding: 12px 16px;
+            font-weight: 800;
+            font-size: 0.95rem;
+            text-align: left;
+        }
+        .comparison-table td {
+            padding: 12px 16px;
+            font-size: 0.88rem;
+            line-height: 1.5;
+            border-top: 1px solid;
+        }
         /* Hero & Bottom Grand Banner CTA Buttons */
         div[class*="st-key-hero_cta_box"] button,
         div[class*="st-key-bottom_cta_box"] button,
@@ -309,6 +523,7 @@ def render_landing_page(is_dark: bool):
     # ----------------------------------------------------
     # 2. 4대 핵심 기능 소개 (Features Grid)
     # ----------------------------------------------------
+    st.markdown("<div id='section-features' class='anchor-marker'></div>", unsafe_allow_html=True)
     st.markdown("### 🌟 Stock Radar 핵심 기능 & AI 기술력")
     st.caption("단순한 급등주 나열이 아닌, 데이터 기반의 4중 필터링 시스템으로 안전한 투자처를 발굴합니다.")
 
@@ -368,8 +583,307 @@ def render_landing_page(is_dark: bool):
     st.markdown("<div style='height: 35px;'></div>", unsafe_allow_html=True)
 
     # ----------------------------------------------------
-    # 3. 초보자 3단계 실전 매매 가이드 (3-Step Guide)
+    # 3. 📊 Stock Radar AI 차트 정밀 분석표 & 실전 시그널 쇼케이스
     # ----------------------------------------------------
+    st.markdown("<div id='section-charts' class='anchor-marker'></div>", unsafe_allow_html=True)
+    st.markdown("### 📊 Stock Radar AI 차트 정밀 분석표 & 실전 시그널")
+    st.caption("단순한 보조지표가 아닌, 5일·20일 이평선 정배열과 메이저 세력 수급이 결합된 AI 실전 매매 타점을 시뮬레이션으로 직접 확인하세요.")
+
+    tab_breakout, tab_pullback, tab_ipo = st.tabs([
+        "🔥 급등 돌파형 (골든크로스 + 대량거래)",
+        "💎 눌림목 반등형 (20일선 지지 + 수급집중)",
+        "🚀 신규상장주 턴어라운드 (바닥탈출 장대양봉)",
+    ])
+
+    card_bg = "#151A23" if is_dark else "#FFFFFF"
+    card_border = "#242D3D" if is_dark else "#E2E8F0"
+    text_color = "#F8FAFC" if is_dark else "#0F172A"
+    sub_color = "#94A3B8" if is_dark else "#475569"
+    sub_bg = "#1E293B" if is_dark else "#F8FAFC"
+    box_shadow = "0 4px 14px rgba(0, 0, 0, 0.25)" if is_dark else "0 4px 14px rgba(0, 0, 0, 0.05)"
+
+    with tab_breakout:
+        col_c1, col_m1 = st.columns([1.55, 1.1])
+        with col_c1:
+            fig1 = create_showcase_figure("breakout", is_dark)
+            st.plotly_chart(fig1, use_container_width=True, config={"displayModeBar": False})
+        with col_m1:
+            st.markdown(
+                f"""
+                <div class="chart-score-box" style="background-color: {card_bg}; border: 1px solid {card_border}; box-shadow: {box_shadow};">
+                    <div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span class="badge-pill notranslate" translate="no" style="background-color: rgba(239, 68, 68, 0.15) !important; color: #EF4444 !important; border-color: #EF4444 !important; margin: 0; font-size: 0.76rem;">🏆 S등급 초강력 추천</span>
+                            <span style="font-size: 0.82rem; color: {sub_color};">코스피 450080</span>
+                        </div>
+                        <div style="font-size: 1.35rem; font-weight: 900; color: {text_color}; margin-bottom: 2px;">
+                            에코프로머티 <span style="font-size: 0.95rem; color: #EF4444; font-weight: 800;">+14.5% 🚀</span>
+                        </div>
+                        <div style="font-size: 0.86rem; color: {sub_color}; margin-bottom: 14px;">
+                            5일 이내 추가 상승 확률: <b style="color: #10B981; font-size: 0.98rem;">74.8% (매우 유력)</b>
+                        </div>
+                        
+                        <div style="background: {sub_bg}; border-radius: 10px; padding: 12px; margin-bottom: 12px; border: 1px solid {card_border};">
+                            <div style="display: flex; justify-content: space-between; font-weight: 800; font-size: 0.92rem; margin-bottom: 4px; color: {text_color};">
+                                <span>AI 퀀트 종합 스코어</span>
+                                <span style="color: #2563EB; font-size: 1.05rem;">96점 <small style="font-size: 0.75rem; color: {sub_color};">/ 100</small></span>
+                            </div>
+                            <div style="background: rgba(148, 163, 184, 0.2); border-radius: 999px; height: 8px; overflow: hidden;">
+                                <div style="background: linear-gradient(90deg, #2563EB, #10B981); width: 96%; height: 100%;"></div>
+                            </div>
+                        </div>
+
+                        <div style="font-size: 0.84rem; line-height: 1.8; color: {text_color}; margin-bottom: 14px;">
+                            <div style="display: flex; justify-content: space-between;">
+                                <span>🚀 상승 모멘텀</span><b>25 / 25 만점</b>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span>👥 큰손 수급 (외인·기관)</span><b>24 / 25 점 (+42만주)</b>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span>📈 차트 안정성 (이평선)</span><b>24 / 25 점 (정배열)</b>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span>🔥 거래대금 유동성</span><b>23 / 25 점 (1,480억원)</b>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="background: rgba(37, 99, 235, 0.08); border-left: 4px solid #2563EB; border-radius: 0 8px 8px 0; padding: 10px 12px; font-size: 0.85rem; line-height: 1.55; color: {text_color};">
+                        <div style="font-weight: 800; color: #2563EB; margin-bottom: 3px;">🎯 AI 실전 매매 가이드</div>
+                        <div>• <b>분할 매수가:</b> 51,500원 ~ 53,000원</div>
+                        <div>• <b>1차 목표가:</b> <span style="color: #10B981; font-weight: 800;">56,800원 (+7.2%)</span></div>
+                        <div>• <b>원칙 손절가:</b> <span style="color: #EF4444; font-weight: 800;">49,900원 (-3.0%)</span></div>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    with tab_pullback:
+        col_c2, col_m2 = st.columns([1.55, 1.1])
+        with col_c2:
+            fig2 = create_showcase_figure("pullback", is_dark)
+            st.plotly_chart(fig2, use_container_width=True, config={"displayModeBar": False})
+        with col_m2:
+            st.markdown(
+                f"""
+                <div class="chart-score-box" style="background-color: {card_bg}; border: 1px solid {card_border}; box-shadow: {box_shadow};">
+                    <div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span class="badge-pill notranslate" translate="no" style="background-color: rgba(16, 185, 129, 0.15) !important; color: #10B981 !important; border-color: #10B981 !important; margin: 0; font-size: 0.76rem;">💎 S등급 스윙 원픽</span>
+                            <span style="font-size: 0.82rem; color: {sub_color};">코스닥 277810</span>
+                        </div>
+                        <div style="font-size: 1.35rem; font-weight: 900; color: {text_color}; margin-bottom: 2px;">
+                            레인보우로보틱스 <span style="font-size: 0.95rem; color: #10B981; font-weight: 800;">+8.3% ✨</span>
+                        </div>
+                        <div style="font-size: 0.86rem; color: {sub_color}; margin-bottom: 14px;">
+                            5일 이내 추가 상승 확률: <b style="color: #10B981; font-size: 0.98rem;">71.5% (유력)</b>
+                        </div>
+                        
+                        <div style="background: {sub_bg}; border-radius: 10px; padding: 12px; margin-bottom: 12px; border: 1px solid {card_border};">
+                            <div style="display: flex; justify-content: space-between; font-weight: 800; font-size: 0.92rem; margin-bottom: 4px; color: {text_color};">
+                                <span>AI 퀀트 종합 스코어</span>
+                                <span style="color: #10B981; font-size: 1.05rem;">94점 <small style="font-size: 0.75rem; color: {sub_color};">/ 100</small></span>
+                            </div>
+                            <div style="background: rgba(148, 163, 184, 0.2); border-radius: 999px; height: 8px; overflow: hidden;">
+                                <div style="background: linear-gradient(90deg, #10B981, #059669); width: 94%; height: 100%;"></div>
+                            </div>
+                        </div>
+
+                        <div style="font-size: 0.84rem; line-height: 1.8; color: {text_color}; margin-bottom: 14px;">
+                            <div style="display: flex; justify-content: space-between;">
+                                <span>🚀 상승 모멘텀</span><b>22 / 25 점 (눌림 안착)</b>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span>👥 큰손 수급 (외인·기관)</span><b>25 / 25 만점 (기관 300억)</b>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span>📈 차트 안정성 (이평선)</span><b>25 / 25 만점 (20일 지지)</b>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span>🔥 거래대금 유동성</span><b>22 / 25 점 (880억원)</b>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="background: rgba(16, 185, 129, 0.08); border-left: 4px solid #10B981; border-radius: 0 8px 8px 0; padding: 10px 12px; font-size: 0.85rem; line-height: 1.55; color: {text_color};">
+                        <div style="font-weight: 800; color: #10B981; margin-bottom: 3px;">🎯 AI 실전 매매 가이드</div>
+                        <div>• <b>눌림 매수가:</b> 39,500원 ~ 40,500원</div>
+                        <div>• <b>1차 목표가:</b> <span style="color: #10B981; font-weight: 800;">43,800원 (+8.1%)</span></div>
+                        <div>• <b>원칙 손절가:</b> <span style="color: #EF4444; font-weight: 800;">38,300원 (-3.0%)</span></div>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    with tab_ipo:
+        col_c3, col_m3 = st.columns([1.55, 1.1])
+        with col_c3:
+            fig3 = create_showcase_figure("ipo", is_dark)
+            st.plotly_chart(fig3, use_container_width=True, config={"displayModeBar": False})
+        with col_m3:
+            st.markdown(
+                f"""
+                <div class="chart-score-box" style="background-color: {card_bg}; border: 1px solid {card_border}; box-shadow: {box_shadow};">
+                    <div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span class="badge-pill notranslate" translate="no" style="background-color: rgba(139, 92, 246, 0.15) !important; color: #8B5CF6 !important; border-color: #8B5CF6 !important; margin: 0; font-size: 0.76rem;">🚀 턴어라운드 원픽</span>
+                            <span style="font-size: 0.82rem; color: {sub_color};">코스피 454910</span>
+                        </div>
+                        <div style="font-size: 1.35rem; font-weight: 900; color: {text_color}; margin-bottom: 2px;">
+                            두산로보틱스 <span style="font-size: 0.95rem; color: #8B5CF6; font-weight: 800;">+17.8% 🔥</span>
+                        </div>
+                        <div style="font-size: 0.86rem; color: {sub_color}; margin-bottom: 14px;">
+                            5일 이내 추가 상승 확률: <b style="color: #10B981; font-size: 0.98rem;">69.2% (유력)</b>
+                        </div>
+                        
+                        <div style="background: {sub_bg}; border-radius: 10px; padding: 12px; margin-bottom: 12px; border: 1px solid {card_border};">
+                            <div style="display: flex; justify-content: space-between; font-weight: 800; font-size: 0.92rem; margin-bottom: 4px; color: {text_color};">
+                                <span>AI 퀀트 종합 스코어</span>
+                                <span style="color: #8B5CF6; font-size: 1.05rem;">93점 <small style="font-size: 0.75rem; color: {sub_color};">/ 100</small></span>
+                            </div>
+                            <div style="background: rgba(148, 163, 184, 0.2); border-radius: 999px; height: 8px; overflow: hidden;">
+                                <div style="background: linear-gradient(90deg, #8B5CF6, #EC4899); width: 93%; height: 100%;"></div>
+                            </div>
+                        </div>
+
+                        <div style="font-size: 0.84rem; line-height: 1.8; color: {text_color}; margin-bottom: 14px;">
+                            <div style="display: flex; justify-content: space-between;">
+                                <span>🚀 상승 모멘텀</span><b>24 / 25 점 (바닥 탈출)</b>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span>👥 큰손 수급 (외인·기관)</span><b>23 / 25 점 (기관 전환)</b>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span>📈 차트 안정성 (이평선)</span><b>22 / 25 점 (이평 수렴)</b>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span>🔥 거래대금 유동성</span><b>24 / 25 점 (1,920억원)</b>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="background: rgba(139, 92, 246, 0.08); border-left: 4px solid #8B5CF6; border-radius: 0 8px 8px 0; padding: 10px 12px; font-size: 0.85rem; line-height: 1.55; color: {text_color};">
+                        <div style="font-weight: 800; color: #8B5CF6; margin-bottom: 3px;">🎯 AI 실전 매매 가이드</div>
+                        <div>• <b>바닥 매수가:</b> 18,800원 ~ 19,500원</div>
+                        <div>• <b>1차 목표가:</b> <span style="color: #10B981; font-weight: 800;">21,200원 (+9.0%)</span></div>
+                        <div>• <b>원칙 손절가:</b> <span style="color: #EF4444; font-weight: 800;">18,200원 (-3.5%)</span></div>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    st.markdown("<div style='height: 25px;'></div>", unsafe_allow_html=True)
+
+    # 1초 만에 끝내는 AI 차트 판독 4대 핵심 체크포인트
+    st.markdown("#### 💡 초보자도 1초 만에 끝내는 AI 차트 판독 4대 핵심 체크포인트")
+    cp1, cp2, cp3, cp4 = st.columns(4)
+    with cp1:
+        st.markdown(
+            f"""
+            <div class="step-card" style="padding: 18px 16px;">
+                <div style="font-size: 1.5rem; margin-bottom: 6px;">📈</div>
+                <div style="font-weight: 800; font-size: 1.02rem; color: #2563EB; margin-bottom: 6px;">01. 정배열 골든크로스</div>
+                <div style="font-size: 0.85rem; color: {sub_color}; line-height: 1.55;">
+                    5일선이 20일선을 상향 돌파하며 정배열을 완성할 때가 가장 안전하고 폭발적인 1차 매수 타점입니다.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with cp2:
+        st.markdown(
+            f"""
+            <div class="step-card" style="padding: 18px 16px;">
+                <div style="font-size: 1.5rem; margin-bottom: 6px;">🔥</div>
+                <div style="font-weight: 800; font-size: 1.02rem; color: #EF4444; margin-bottom: 6px;">02. 거래량 300% 폭증</div>
+                <div style="font-size: 0.85rem; color: {sub_color}; line-height: 1.55;">
+                    전일 대비 거래량이 300% 이상 폭증하는 것은 개미가 아닌 메이저 세력의 실제 자금이 유입된 명백한 증거입니다.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with cp3:
+        st.markdown(
+            f"""
+            <div class="step-card" style="padding: 18px 16px;">
+                <div style="font-size: 1.5rem; margin-bottom: 6px;">👥</div>
+                <div style="font-weight: 800; font-size: 1.02rem; color: #10B981; margin-bottom: 6px;">03. 외인·기관 수급 일치</div>
+                <div style="font-size: 0.85rem; color: {sub_color}; line-height: 1.55;">
+                    차트만 그럴듯한 껍데기 테마주를 배제하고, 외국인과 기관이 3일 이상 동반 순매수한 진짜 주도주만 선별합니다.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with cp4:
+        st.markdown(
+            f"""
+            <div class="step-card" style="padding: 18px 16px;">
+                <div style="font-size: 1.5rem; margin-bottom: 6px;">🛡️</div>
+                <div style="font-weight: 800; font-size: 1.02rem; color: #8B5CF6; margin-bottom: 6px;">04. 기계적 칼손절 원칙</div>
+                <div style="font-size: 0.85rem; color: {sub_color}; line-height: 1.55;">
+                    아무리 좋은 분석도 시장 급변 시 -3.0% 지지선 이탈 즉시 칼손절하여 내 원금을 100% 지키고 다음 기회를 노립니다.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    # ⚖️ 일반 개인 매매 vs Stock Radar AI 퀀트 차트 분석표 비교표
+    st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
+    st.markdown("#### ⚖️ 일반 개인 매매 vs Stock Radar AI 퀀트 차트 분석표")
+    st.markdown(
+        f"""
+        <table class="comparison-table notranslate" translate="no">
+            <thead>
+                <tr>
+                    <th style="width: 20%;">비교 항목</th>
+                    <th style="width: 40%; color: #EF4444;">❌ 일반 개인 투자자 매매 방식</th>
+                    <th style="width: 40%; color: #10B981;">✅ Stock Radar AI 차트 분석표</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><b>1. 종목 발굴</b></td>
+                    <td>지인 추천, 유튜브 찌라시, 포털 인기 검색어 의존</td>
+                    <td><b>KRX 2,870개 전 종목 1분 단위 알고리즘 자동 스캔</b></td>
+                </tr>
+                <tr>
+                    <td><b>2. 매수 타이밍</b></td>
+                    <td>이미 20% 이상 급등한 고점 상투에서 뇌동 추격 매수</td>
+                    <td><b>5일·20일선 정배열 골든크로스 및 눌림목 지지선 선취매</b></td>
+                </tr>
+                <tr>
+                    <td><b>3. 수급 팩트 체크</b></td>
+                    <td>세력의 허매수/자전거래 개미 털기 트랩에 당함</td>
+                    <td><b>외국인·기관 20거래일 누적 순매수 데이터 완벽 검증</b></td>
+                </tr>
+                <tr>
+                    <td><b>4. 목표가 및 손절선</b></td>
+                    <td>언제 팔지 몰라 수익 반납하거나 하락 시 무한 물타기</td>
+                    <td><b>AI 산출 1차 목표가(+6~8%) 분할익절 & 손절선(-3%) 칼준수</b></td>
+                </tr>
+                <tr>
+                    <td><b>5. 상승 확률 검증</b></td>
+                    <td>'오르겠지'라는 막연한 희망과 감정에 휘둘림</td>
+                    <td><b>머신러닝 AI 앙상블 5일 이내 상승 확률(%) 명확 제시</b></td>
+                </tr>
+            </tbody>
+        </table>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown("<div style='height: 35px;'></div>", unsafe_allow_html=True)
+
+    # ----------------------------------------------------
+    # 4. 초보자 3단계 실전 매매 가이드 (3-Step Guide)
+    # ----------------------------------------------------
+    st.markdown("<div id='section-guide' class='anchor-marker'></div>", unsafe_allow_html=True)
     st.markdown("### 🔰 초보자를 위한 3단계 실전 매매법")
     st.caption("주식 투자가 처음이어도 괜찮습니다. AI 가이드를 따라 3단계 원칙만 지키면 뇌동매매 없이 안전하게 수익을 쌓을 수 있습니다.")
 
@@ -417,8 +931,9 @@ def render_landing_page(is_dark: bool):
     st.markdown("<div style='height: 35px;'></div>", unsafe_allow_html=True)
 
     # ----------------------------------------------------
-    # 4. 3대 투자 전략 비교 매트릭스 (Strategy Matrix)
+    # 5. 3대 투자 전략 비교 매트릭스 (Strategy Matrix)
     # ----------------------------------------------------
+    st.markdown("<div id='section-strategy' class='anchor-marker'></div>", unsafe_allow_html=True)
     st.markdown("### 🎯 내게 딱 맞는 3대 투자 전략 한눈에 보기")
     st.caption("투자 기간과 선호 성향에 따라 최적화된 맞춤형 퀀트 알고리즘이 적용됩니다.")
 
@@ -481,8 +996,9 @@ def render_landing_page(is_dark: bool):
     st.markdown("<div style='height: 35px;'></div>", unsafe_allow_html=True)
 
     # ----------------------------------------------------
-    # 5. AI 퀀트 평가 모델 안내 (How It Works)
+    # 6. AI 퀀트 평가 모델 안내 (How It Works)
     # ----------------------------------------------------
+    st.markdown("<div id='section-quant' class='anchor-marker'></div>", unsafe_allow_html=True)
     st.markdown("### 💡 AI 퀀트 점수(100점 만점)는 어떻게 산출되나요?")
     st.caption("감이나 소문에 의존하지 않고, 검증된 4가지 계량 팩터로 종목의 체력을 점수화합니다.")
 
@@ -533,8 +1049,9 @@ def render_landing_page(is_dark: bool):
         )
 
     # ----------------------------------------------------
-    # 6. 하단 전환 유도 통합 배너 버튼 (CTA Grand Banner Button)
+    # 7. 하단 전환 유도 통합 배너 버튼 (CTA Grand Banner Button)
     # ----------------------------------------------------
+    st.markdown("<div id='section-cta' class='anchor-marker'></div>", unsafe_allow_html=True)
     st.markdown("<div style='height: 36px;'></div>", unsafe_allow_html=True)
     _, col_cta_bottom, _ = st.columns([1.2, 3.6, 1.2])
     with col_cta_bottom:

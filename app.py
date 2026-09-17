@@ -535,6 +535,92 @@ div[class*="st-key-bottom_cta_btn"] button p:last-of-type,
     opacity: 0.96 !important;
     letter-spacing: -0.2px !important;
 }
+/* 상단 앵커 내비게이션 & 차트 분석표 (라이트 모드) */
+html {
+    scroll-behavior: smooth !important;
+}
+.anchor-marker {
+    scroll-margin-top: 85px !important;
+    height: 1px !important;
+    visibility: hidden !important;
+    display: block !important;
+}
+.landing-anchor-nav {
+    position: sticky;
+    top: 0px;
+    z-index: 995;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px 14px;
+    margin: 4px 0 18px 0;
+    border-radius: 9999px;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    background: rgba(255, 255, 255, 0.92) !important;
+    backdrop-filter: blur(14px) !important;
+    -webkit-backdrop-filter: blur(14px) !important;
+    border: 1px solid rgba(203, 213, 225, 0.9) !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06) !important;
+}
+.landing-anchor-nav::-webkit-scrollbar {
+    display: none;
+}
+.nav-anchor-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 7px 14px;
+    border-radius: 9999px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    text-decoration: none !important;
+    transition: all 0.2s ease-in-out;
+    color: #334155 !important;
+    background: #F1F5F9;
+    border: 1px solid #E2E8F0;
+}
+.nav-anchor-btn:hover {
+    color: #2563EB !important;
+    background: #EFF6FF !important;
+    border-color: #93C5FD !important;
+    transform: translateY(-1px);
+}
+.chart-score-box {
+    border-radius: 14px;
+    padding: 20px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+.comparison-table {
+    width: 100%;
+    border-collapse: collapse;
+    border-radius: 12px;
+    overflow: hidden;
+    margin-top: 14px;
+    background-color: #FFFFFF !important;
+    border: 1px solid #E2E8F0 !important;
+}
+.comparison-table th {
+    padding: 12px 16px;
+    font-weight: 800;
+    font-size: 0.95rem;
+    text-align: left;
+    background-color: #F8FAFC !important;
+    color: #0F172A !important;
+}
+.comparison-table td {
+    padding: 12px 16px;
+    font-size: 0.88rem;
+    line-height: 1.5;
+    border-top: 1px solid #E2E8F0 !important;
+    color: #334155 !important;
+}
 """
 else:
     theme_css = """
@@ -775,6 +861,92 @@ div[class*="st-key-bottom_cta_btn"] button p:last-of-type,
     color: #A7F3D0 !important;
     opacity: 0.96 !important;
     letter-spacing: -0.2px !important;
+}
+/* 상단 앵커 내비게이션 & 차트 분석표 (다크 모드) */
+html {
+    scroll-behavior: smooth !important;
+}
+.anchor-marker {
+    scroll-margin-top: 85px !important;
+    height: 1px !important;
+    visibility: hidden !important;
+    display: block !important;
+}
+.landing-anchor-nav {
+    position: sticky;
+    top: 0px;
+    z-index: 995;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px 14px;
+    margin: 4px 0 18px 0;
+    border-radius: 9999px;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    background: rgba(15, 23, 42, 0.92) !important;
+    backdrop-filter: blur(14px) !important;
+    -webkit-backdrop-filter: blur(14px) !important;
+    border: 1px solid rgba(51, 65, 85, 0.85) !important;
+    box-shadow: 0 4px 22px rgba(0, 0, 0, 0.45) !important;
+}
+.landing-anchor-nav::-webkit-scrollbar {
+    display: none;
+}
+.nav-anchor-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 7px 14px;
+    border-radius: 9999px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    text-decoration: none !important;
+    transition: all 0.2s ease-in-out;
+    color: #CBD5E1 !important;
+    background: #1E293B;
+    border: 1px solid rgba(71, 85, 105, 0.4);
+}
+.nav-anchor-btn:hover {
+    color: #38BDF8 !important;
+    background: rgba(56, 189, 248, 0.15) !important;
+    border-color: #38BDF8 !important;
+    transform: translateY(-1px);
+}
+.chart-score-box {
+    border-radius: 14px;
+    padding: 20px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+.comparison-table {
+    width: 100%;
+    border-collapse: collapse;
+    border-radius: 12px;
+    overflow: hidden;
+    margin-top: 14px;
+    background-color: #151A23 !important;
+    border: 1px solid #242D3D !important;
+}
+.comparison-table th {
+    padding: 12px 16px;
+    font-weight: 800;
+    font-size: 0.95rem;
+    text-align: left;
+    background-color: #1E293B !important;
+    color: #F8FAFC !important;
+}
+.comparison-table td {
+    padding: 12px 16px;
+    font-size: 0.88rem;
+    line-height: 1.5;
+    border-top: 1px solid #242D3D !important;
+    color: #CBD5E1 !important;
 }
 """
 
