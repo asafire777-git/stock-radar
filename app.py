@@ -438,6 +438,28 @@ div[data-testid="stTextInput"] input:focus {
     margin-top: 32px;
     margin-bottom: 20px;
 }
+.hero-cta-wrap button {
+    min-height: 66px !important;
+    height: 66px !important;
+    border-radius: 14px !important;
+    background: linear-gradient(90deg, #2563EB 0%, #1D4ED8 40%, #059669 100%) !important;
+    color: #FFFFFF !important;
+    border: 1px solid rgba(255, 255, 255, 0.3) !important;
+    box-shadow: 0 8px 25px rgba(37, 99, 235, 0.45) !important;
+    transition: all 0.25s ease-in-out !important;
+    cursor: pointer !important;
+}
+.hero-cta-wrap button:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 12px 30px rgba(16, 185, 129, 0.55) !important;
+    background: linear-gradient(90deg, #1D4ED8 0%, #1E40AF 40%, #047857 100%) !important;
+}
+.hero-cta-wrap button p, .hero-cta-wrap button span {
+    font-size: 1.32rem !important;
+    font-weight: 900 !important;
+    color: #FFFFFF !important;
+    letter-spacing: -0.3px !important;
+}
 """
 else:
     theme_css = """
@@ -596,6 +618,28 @@ div[data-testid="stTextInput"] input:focus {
     color: #FFFFFF !important;
     margin-top: 32px;
     margin-bottom: 20px;
+}
+.hero-cta-wrap button {
+    min-height: 66px !important;
+    height: 66px !important;
+    border-radius: 14px !important;
+    background: linear-gradient(90deg, #2563EB 0%, #3B82F6 40%, #10B981 100%) !important;
+    color: #FFFFFF !important;
+    border: 1px solid rgba(255, 255, 255, 0.35) !important;
+    box-shadow: 0 8px 28px rgba(56, 189, 248, 0.45) !important;
+    transition: all 0.25s ease-in-out !important;
+    cursor: pointer !important;
+}
+.hero-cta-wrap button:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 12px 32px rgba(16, 185, 129, 0.65) !important;
+    background: linear-gradient(90deg, #1D4ED8 0%, #2563EB 40%, #059669 100%) !important;
+}
+.hero-cta-wrap button p, .hero-cta-wrap button span {
+    font-size: 1.32rem !important;
+    font-weight: 900 !important;
+    color: #FFFFFF !important;
+    letter-spacing: -0.3px !important;
 }
 """
 

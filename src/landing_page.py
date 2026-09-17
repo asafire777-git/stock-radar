@@ -143,64 +143,54 @@ def render_landing_page(is_dark: bool):
         unsafe_allow_html=True,
     )
 
-    # 카카오 / 구글 / 게스트 원클릭 소셜 로그인 박스
+    # 대형 Hero CTA 전용 스타일
     st.markdown(
         """
-        <div style="text-align: center; margin-bottom: 12px; font-size: 0.92rem; font-weight: 700; opacity: 0.85;">
-            👇 원하는 계정으로 1초 만에 바로 시작하세요
-        </div>
+        <style>
+        .hero-cta-wrap button {
+            min-height: 66px !important;
+            height: 66px !important;
+            border-radius: 14px !important;
+            background: linear-gradient(90deg, #2563EB 0%, #1D4ED8 40%, #059669 100%) !important;
+            color: #FFFFFF !important;
+            border: 1px solid rgba(255, 255, 255, 0.3) !important;
+            box-shadow: 0 8px 25px rgba(37, 99, 235, 0.45) !important;
+            transition: all 0.25s ease-in-out !important;
+            cursor: pointer !important;
+        }
+        .hero-cta-wrap button:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 12px 30px rgba(16, 185, 129, 0.55) !important;
+            background: linear-gradient(90deg, #1D4ED8 0%, #1E40AF 40%, #047857 100%) !important;
+        }
+        .hero-cta-wrap button p, .hero-cta-wrap button span {
+            font-size: 1.32rem !important;
+            font-weight: 900 !important;
+            color: #FFFFFF !important;
+            letter-spacing: -0.3px !important;
+        }
+        </style>
         """,
         unsafe_allow_html=True,
     )
 
-    col_h1, col_h2, col_h3 = st.columns(3)
-    with col_h1:
-        if st.button("💬 카카오로 1초 시작", key="hero_kakao_btn", use_container_width=True):
-            st.session_state["is_authenticated"] = True
-            st.session_state["user_info"] = {
-                "name": "카카오 투자자",
-                "email": "investor@kakao.com",
-                "provider": "Kakao",
-                "badge": "🟡 Kakao VIP",
-            }
-            st.session_state["current_page"] = "dashboard"
-            st.rerun()
-
-    with col_h2:
-        if st.button("🌐 Google로 계속하기", key="hero_google_btn", use_container_width=True):
-            st.session_state["is_authenticated"] = True
-            st.session_state["user_info"] = {
-                "name": "Google 투자자",
-                "email": "investor@gmail.com",
-                "provider": "Google",
-                "badge": "🔵 Google VIP",
-            }
-            st.session_state["current_page"] = "dashboard"
-            st.rerun()
-
-    with col_h3:
-        if st.button("⚡ 체험판 바로 입장", key="hero_guest_btn", use_container_width=True):
-            st.session_state["is_authenticated"] = True
-            st.session_state["user_info"] = {
-                "name": "게스트 회원",
-                "email": "guest@stockradar.ai",
-                "provider": "Guest",
-                "badge": "🟢 체험 회원",
-            }
-            st.session_state["current_page"] = "dashboard"
-            st.rerun()
-
-    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-
-    # Hero 메인 CTA 버튼
-    _, col_cta, _ = st.columns([1, 1.8, 1])
+    # Hero 메인 대형 CTA 버튼
+    st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
+    _, col_cta, _ = st.columns([1, 2.2, 1])
     with col_cta:
+        st.markdown('<div class="hero-cta-wrap">', unsafe_allow_html=True)
         if st.button("🚀 지금 바로 AI 급등주 분석 시작하기", type="primary", use_container_width=True, key="hero_cta_btn"):
-            if is_authed:
-                st.session_state["current_page"] = "dashboard"
-                st.rerun()
-            else:
-                open_login_modal()
+            if not is_authed:
+                st.session_state["is_authenticated"] = True
+                st.session_state["user_info"] = {
+                    "name": "체험 투자자",
+                    "email": "guest@stockradar.ai",
+                    "provider": "Guest",
+                    "badge": "🟢 체험 회원",
+                }
+            st.session_state["current_page"] = "dashboard"
+            st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
 
     # 핵심 신뢰 지표 4선
     st.markdown("<div style='height: 25px;'></div>", unsafe_allow_html=True)
@@ -493,13 +483,20 @@ def render_landing_page(is_dark: bool):
         unsafe_allow_html=True,
     )
 
-    _, col_cta_bottom, _ = st.columns([1, 1.8, 1])
+    _, col_cta_bottom, _ = st.columns([1, 2.2, 1])
     with col_cta_bottom:
+        st.markdown('<div class="hero-cta-wrap">', unsafe_allow_html=True)
         if st.button("📈 AI 급등주 분석 레이더 입장하기", type="primary", use_container_width=True, key="bottom_cta_btn"):
-            if is_authed:
-                st.session_state["current_page"] = "dashboard"
-                st.rerun()
-            else:
-                open_login_modal()
+            if not is_authed:
+                st.session_state["is_authenticated"] = True
+                st.session_state["user_info"] = {
+                    "name": "체험 투자자",
+                    "email": "guest@stockradar.ai",
+                    "provider": "Guest",
+                    "badge": "🟢 체험 회원",
+                }
+            st.session_state["current_page"] = "dashboard"
+            st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown("<div style='height: 30px;'></div>", unsafe_allow_html=True)
