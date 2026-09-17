@@ -39,41 +39,63 @@ st.set_page_config(
 # 세션 상태 초기화 (첫 방문 시 소개/가이드 페이지를 디폴트로)
 if "current_page" not in st.session_state:
     st.session_state["current_page"] = "intro"
+if "is_authenticated" not in st.session_state:
+    st.session_state["is_authenticated"] = False
+if "user_info" not in st.session_state:
+    st.session_state["user_info"] = None
+if "theme_mode" not in st.session_state:
+    st.session_state["theme_mode"] = "light"
+
+is_dark = (st.session_state.get("theme_mode", "light") == "dark")
 
 
 # ----------------------------------------------------
-# 2. 사이드바 (내비게이션 & 테마 & 조건 제어)
+# 2. 사이드바 (대시보드 페이지에서만 렌더링)
 # ----------------------------------------------------
-with st.sidebar:
-    st.markdown("### 🧭 메뉴 이동")
-    page_options = ["🏠 서비스 소개 및 가이드", "🚀 AI 급등주 분석 레이더"]
-    cur_page_idx = 0 if st.session_state.get("current_page", "intro") == "intro" else 1
+if st.session_state["current_page"] == "dashboard":
+    with st.sidebar:
+        user = st.session_state.get("user_info")
+        if user:
+            u_name = user.get("name", "회원")
+            u_email = user.get("email", "")
+            u_badge = user.get("badge", "VIP")
+            st.markdown(
+                f"""
+                <div class="user-profile-card">
+                    <div style="font-size: 1.05rem; font-weight: 800; margin-bottom: 2px;">👤 {u_name}님</div>
+                    <div style="font-size: 0.8rem; opacity: 0.75; margin-bottom: 6px;">{u_email}</div>
+                    <span class="badge-pill notranslate" translate="no" style="padding: 2px 8px; font-size: 0.72rem; margin-bottom: 0;">{u_badge}</span>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            col_sb1, col_sb2 = st.columns(2)
+            with col_sb1:
+                if st.button("🏠 홈으로", key="sb_btn_home", use_container_width=True):
+                    st.session_state["current_page"] = "intro"
+                    st.rerun()
+            with col_sb2:
+                if st.button("🚪 로그아웃", key="sb_btn_logout", use_container_width=True):
+                    st.session_state["is_authenticated"] = False
+                    st.session_state["user_info"] = None
+                    st.session_state["current_page"] = "intro"
+                    st.rerun()
+            st.markdown("---")
 
-    selected_menu = st.radio(
-        "이동할 메뉴를 선택하세요",
-        page_options,
-        index=cur_page_idx,
-        label_visibility="collapsed",
-    )
-    if "서비스 소개" in selected_menu and st.session_state["current_page"] != "intro":
-        st.session_state["current_page"] = "intro"
-        st.rerun()
-    elif "급등주 분석" in selected_menu and st.session_state["current_page"] != "dashboard":
-        st.session_state["current_page"] = "dashboard"
-        st.rerun()
+        st.markdown("### 🎨 화면 테마")
+        theme_idx = 1 if is_dark else 0
+        theme_sel = st.radio(
+            "테마 모드 선택",
+            ["☀️ 낮 모드 (화이트)", "🌙 밤 모드 (다크)"],
+            index=theme_idx,
+            horizontal=True,
+            key="sb_theme_radio",
+        )
+        new_theme = "dark" if "밤 모드" in theme_sel else "light"
+        if new_theme != st.session_state["theme_mode"]:
+            st.session_state["theme_mode"] = new_theme
+            st.rerun()
 
-    st.markdown("---")
-    st.markdown("### 🎨 화면 테마")
-    theme_mode = st.radio(
-        "테마 모드 선택",
-        ["☀️ 낮 모드 (화이트)", "🌙 밤 모드 (다크)"],
-        index=0,
-        horizontal=True,
-    )
-    is_dark = "밤 모드" in theme_mode
-
-    # 대시보드 상태일 때: 투자 스타일 및 상세 조건 슬라이더 표시
-    if st.session_state["current_page"] == "dashboard":
         st.markdown("---")
         st.markdown("### 🎯 나의 투자 스타일 (초보자 원클릭)")
         preset_style = st.radio(
@@ -111,119 +133,188 @@ with st.sidebar:
                 help="너무 높으면 상한가 직전이라 위험하고, 3~5%가 가장 안정적인 진입점입니다."
             )
             new_listing_months = st.slider("신규상장 기준 (최근 N개월)", min_value=1, max_value=24, value=def_months)
-    else:
-        # 소개 페이지일 때 기본값 설정 및 빠른 CTA 버튼
-        preset_style = "🛡️ 안정적인 스윙형 (추천)"
-        market_filter = "전체 (KOSPI + KOSDAQ)"
-        min_change_rate = 3.0
-        new_listing_months = 12
 
         st.markdown("---")
-        st.markdown("### ⚡ 빠른 이동")
-        if st.button("🚀 급등주 분석 레이더 입장", type="primary", use_container_width=True, key="side_cta_btn"):
-            st.session_state["current_page"] = "dashboard"
+        with st.expander("💡 AI 퀀트 점수가 무엇인가요?", expanded=False):
+            st.caption(
+                "AI가 복잡한 주식 빅데이터를 분석해 100점 만점으로 매긴 점수입니다:\n\n"
+                "• **🚀 상승 추진력(30점)**: 시장의 관심이 지금 이 종목에 얼마나 쏠려있는가?\n"
+                "• **💰 큰손 수급(20점)**: 개미만 사는 게 아니라 외국인·기관이 진짜 돈을 넣었는가?\n"
+                "• **📈 차트 안전성(25점)**: 5일선 위에 안착하여 바닥을 탄탄히 다지고 올라가는가?\n"
+                "• **🔥 거래대금(25점)**: 내가 팔고 싶을 때 바로 팔릴 만큼 거래가 활발한가?"
+            )
+
+        if st.button("🔄 실시간 데이터 새로고침", use_container_width=True):
+            st.cache_data.clear()
             st.rerun()
 
-    st.markdown("---")
-    with st.expander("💡 AI 퀀트 점수가 무엇인가요?", expanded=False):
-        st.caption(
-            "AI가 복잡한 주식 빅데이터를 분석해 100점 만점으로 매긴 점수입니다:\n\n"
-            "• **🚀 상승 추진력(30점)**: 시장의 관심이 지금 이 종목에 얼마나 쏠려있는가?\n"
-            "• **💰 큰손 수급(20점)**: 개미만 사는 게 아니라 외국인·기관이 진짜 돈을 넣었는가?\n"
-            "• **📈 차트 안전성(25점)**: 5일선 위에 안착하여 바닥을 탄탄히 다지고 올라가는가?\n"
-            "• **🔥 거래대금(25점)**: 내가 팔고 싶을 때 바로 팔릴 만큼 거래가 활발한가?"
-        )
-
-    if st.button("🔄 실시간 데이터 새로고침", use_container_width=True):
-        st.cache_data.clear()
-        st.rerun()
-
-    st.markdown("---")
-    now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    st.caption(f"기준 시간: {now_str}")
+        st.markdown("---")
+        now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        st.caption(f"기준 시간: {now_str}")
+else:
+    # 소개 페이지 기본 파라미터
+    preset_style = "🛡️ 안정적인 스윙형 (추천)"
+    market_filter = "전체 (KOSPI + KOSDAQ)"
+    min_change_rate = 3.0
+    new_listing_months = 12
 
 
 # ----------------------------------------------------
-# 3. 테마에 따른 동적 CSS 주입 (크롬 오번역 방지 포함)
+# 3. 테마에 따른 동적 CSS 주입 (크롬 오번역 방지 & 도구바 제거 포함)
 # ----------------------------------------------------
+is_intro = (st.session_state.get("current_page", "intro") == "intro")
+
+# 공통 숨김 스타일 (Streamlit 상단 도구바, 배포 버튼, 햄버거 메뉴, 풋터, 상태 표시기 완전 숨김)
+common_hide_css = """
+#MainMenu { visibility: hidden !important; display: none !important; }
+footer { visibility: hidden !important; display: none !important; }
+header[data-testid="stHeader"] { 
+    background-color: transparent !important; 
+    height: 0px !important;
+    min-height: 0px !important;
+    border-bottom: none !important;
+}
+[data-testid="stToolbar"] { 
+    visibility: hidden !important; 
+    display: none !important; 
+}
+[data-testid="stDecoration"] { 
+    display: none !important; 
+}
+[data-testid="stStatusWidget"] { 
+    visibility: hidden !important; 
+    display: none !important; 
+}
+div[class*="viewerBadge"] {
+    display: none !important;
+}
+
+/* 🟡 카카오 소셜 로그인 버튼 */
+button[key*="kakao"], button:has(div:contains("카카오")), button:has(p:contains("카카오")) {
+    background-color: #FEE500 !important;
+    color: #191919 !important;
+    border: 1px solid #E6CF00 !important;
+    font-weight: 700 !important;
+    border-radius: 8px !important;
+}
+button[key*="kakao"]:hover {
+    background-color: #FADA0A !important;
+    color: #191919 !important;
+}
+
+/* ⚪ Google 소셜 로그인 버튼 */
+button[key*="google"], button:has(div:contains("Google")), button:has(p:contains("Google")) {
+    background-color: #FFFFFF !important;
+    color: #374151 !important;
+    border: 1px solid #D1D5DB !important;
+    font-weight: 700 !important;
+    border-radius: 8px !important;
+}
+button[key*="google"]:hover {
+    background-color: #F3F4F6 !important;
+    color: #111827 !important;
+}
+"""
+
+# 소개 페이지일 때: 사이드바 및 토글 화살표 완전히 없애고 홈페이지 레이아웃으로
+intro_sidebar_hide_css = """
+[data-testid="stSidebar"], section[data-testid="stSidebar"], [data-testid="collapsedControl"] {
+    display: none !important;
+}
+.main .block-container {
+    max-width: 1180px !important;
+    padding-top: 1rem !important;
+    padding-left: 2rem !important;
+    padding-right: 2rem !important;
+    padding-bottom: 3.5rem !important;
+    margin: 0 auto !important;
+}
+""" if is_intro else ""
+
 if not is_dark:
     # ☀️ 낮 모드 (화이트)
     st.markdown(
-        """
+        f"""
         <meta name="google" content="notranslate">
         <style>
-        .stApp {
+        {common_hide_css}
+        {intro_sidebar_hide_css}
+        .stApp {{
             background-color: #F8FAFC !important;
             color: #0F172A !important;
-        }
-        header[data-testid="stHeader"] {
-            background-color: #F8FAFC !important;
-        }
-        [data-testid="stSidebar"] {
+        }}
+        [data-testid="stSidebar"] {{
             background-color: #FFFFFF !important;
             border-right: 1px solid #E2E8F0 !important;
-        }
+        }}
         [data-testid="stSidebar"] label,
         [data-testid="stSidebar"] p,
         [data-testid="stSidebar"] span,
-        [data-testid="stSidebar"] div {
+        [data-testid="stSidebar"] div {{
             color: #1E293B !important;
-        }
+        }}
         [data-testid="stSidebar"] .stCaption, 
-        [data-testid="stSidebar"] small {
+        [data-testid="stSidebar"] small {{
             color: #64748B !important;
-        }
-        .main-title {
+        }}
+        .user-profile-card {{
+            background-color: #EFF6FF !important;
+            border: 1px solid #BFDBFE !important;
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin-bottom: 12px;
+        }}
+        .main-title {{
             font-size: 2.2rem;
             font-weight: 900;
             background: linear-gradient(90deg, #1D4ED8 0%, #059669 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             margin-bottom: 0.2rem;
-        }
-        .sub-title {
+        }}
+        .sub-title {{
             font-size: 1rem;
             color: #64748B !important;
             margin-bottom: 1.2rem;
-        }
-        [data-testid="stMetricLabel"] * {
+        }}
+        [data-testid="stMetricLabel"] * {{
             color: #475569 !important;
             font-weight: 600 !important;
-        }
-        [data-testid="stMetricValue"] * {
+        }}
+        [data-testid="stMetricValue"] * {{
             color: #0F172A !important;
             font-weight: 800 !important;
-        }
-        button[data-baseweb="tab"] p, button[data-baseweb="tab"] span {
+        }}
+        button[data-baseweb="tab"] p, button[data-baseweb="tab"] span {{
             color: #64748B !important;
             font-size: 0.95rem;
-        }
-        button[data-baseweb="tab"][aria-selected="true"] p, button[data-baseweb="tab"][aria-selected="true"] span {
+        }}
+        button[data-baseweb="tab"][aria-selected="true"] p, button[data-baseweb="tab"][aria-selected="true"] span {{
             color: #1D4ED8 !important;
             font-weight: bold !important;
-        }
-        .recommend-card {
+        }}
+        .recommend-card {{
             background-color: #FFFFFF !important;
             border: 1px solid #E2E8F0 !important;
             border-radius: 10px;
             padding: 14px 18px;
             margin-bottom: 12px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-        }
-        .stock-title {
+        }}
+        .stock-title {{
             color: #0F172A !important;
             font-size: 1.2rem;
             font-weight: 800;
-        }
-        .stock-meta {
+        }}
+        .stock-meta {{
             color: #64748B !important;
             margin-left: 6px;
-        }
-        .signal-desc {
+        }}
+        .signal-desc {{
             color: #334155 !important;
             font-size: 0.92rem;
-        }
-        .badge-pill {
+        }}
+        .badge-pill {{
             display: inline-block;
             padding: 5px 14px;
             border-radius: 9999px;
@@ -233,56 +324,56 @@ if not is_dark:
             font-size: 0.85rem;
             border: 1px solid #BFDBFE !important;
             margin-bottom: 12px;
-        }
-        .hero-title {
+        }}
+        .hero-title {{
             font-size: 2.3rem;
             font-weight: 900;
             line-height: 1.35;
             color: #0F172A !important;
             margin-bottom: 12px;
-        }
-        .hero-subtitle {
+        }}
+        .hero-subtitle {{
             font-size: 1.05rem;
             color: #475569 !important;
             line-height: 1.6;
             margin-bottom: 24px;
-        }
-        .feature-card {
+        }}
+        .feature-card {{
             background-color: #FFFFFF !important;
             border: 1px solid #E2E8F0 !important;
             border-radius: 12px;
             padding: 22px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.04);
             margin-bottom: 16px;
-        }
-        .feature-title {
+        }}
+        .feature-title {{
             font-size: 1.15rem;
             font-weight: 800;
             color: #0F172A !important;
             margin-bottom: 8px;
-        }
-        .feature-desc {
+        }}
+        .feature-desc {{
             font-size: 0.93rem;
             color: #475569 !important;
             line-height: 1.55;
-        }
-        .step-card {
+        }}
+        .step-card {{
             background-color: #FFFFFF !important;
             border: 1px solid #E2E8F0 !important;
             border-radius: 12px;
             padding: 20px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.04);
             margin-bottom: 14px;
-        }
-        .strategy-card {
+        }}
+        .strategy-card {{
             background-color: #FFFFFF !important;
             border: 1px solid #E2E8F0 !important;
             border-radius: 12px;
             padding: 20px;
             margin-bottom: 14px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.04);
-        }
-        .cta-banner {
+        }}
+        .cta-banner {{
             background: linear-gradient(135deg, #1E3A8A 0%, #065F46 100%);
             border-radius: 16px;
             padding: 36px 24px;
@@ -290,7 +381,7 @@ if not is_dark:
             color: #FFFFFF !important;
             margin-top: 32px;
             margin-bottom: 20px;
-        }
+        }}
         </style>
         """,
         unsafe_allow_html=True,
@@ -298,84 +389,90 @@ if not is_dark:
 else:
     # 🌙 밤 모드 (다크)
     st.markdown(
-        """
+        f"""
         <meta name="google" content="notranslate">
         <style>
-        .stApp {
+        {common_hide_css}
+        {intro_sidebar_hide_css}
+        .stApp {{
             background-color: #0B0E14 !important;
             color: #F1F5F9 !important;
-        }
-        header[data-testid="stHeader"] {
-            background-color: #0B0E14 !important;
-        }
-        [data-testid="stSidebar"] {
+        }}
+        [data-testid="stSidebar"] {{
             background-color: #151A23 !important;
             border-right: 1px solid #242D3D !important;
-        }
+        }}
         [data-testid="stSidebar"] label,
         [data-testid="stSidebar"] p,
         [data-testid="stSidebar"] span,
-        [data-testid="stSidebar"] div {
+        [data-testid="stSidebar"] div {{
             color: #E2E8F0 !important;
-        }
-        [data-testid="stSidebar"] [data-testid="stWidgetLabel"] p {
+        }}
+        [data-testid="stSidebar"] [data-testid="stWidgetLabel"] p {{
             color: #F8FAFC !important;
             font-weight: 700 !important;
-        }
+        }}
         [data-testid="stSidebar"] .stCaption, 
-        [data-testid="stSidebar"] small {
+        [data-testid="stSidebar"] small {{
             color: #94A3B8 !important;
-        }
-        .main-title {
+        }}
+        .user-profile-card {{
+            background-color: #1E293B !important;
+            border: 1px solid #334155 !important;
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin-bottom: 12px;
+        }}
+        .main-title {{
             font-size: 2.2rem;
             font-weight: 900;
             background: linear-gradient(90deg, #60A5FA 0%, #34D399 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             margin-bottom: 0.2rem;
-        }
-        .sub-title {
+        }}
+        .sub-title {{
             font-size: 1rem;
             color: #94A3B8 !important;
             margin-bottom: 1.2rem;
-        }
-        [data-testid="stMetricLabel"] * {
+        }}
+        [data-testid="stMetricLabel"] * {{
             color: #94A3B8 !important;
             font-weight: 600 !important;
-        }
-        [data-testid="stMetricValue"] * {
+        }}
+        [data-testid="stMetricValue"] * {{
             color: #F8FAFC !important;
             font-weight: 800 !important;
-        }
-        button[data-baseweb="tab"] p, button[data-baseweb="tab"] span {
+        }}
+        button[data-baseweb="tab"] p, button[data-baseweb="tab"] span {{
             color: #94A3B8 !important;
             font-size: 0.95rem;
-        }
-        button[data-baseweb="tab"][aria-selected="true"] p, button[data-baseweb="tab"][aria-selected="true"] span {
+        }}
+        button[data-baseweb="tab"][aria-selected="true"] p, button[data-baseweb="tab"][aria-selected="true"] span {{
             color: #38BDF8 !important;
             font-weight: bold !important;
-        }
-        .recommend-card {
+        }}
+        .recommend-card {{
             background-color: #151A23 !important;
             border: 1px solid #242D3D !important;
             border-radius: 10px;
             padding: 14px 18px;
             margin-bottom: 12px;
-        }
-        .stock-title {
+        }}
+        .stock-title {{
             color: #FFFFFF !important;
             font-size: 1.2rem;
             font-weight: 800;
-        }
-        .stock-meta {
+        }}
+        .stock-meta {{
             color: #94A3B8 !important;
             margin-left: 6px;
-        }
-        .signal-desc {
+        }}
+        .signal-desc {{
             color: #CBD5E1 !important;
             font-size: 0.92rem;
-        }
-        .badge-pill {
+        }}
+        .badge-pill {{
             display: inline-block;
             padding: 5px 14px;
             border-radius: 9999px;
@@ -385,53 +482,53 @@ else:
             font-size: 0.85rem;
             border: 1px solid #3B82F6 !important;
             margin-bottom: 12px;
-        }
-        .hero-title {
+        }}
+        .hero-title {{
             font-size: 2.3rem;
             font-weight: 900;
             line-height: 1.35;
             color: #F8FAFC !important;
             margin-bottom: 12px;
-        }
-        .hero-subtitle {
+        }}
+        .hero-subtitle {{
             font-size: 1.05rem;
             color: #94A3B8 !important;
             line-height: 1.6;
             margin-bottom: 24px;
-        }
-        .feature-card {
+        }}
+        .feature-card {{
             background-color: #151A23 !important;
             border: 1px solid #242D3D !important;
             border-radius: 12px;
             padding: 22px;
             margin-bottom: 16px;
-        }
-        .feature-title {
+        }}
+        .feature-title {{
             font-size: 1.15rem;
             font-weight: 800;
             color: #F8FAFC !important;
             margin-bottom: 8px;
-        }
-        .feature-desc {
+        }}
+        .feature-desc {{
             font-size: 0.93rem;
             color: #94A3B8 !important;
             line-height: 1.55;
-        }
-        .step-card {
+        }}
+        .step-card {{
             background-color: #151A23 !important;
             border: 1px solid #242D3D !important;
             border-radius: 12px;
             padding: 20px;
             margin-bottom: 14px;
-        }
-        .strategy-card {
+        }}
+        .strategy-card {{
             background-color: #151A23 !important;
             border: 1px solid #242D3D !important;
             border-radius: 12px;
             padding: 20px;
             margin-bottom: 14px;
-        }
-        .cta-banner {
+        }}
+        .cta-banner {{
             background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
             border: 1px solid #334155;
             border-radius: 16px;
@@ -440,7 +537,7 @@ else:
             color: #FFFFFF !important;
             margin-top: 32px;
             margin-bottom: 20px;
-        }
+        }}
         </style>
         """,
         unsafe_allow_html=True,
@@ -483,17 +580,37 @@ if st.session_state.get("current_page", "intro") == "intro":
     st.stop()
 
 # ----------------------------------------------------
-# [대시보드] 상단 헤더 및 소개 복귀 버튼
+# [대시보드] 상단 헤더 및 회원 상태 바
 # ----------------------------------------------------
-head_c1, head_c2 = st.columns([4, 1.2])
+head_c1, head_c2 = st.columns([5, 3.2])
 with head_c1:
     st.markdown('<div class="main-title notranslate" translate="no">📈 Stock Radar : AI 급등주 & 신규상장 분석기</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-title">어려운 차트 공부 없이, 큰손(외인·기관) 수급과 상승 확률 높은 종목만 한눈에 확인하세요!</div>', unsafe_allow_html=True)
 with head_c2:
-    st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
-    if st.button("🏠 서비스 소개 및 가이드", use_container_width=True, key="btn_dash_to_intro"):
-        st.session_state["current_page"] = "intro"
-        st.rerun()
+    user = st.session_state.get("user_info")
+    if user:
+        u_name = user.get("name", "회원")
+        u_badge = user.get("badge", "VIP")
+        st.markdown(
+            f"""
+            <div style="text-align: right; padding-top: 2px; margin-bottom: 6px;">
+                <span style="font-weight: 800; font-size: 0.95rem;">👤 {u_name}님</span>
+                <span class="badge-pill notranslate" translate="no" style="margin-left: 6px; padding: 2px 8px; font-size: 0.75rem;">{u_badge}</span>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    h_btn1, h_btn2 = st.columns(2)
+    with h_btn1:
+        if st.button("🏠 서비스 소개", use_container_width=True, key="btn_dash_to_intro"):
+            st.session_state["current_page"] = "intro"
+            st.rerun()
+    with h_btn2:
+        if st.button("🚪 로그아웃", use_container_width=True, key="btn_dash_logout"):
+            st.session_state["is_authenticated"] = False
+            st.session_state["user_info"] = None
+            st.session_state["current_page"] = "intro"
+            st.rerun()
 
 # 초보자 3초 투자 가이드 배너
 with st.expander("🔰 초보자를 위한 3초 투자 가이드 (처음 오셨다면 꼭 읽어보세요!)", expanded=False):

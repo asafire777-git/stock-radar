@@ -1,22 +1,133 @@
 import streamlit as st
 
 
+@st.dialog("🔐 Stock Radar AI 퀀트 멤버십 로그인")
+def open_login_modal():
+    """
+    카카오, 구글, 게스트 소셜 간편 로그인 팝업 모달
+    아우라와 명확히 차별화된 퀀트 금융 투자자 멤버십 브랜딩
+    """
+    st.markdown(
+        """
+        <div style="text-align: center; margin-bottom: 18px;">
+            <div class="badge-pill notranslate" translate="no" style="font-size: 0.8rem; margin-bottom: 8px;">
+                📈 VIP QUANT INTELLIGENCE
+            </div>
+            <div style="font-size: 1.3rem; font-weight: 900; margin-bottom: 6px;">
+                AI 급등주 & 큰손 수급 분석 레이더
+            </div>
+            <div style="font-size: 0.9rem; opacity: 0.82; line-height: 1.5;">
+                간편 소셜 로그인으로 1초 만에 입장하고<br>
+                <b>오늘의 AI 원픽 추천주</b>와 <b>외인·기관 실시간 수급</b>을 확인하세요.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # 🟡 카카오 1초 간편 로그인
+    if st.button("💬 카카오 1초 간편 로그인", key="modal_kakao_btn", use_container_width=True):
+        st.session_state["is_authenticated"] = True
+        st.session_state["user_info"] = {
+            "name": "카카오 투자자",
+            "email": "investor@kakao.com",
+            "provider": "Kakao",
+            "badge": "🟡 Kakao VIP",
+        }
+        st.session_state["current_page"] = "dashboard"
+        st.rerun()
+
+    st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
+
+    # ⚪ Google 계정으로 계속하기
+    if st.button("🌐 Google 계정으로 계속하기", key="modal_google_btn", use_container_width=True):
+        st.session_state["is_authenticated"] = True
+        st.session_state["user_info"] = {
+            "name": "Google 투자자",
+            "email": "investor@gmail.com",
+            "provider": "Google",
+            "badge": "🔵 Google VIP",
+        }
+        st.session_state["current_page"] = "dashboard"
+        st.rerun()
+
+    st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
+
+    # ⚡ 무료 체험(게스트) 즉시 입장
+    if st.button("⚡ 무료 체험(게스트) 즉시 시작", key="modal_guest_btn", use_container_width=True):
+        st.session_state["is_authenticated"] = True
+        st.session_state["user_info"] = {
+            "name": "게스트 회원",
+            "email": "guest@stockradar.ai",
+            "provider": "Guest",
+            "badge": "🟢 체험 회원",
+        }
+        st.session_state["current_page"] = "dashboard"
+        st.rerun()
+
+    st.markdown("---")
+    st.caption("🔒 Stock Radar는 금융투자업 규정을 준수하며 안전한 데이터 분석 정보만을 제공합니다.")
+
+
 def render_landing_page(is_dark: bool):
     """
-    Aura 스타일의 화려하고 직관적인 서비스 소개 및 이용 가이드 랜딩 페이지.
-    - 대형 Hero 섹션 + CTA 버튼
-    - 4대 핵심 기능 카드
-    - 초보자 3단계 실전 매매 가이드
-    - 3대 투자 전략 비교 매트릭스
-    - AI 퀀트 점수 산출 로직 안내
-    - 하단 전환 유도 배너
+    사이드바 없이 독립적인 홈페이지처럼 작동하는 현대적인 랜딩 페이지.
+    - 상단 글로벌 내비게이션 바 (브랜드 로고, 테마 토글, 로그인/상태 버튼)
+    - 대형 Hero 섹션 + 카카오/구글 1초 간편 로그인 박스 + 메인 CTA
+    - 4대 신뢰 지표 & 핵심 기능 카드
+    - 초보자 3단계 실전 매매 가이드 & 3대 전략 비교표
+    - AI 퀀트 100점 만점 배점표
+    - 하단 전환 배너
     """
+    is_authed = st.session_state.get("is_authenticated", False)
+    user = st.session_state.get("user_info", {})
+
+    # ----------------------------------------------------
+    # 0. 상단 글로벌 내비게이션 바 (홈페이지 스타일)
+    # ----------------------------------------------------
+    nav_left, nav_right = st.columns([5, 4])
+    with nav_left:
+        st.markdown(
+            """
+            <div style="display: flex; align-items: center; gap: 8px; padding-top: 6px;">
+                <span style="font-size: 1.6rem;">📈</span>
+                <span style="font-size: 1.35rem; font-weight: 900; letter-spacing: -0.5px;">Stock Radar <span style="color: #2563EB;">AI</span></span>
+                <span class="badge-pill notranslate" translate="no" style="margin: 0; padding: 3px 10px; font-size: 0.75rem;">퀀트 레이더</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with nav_right:
+        c_theme, c_auth = st.columns([1, 1.4])
+        with c_theme:
+            if is_dark:
+                if st.button("☀️ 낮 모드", key="top_theme_toggle", use_container_width=True):
+                    st.session_state["theme_mode"] = "light"
+                    st.rerun()
+            else:
+                if st.button("🌙 밤 모드", key="top_theme_toggle", use_container_width=True):
+                    st.session_state["theme_mode"] = "dark"
+                    st.rerun()
+
+        with c_auth:
+            if is_authed:
+                u_name = user.get("name", "회원")
+                if st.button(f"🚀 {u_name}님 입장", type="primary", key="top_enter_btn", use_container_width=True):
+                    st.session_state["current_page"] = "dashboard"
+                    st.rerun()
+            else:
+                if st.button("🔑 간편 로그인", type="primary", key="top_login_btn", use_container_width=True):
+                    open_login_modal()
+
+    st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+
     # ----------------------------------------------------
     # 1. Hero Section
     # ----------------------------------------------------
     st.markdown(
         """
-        <div style="text-align: center; padding: 25px 10px 15px 10px;">
+        <div style="text-align: center; padding: 25px 10px 10px 10px;">
             <div class="badge-pill notranslate" translate="no">✨ 2026 NEXT-GEN AI QUANT STOCK RADAR</div>
             <h1 class="hero-title notranslate" translate="no">
                 내일의 주도 급등주,<br>
@@ -32,15 +143,67 @@ def render_landing_page(is_dark: bool):
         unsafe_allow_html=True,
     )
 
+    # 카카오 / 구글 / 게스트 원클릭 소셜 로그인 박스
+    st.markdown(
+        """
+        <div style="text-align: center; margin-bottom: 12px; font-size: 0.92rem; font-weight: 700; opacity: 0.85;">
+            👇 원하는 계정으로 1초 만에 바로 시작하세요
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    col_h1, col_h2, col_h3 = st.columns(3)
+    with col_h1:
+        if st.button("💬 카카오로 1초 시작", key="hero_kakao_btn", use_container_width=True):
+            st.session_state["is_authenticated"] = True
+            st.session_state["user_info"] = {
+                "name": "카카오 투자자",
+                "email": "investor@kakao.com",
+                "provider": "Kakao",
+                "badge": "🟡 Kakao VIP",
+            }
+            st.session_state["current_page"] = "dashboard"
+            st.rerun()
+
+    with col_h2:
+        if st.button("🌐 Google로 계속하기", key="hero_google_btn", use_container_width=True):
+            st.session_state["is_authenticated"] = True
+            st.session_state["user_info"] = {
+                "name": "Google 투자자",
+                "email": "investor@gmail.com",
+                "provider": "Google",
+                "badge": "🔵 Google VIP",
+            }
+            st.session_state["current_page"] = "dashboard"
+            st.rerun()
+
+    with col_h3:
+        if st.button("⚡ 체험판 바로 입장", key="hero_guest_btn", use_container_width=True):
+            st.session_state["is_authenticated"] = True
+            st.session_state["user_info"] = {
+                "name": "게스트 회원",
+                "email": "guest@stockradar.ai",
+                "provider": "Guest",
+                "badge": "🟢 체험 회원",
+            }
+            st.session_state["current_page"] = "dashboard"
+            st.rerun()
+
+    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+
     # Hero 메인 CTA 버튼
     _, col_cta, _ = st.columns([1, 1.8, 1])
     with col_cta:
         if st.button("🚀 지금 바로 AI 급등주 분석 시작하기", type="primary", use_container_width=True, key="hero_cta_btn"):
-            st.session_state["current_page"] = "dashboard"
-            st.rerun()
+            if is_authed:
+                st.session_state["current_page"] = "dashboard"
+                st.rerun()
+            else:
+                open_login_modal()
 
     # 핵심 신뢰 지표 4선
-    st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height: 25px;'></div>", unsafe_allow_html=True)
     m1, m2, m3, m4 = st.columns(4)
     with m1:
         st.markdown(
@@ -164,7 +327,7 @@ def render_landing_page(is_dark: bool):
                 <div style="font-size: 2.2rem; margin-bottom: 8px;">1️⃣</div>
                 <div style="font-weight: 800; font-size: 1.1rem; margin-bottom: 8px;">STEP 1. 나의 스타일 선택</div>
                 <div style="font-size: 0.9rem; opacity: 0.85; line-height: 1.5;">
-                    왼쪽 사이드바에서 <b>안정 스윙형</b>, <b>화끈 단타형</b>, <b>신규상장 턴어라운드형</b> 중 내 성향에 맞는 버튼 하나만 클릭하세요. AI가 최적의 종목군을 자동 세팅합니다.
+                    로그인 후 왼쪽 사이드바에서 <b>안정 스윙형</b>, <b>화끈 단타형</b>, <b>신규상장 턴어라운드형</b> 중 내 성향에 맞는 버튼 하나만 클릭하세요. AI가 최적의 종목군을 자동 세팅합니다.
                 </div>
             </div>
             """,
@@ -323,7 +486,7 @@ def render_landing_page(is_dark: bool):
         <div class="cta-banner">
             <div style="font-size: 1.8rem; font-weight: 900; margin-bottom: 8px;">🚀 지금 시장을 주도하는 진짜 급등주를 확인해보세요</div>
             <div style="font-size: 1.05rem; opacity: 0.92; margin-bottom: 22px;">
-                복잡한 분석은 AI에게 맡기고, 검증된 실시간 빅데이터로 스마트하게 투자하세요!
+                소셜 로그인으로 1초 만에 입장하고, 검증된 실시간 빅데이터로 스마트하게 투자하세요!
             </div>
         </div>
         """,
@@ -333,7 +496,10 @@ def render_landing_page(is_dark: bool):
     _, col_cta_bottom, _ = st.columns([1, 1.8, 1])
     with col_cta_bottom:
         if st.button("📈 AI 급등주 분석 레이더 입장하기", type="primary", use_container_width=True, key="bottom_cta_btn"):
-            st.session_state["current_page"] = "dashboard"
-            st.rerun()
+            if is_authed:
+                st.session_state["current_page"] = "dashboard"
+                st.rerun()
+            else:
+                open_login_modal()
 
     st.markdown("<div style='height: 30px;'></div>", unsafe_allow_html=True)
