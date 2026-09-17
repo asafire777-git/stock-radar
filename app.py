@@ -1,6 +1,7 @@
 import datetime
 import os
 import sys
+import time
 
 # src 경로 추가
 sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
@@ -21,6 +22,7 @@ from naver_collector import (
     fetch_top_volume_stocks,
 )
 from landing_page import render_landing_page
+from matrix_loader import render_matrix_loader
 from prediction_model import predictor
 from quant_scorer import calculate_quant_score
 from technical_analysis import analyze_stock_signals, compute_technical_indicators
@@ -58,6 +60,7 @@ if hasattr(st, "query_params"):
                 "provider": "Guest",
                 "badge": "🟢 체험 회원",
             }
+        st.session_state["matrix_intro_transition"] = True
         st.session_state["current_page"] = "dashboard"
         st.query_params.clear()
 
@@ -173,6 +176,7 @@ if st.session_state["current_page"] == "dashboard":
 
         if st.button("🔄 실시간 데이터 새로고침", use_container_width=True):
             st.cache_data.clear()
+            st.session_state["matrix_intro_transition"] = True
             st.rerun()
 
         st.markdown("---")
@@ -1384,6 +1388,73 @@ if st.session_state.get("current_page", "intro") == "intro":
     st.stop()
 
 # ----------------------------------------------------
+# 5-1. 매트릭스 디지털 연산 트랜지션 로더 (서비스 소개 -> 대시보드 진입 시)
+# ----------------------------------------------------
+show_matrix = st.session_state.get("matrix_intro_transition", False)
+matrix_holder = st.empty()
+if show_matrix:
+    matrix_holder.html(render_matrix_loader(is_dark))
+    matrix_start_time = time.time()
+
+# 메인 데이터 로드 (매트릭스 로더 화면 뒤에서 사전 수행)
+if not show_matrix:
+    with st.spinner("최신 주식 시장 데이터를 수집 및 분석 중입니다..."):
+        df_rising = load_rising_data()
+        df_volume = load_volume_data()
+        df_new = load_new_listings(months=new_listing_months)
+else:
+    df_rising = load_rising_data()
+    df_volume = load_volume_data()
+    df_new = load_new_listings(months=new_listing_months)
+
+# 필터 적용
+if not df_rising.empty and market_filter != "전체 (KOSPI + KOSDAQ)":
+    df_rising_filtered = df_rising[df_rising["market"] == market_filter]
+else:
+    df_rising_filtered = df_rising
+
+if not df_rising_filtered.empty:
+    df_rising_filtered = df_rising_filtered[df_rising_filtered["change_rate"] >= min_change_rate]
+
+# 🎯 AI 추천 종목 풀 구성 및 사전 연산 (매트릭스 화면이 떠 있는 동안 완전 선행 연산)
+if "신규상장" in preset_style:
+    strategy_key = "신규상장"
+    if not df_new.empty:
+        pool = df_new[df_new["price"] > 0].sort_values(by="trade_value_억", ascending=False).head(30)
+    else:
+        pool = pd.DataFrame()
+elif "단타" in preset_style or "실시간" in analysis_period:
+    strategy_key = "단타"
+    hot_rise = df_rising[df_rising["change_rate"] >= 5.0].head(25) if not df_rising.empty else pd.DataFrame()
+    pool = pd.concat([hot_rise, df_volume.head(25)]).drop_duplicates(subset=["code"]).head(35)
+elif "1주일" in analysis_period:
+    strategy_key = "스윙"
+    swing_rise = df_rising[(df_rising["change_rate"] >= 1.5) & (df_rising["change_rate"] <= 10.0)].head(25) if not df_rising.empty else pd.DataFrame()
+    pool = pd.concat([swing_rise, df_volume.head(20)]).drop_duplicates(subset=["code"]).head(35)
+else:
+    strategy_key = "스윙"
+    swing_rise = df_rising[(df_rising["change_rate"] >= 2.0) & (df_rising["change_rate"] <= 14.0)].head(25) if not df_rising.empty else pd.DataFrame()
+    pool = pd.concat([swing_rise, df_volume.head(20)]).drop_duplicates(subset=["code"]).head(35)
+
+candidates = []
+if not pool.empty:
+    pool_subset = pool.head(20)
+    pool_records = pool_subset.to_dict("records")
+    if not show_matrix:
+        with st.spinner(f"[{preset_style}] AI 퀀트 및 상승 확률 정밀 분석 중..."):
+            candidates = evaluate_candidates(pool_records, strategy_key)
+    else:
+        candidates = evaluate_candidates(pool_records, strategy_key)
+
+# 매트릭스 디지털 레인 애니메이션 최소 2.2초 연출 보장 후 짠~ 하고 해제
+if show_matrix:
+    elapsed = time.time() - matrix_start_time
+    if elapsed < 2.2:
+        time.sleep(2.2 - elapsed)
+    matrix_holder.empty()
+    st.session_state["matrix_intro_transition"] = False
+
+# ----------------------------------------------------
 # [대시보드] 상단 헤더 및 회원 상태 바
 # ----------------------------------------------------
 head_c1, head_c2 = st.columns([5, 3.2])
@@ -1460,21 +1531,6 @@ with st.expander("🔰 초보자를 위한 3초 투자 가이드 (처음 오셨�
         3. **3단계 (매매 가이드)**: 욕심부리지 말고 AI가 제안하는 **목표 수익률(+5% ~ +8%)**에 도달하면 분할 매도하고, **-3% 손절 기준**을 지키면 가장 안전합니다!
         """
     )
-
-# 메인 데이터 로드
-with st.spinner("최신 주식 시장 데이터를 수집 및 분석 중입니다..."):
-    df_rising = load_rising_data()
-    df_volume = load_volume_data()
-    df_new = load_new_listings(months=new_listing_months)
-
-# 필터 적용
-if not df_rising.empty and market_filter != "전체 (KOSPI + KOSDAQ)":
-    df_rising_filtered = df_rising[df_rising["market"] == market_filter]
-else:
-    df_rising_filtered = df_rising
-
-if not df_rising_filtered.empty:
-    df_rising_filtered = df_rising_filtered[df_rising_filtered["change_rate"] >= min_change_rate]
 
 # 상단 요약 지표 카드
 c1, c2, c3, c4 = st.columns(4)
@@ -1601,36 +1657,6 @@ tab_ai, tab_rising, tab_new, tab_chart = st.tabs([
 # TAB 1: AI 퀀트 추천 TOP 20
 # ====================================================
 with tab_ai:
-    candidates = []
-
-    # 🎯 선택된 투자 스타일 및 분석 주기에 따라 종목 풀(Pool)과 가중치 전략 동적 분기
-    if "신규상장" in preset_style:
-        strategy_key = "신규상장"
-        if not df_new.empty:
-            pool = df_new[df_new["price"] > 0].sort_values(by="trade_value_억", ascending=False).head(30)
-        else:
-            pool = pd.DataFrame()
-    elif "단타" in preset_style or "실시간" in analysis_period:
-        strategy_key = "단타"
-        hot_rise = df_rising[df_rising["change_rate"] >= 5.0].head(25) if not df_rising.empty else pd.DataFrame()
-        pool = pd.concat([hot_rise, df_volume.head(25)]).drop_duplicates(subset=["code"]).head(35)
-    elif "1주일" in analysis_period:
-        strategy_key = "스윙"
-        swing_rise = df_rising[(df_rising["change_rate"] >= 1.5) & (df_rising["change_rate"] <= 10.0)].head(25) if not df_rising.empty else pd.DataFrame()
-        pool = pd.concat([swing_rise, df_volume.head(20)]).drop_duplicates(subset=["code"]).head(35)
-    else:
-        strategy_key = "스윙"
-        swing_rise = df_rising[(df_rising["change_rate"] >= 2.0) & (df_rising["change_rate"] <= 14.0)].head(25) if not df_rising.empty else pd.DataFrame()
-        pool = pd.concat([swing_rise, df_volume.head(20)]).drop_duplicates(subset=["code"]).head(35)
-
-
-    if not pool.empty:
-        pool_subset = pool.head(20)
-        pool_records = pool_subset.to_dict("records")
-        with st.spinner(f"[{preset_style}] AI 퀀트 및 상승 확률 정밀 분석 중..."):
-            candidates = evaluate_candidates(pool_records, strategy_key)
-
-
     if candidates:
         df_ai = pd.DataFrame(candidates)
         df_ai = df_ai.sort_values(by=["total_score", "upside_prob"], ascending=False).reset_index(drop=True).head(20)

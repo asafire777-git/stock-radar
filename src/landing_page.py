@@ -132,6 +132,7 @@ def open_login_modal():
             "provider": "Kakao",
             "badge": "🟡 Kakao VIP",
         }
+        st.session_state["matrix_intro_transition"] = True
         st.session_state["current_page"] = "dashboard"
         st.rerun()
 
@@ -146,6 +147,7 @@ def open_login_modal():
             "provider": "Google",
             "badge": "🔵 Google VIP",
         }
+        st.session_state["matrix_intro_transition"] = True
         st.session_state["current_page"] = "dashboard"
         st.rerun()
 
@@ -160,6 +162,7 @@ def open_login_modal():
             "provider": "Guest",
             "badge": "🟢 체험 회원",
         }
+        st.session_state["matrix_intro_transition"] = True
         st.session_state["current_page"] = "dashboard"
         st.rerun()
 
@@ -390,6 +393,7 @@ def render_landing_page(is_dark: bool):
             if is_authed:
                 u_name = user.get("name", "회원")
                 if st.button(f"🚀 {u_name}님 입장", type="primary", key="top_enter_btn", use_container_width=True):
+                    st.session_state["matrix_intro_transition"] = True
                     st.session_state["current_page"] = "dashboard"
                     st.rerun()
             else:
@@ -457,6 +461,7 @@ def render_landing_page(is_dark: bool):
                         "provider": "Guest",
                         "badge": "🟢 체험 회원",
                     }
+                st.session_state["matrix_intro_transition"] = True
                 st.session_state["current_page"] = "dashboard"
                 st.rerun()
 
@@ -1026,6 +1031,7 @@ def render_landing_page(is_dark: bool):
                         "provider": "Guest",
                         "badge": "🟢 체험 회원",
                     }
+                st.session_state["matrix_intro_transition"] = True
                 st.session_state["current_page"] = "dashboard"
                 st.rerun()
 
