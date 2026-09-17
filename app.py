@@ -537,6 +537,49 @@ def load_stock_investors(code: str):
     return get_investor_net_purchases(code, days=20)
 
 
+@st.cache_data(ttl=120)
+def evaluate_candidates(pool_records: list, strategy_key: str) -> list:
+    """선정된 종목 풀에 대해 기술적 지표, 퀀트 점수, 상승 확률을 일괄 평가 (캐싱 적용)"""
+    results = []
+    for row in pool_records:
+        code = str(row.get("code", ""))
+        name = str(row.get("name", ""))
+        if not code:
+            continue
+
+        ohlcv = get_stock_ohlcv(code, days=60)
+        if ohlcv.empty or len(ohlcv) < 20:
+            continue
+
+        ohlcv_ind = compute_technical_indicators(ohlcv)
+        signals = analyze_stock_signals(ohlcv_ind)
+        investor_df = get_investor_net_purchases(code, days=15)
+
+        item_dict = {
+            "change_rate": float(row.get("change_rate", 0.0)),
+            "trade_value_억": float(row.get("trade_value_억", 0.0)),
+            "days_since_listing": int(row.get("days_since_listing", 90)),
+        }
+
+        quant_res = calculate_quant_score(item_dict, signals, investor_df, strategy=strategy_key)
+        pred_res = predictor.predict_probability(ohlcv_ind, quant_score=quant_res["total_score"])
+
+        results.append({
+            "code": code,
+            "name": name,
+            "market": row.get("market", ""),
+            "price": int(row.get("price", 0)),
+            "change_rate": float(row.get("change_rate", 0.0)),
+            "grade": quant_res["grade"],
+            "total_score": quant_res["total_score"],
+            "upside_prob": pred_res["upside_probability"],
+            "direction": pred_res["direction"],
+            "signals": ", ".join(signals["signals"][:3]) if signals["signals"] else "기본 상승 탄력 유지",
+            "reasons": quant_res["key_reasons"],
+        })
+    return results
+
+
 # ----------------------------------------------------
 # 5. 페이지 라우팅 (소개 페이지 vs 실시간 분석 대시보드)
 # ----------------------------------------------------
@@ -660,47 +703,11 @@ with tab_ai:
         pool = pd.concat([swing_rise, df_volume.head(20)]).drop_duplicates(subset=["code"]).head(35)
 
     if not pool.empty:
-        progress_bar = st.progress(0, text=f"[{preset_style}] 맞춤 수급 및 상승 확률 정밀 분석 중...")
-        total_items = len(pool)
+        pool_subset = pool.head(20)
+        pool_records = pool_subset.to_dict("records")
+        with st.spinner(f"[{preset_style}] AI 퀀트 및 상승 확률 정밀 분석 중..."):
+            candidates = evaluate_candidates(pool_records, strategy_key)
 
-        for idx, (_, row) in enumerate(pool.iterrows()):
-            code = str(row["code"])
-            name = str(row["name"])
-
-            ohlcv = load_stock_chart(code, days=60)
-            if ohlcv.empty or len(ohlcv) < 20:
-                continue
-
-            ohlcv_ind = compute_technical_indicators(ohlcv)
-            signals = analyze_stock_signals(ohlcv_ind)
-            investor_df = load_stock_investors(code)
-
-            item_dict = {
-                "change_rate": float(row.get("change_rate", 0.0)),
-                "trade_value_억": float(row.get("trade_value_억", 0.0)),
-                "days_since_listing": int(row.get("days_since_listing", 90)),
-            }
-
-            quant_res = calculate_quant_score(item_dict, signals, investor_df, strategy=strategy_key)
-            pred_res = predictor.predict_probability(ohlcv_ind, quant_score=quant_res["total_score"])
-
-            candidates.append({
-                "code": code,
-                "name": name,
-                "market": row.get("market", ""),
-                "price": int(row.get("price", 0)),
-                "change_rate": float(row.get("change_rate", 0.0)),
-                "grade": quant_res["grade"],
-                "total_score": quant_res["total_score"],
-                "upside_prob": pred_res["upside_probability"],
-                "direction": pred_res["direction"],
-                "signals": ", ".join(signals["signals"][:3]) if signals["signals"] else "기본 상승 탄력 유지",
-                "reasons": quant_res["key_reasons"],
-            })
-
-            progress_bar.progress((idx + 1) / total_items)
-
-        progress_bar.empty()
 
     if candidates:
         df_ai = pd.DataFrame(candidates)
