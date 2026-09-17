@@ -160,388 +160,353 @@ else:
 
 
 # ----------------------------------------------------
-# 3. 테마에 따른 동적 CSS 주입 (크롬 오번역 방지 & 도구바 제거 포함)
+# 3. 테마에 따른 동적 CSS 주입 (크롬 오번역 방지 & 도구바 제거)
 # ----------------------------------------------------
 is_intro = (st.session_state.get("current_page", "intro") == "intro")
 
-# 공통 숨김 스타일 (Streamlit 상단 도구바, 배포 버튼, 햄버거 메뉴, 풋터, 상태 표시기 완전 숨김)
-common_hide_css = """
-#MainMenu { visibility: hidden !important; display: none !important; }
-footer { visibility: hidden !important; display: none !important; }
-header[data-testid="stHeader"] { 
-    background-color: transparent !important; 
-    height: 0px !important;
-    min-height: 0px !important;
-    border-bottom: none !important;
-}
-[data-testid="stToolbar"] { 
-    visibility: hidden !important; 
-    display: none !important; 
-}
-[data-testid="stDecoration"] { 
-    display: none !important; 
-}
-[data-testid="stStatusWidget"] { 
-    visibility: hidden !important; 
-    display: none !important; 
-}
-div[class*="viewerBadge"] {
+common_css = """
+#MainMenu, footer, [data-testid="stToolbar"], [data-testid="stDecoration"], [data-testid="stStatusWidget"], div[class*="viewerBadge"] {
+    visibility: hidden !important;
     display: none !important;
 }
-
-/* 🟡 카카오 소셜 로그인 버튼 */
-button[key*="kakao"], button:has(div:contains("카카오")), button:has(p:contains("카카오")) {
+header[data-testid="stHeader"] {
+    background: transparent !important;
+    height: 0px !important;
+    min-height: 0px !important;
+    border: none !important;
+}
+div.st-key-modal_kakao_btn button, div.st-key-hero_kakao_btn button {
     background-color: #FEE500 !important;
     color: #191919 !important;
     border: 1px solid #E6CF00 !important;
     font-weight: 700 !important;
     border-radius: 8px !important;
 }
-button[key*="kakao"]:hover {
+div.st-key-modal_kakao_btn button:hover, div.st-key-hero_kakao_btn button:hover {
     background-color: #FADA0A !important;
     color: #191919 !important;
 }
-
-/* ⚪ Google 소셜 로그인 버튼 */
-button[key*="google"], button:has(div:contains("Google")), button:has(p:contains("Google")) {
+div.st-key-modal_google_btn button, div.st-key-hero_google_btn button {
     background-color: #FFFFFF !important;
     color: #374151 !important;
     border: 1px solid #D1D5DB !important;
     font-weight: 700 !important;
     border-radius: 8px !important;
 }
-button[key*="google"]:hover {
+div.st-key-modal_google_btn button:hover, div.st-key-hero_google_btn button:hover {
     background-color: #F3F4F6 !important;
     color: #111827 !important;
 }
 """
 
-# 소개 페이지일 때: 사이드바 및 토글 화살표 완전히 없애고 홈페이지 레이아웃으로
-intro_sidebar_hide_css = """
+if is_intro:
+    layout_css = """
 [data-testid="stSidebar"], section[data-testid="stSidebar"], [data-testid="collapsedControl"] {
     display: none !important;
 }
 .main .block-container {
     max-width: 1180px !important;
-    padding-top: 1rem !important;
+    padding-top: 1.2rem !important;
     padding-left: 2rem !important;
     padding-right: 2rem !important;
     padding-bottom: 3.5rem !important;
     margin: 0 auto !important;
 }
-""" if is_intro else ""
+"""
+else:
+    layout_css = """
+.main .block-container {
+    padding-top: 1.5rem !important;
+}
+"""
 
 if not is_dark:
-    # ☀️ 낮 모드 (화이트)
-    st.markdown(
-        f"""
-        <meta name="google" content="notranslate">
-        <style>
-        {common_hide_css}
-        {intro_sidebar_hide_css}
-        .stApp {{
-            background-color: #F8FAFC !important;
-            color: #0F172A !important;
-        }}
-        [data-testid="stSidebar"] {{
-            background-color: #FFFFFF !important;
-            border-right: 1px solid #E2E8F0 !important;
-        }}
-        [data-testid="stSidebar"] label,
-        [data-testid="stSidebar"] p,
-        [data-testid="stSidebar"] span,
-        [data-testid="stSidebar"] div {{
-            color: #1E293B !important;
-        }}
-        [data-testid="stSidebar"] .stCaption, 
-        [data-testid="stSidebar"] small {{
-            color: #64748B !important;
-        }}
-        .user-profile-card {{
-            background-color: #EFF6FF !important;
-            border: 1px solid #BFDBFE !important;
-            border-radius: 10px;
-            padding: 12px 14px;
-            margin-bottom: 12px;
-        }}
-        .main-title {{
-            font-size: 2.2rem;
-            font-weight: 900;
-            background: linear-gradient(90deg, #1D4ED8 0%, #059669 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin-bottom: 0.2rem;
-        }}
-        .sub-title {{
-            font-size: 1rem;
-            color: #64748B !important;
-            margin-bottom: 1.2rem;
-        }}
-        [data-testid="stMetricLabel"] * {{
-            color: #475569 !important;
-            font-weight: 600 !important;
-        }}
-        [data-testid="stMetricValue"] * {{
-            color: #0F172A !important;
-            font-weight: 800 !important;
-        }}
-        button[data-baseweb="tab"] p, button[data-baseweb="tab"] span {{
-            color: #64748B !important;
-            font-size: 0.95rem;
-        }}
-        button[data-baseweb="tab"][aria-selected="true"] p, button[data-baseweb="tab"][aria-selected="true"] span {{
-            color: #1D4ED8 !important;
-            font-weight: bold !important;
-        }}
-        .recommend-card {{
-            background-color: #FFFFFF !important;
-            border: 1px solid #E2E8F0 !important;
-            border-radius: 10px;
-            padding: 14px 18px;
-            margin-bottom: 12px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-        }}
-        .stock-title {{
-            color: #0F172A !important;
-            font-size: 1.2rem;
-            font-weight: 800;
-        }}
-        .stock-meta {{
-            color: #64748B !important;
-            margin-left: 6px;
-        }}
-        .signal-desc {{
-            color: #334155 !important;
-            font-size: 0.92rem;
-        }}
-        .badge-pill {{
-            display: inline-block;
-            padding: 5px 14px;
-            border-radius: 9999px;
-            background-color: #EFF6FF !important;
-            color: #1D4ED8 !important;
-            font-weight: 700;
-            font-size: 0.85rem;
-            border: 1px solid #BFDBFE !important;
-            margin-bottom: 12px;
-        }}
-        .hero-title {{
-            font-size: 2.3rem;
-            font-weight: 900;
-            line-height: 1.35;
-            color: #0F172A !important;
-            margin-bottom: 12px;
-        }}
-        .hero-subtitle {{
-            font-size: 1.05rem;
-            color: #475569 !important;
-            line-height: 1.6;
-            margin-bottom: 24px;
-        }}
-        .feature-card {{
-            background-color: #FFFFFF !important;
-            border: 1px solid #E2E8F0 !important;
-            border-radius: 12px;
-            padding: 22px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.04);
-            margin-bottom: 16px;
-        }}
-        .feature-title {{
-            font-size: 1.15rem;
-            font-weight: 800;
-            color: #0F172A !important;
-            margin-bottom: 8px;
-        }}
-        .feature-desc {{
-            font-size: 0.93rem;
-            color: #475569 !important;
-            line-height: 1.55;
-        }}
-        .step-card {{
-            background-color: #FFFFFF !important;
-            border: 1px solid #E2E8F0 !important;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.04);
-            margin-bottom: 14px;
-        }}
-        .strategy-card {{
-            background-color: #FFFFFF !important;
-            border: 1px solid #E2E8F0 !important;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 14px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.04);
-        }}
-        .cta-banner {{
-            background: linear-gradient(135deg, #1E3A8A 0%, #065F46 100%);
-            border-radius: 16px;
-            padding: 36px 24px;
-            text-align: center;
-            color: #FFFFFF !important;
-            margin-top: 32px;
-            margin-bottom: 20px;
-        }}
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+    theme_css = """
+.stApp {
+    background-color: #F8FAFC !important;
+    color: #0F172A !important;
+}
+[data-testid="stSidebar"] {
+    background-color: #FFFFFF !important;
+    border-right: 1px solid #E2E8F0 !important;
+}
+[data-testid="stSidebar"] label, [data-testid="stSidebar"] p, [data-testid="stSidebar"] span, [data-testid="stSidebar"] div {
+    color: #1E293B !important;
+}
+[data-testid="stSidebar"] .stCaption, [data-testid="stSidebar"] small {
+    color: #64748B !important;
+}
+.user-profile-card {
+    background-color: #EFF6FF !important;
+    border: 1px solid #BFDBFE !important;
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+}
+.main-title {
+    font-size: 2.2rem;
+    font-weight: 900;
+    background: linear-gradient(90deg, #1D4ED8 0%, #059669 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 0.2rem;
+}
+.sub-title {
+    font-size: 1rem;
+    color: #64748B !important;
+    margin-bottom: 1.2rem;
+}
+[data-testid="stMetricLabel"] * {
+    color: #475569 !important;
+    font-weight: 600 !important;
+}
+[data-testid="stMetricValue"] * {
+    color: #0F172A !important;
+    font-weight: 800 !important;
+}
+button[data-baseweb="tab"] p, button[data-baseweb="tab"] span {
+    color: #64748B !important;
+    font-size: 0.95rem;
+}
+button[data-baseweb="tab"][aria-selected="true"] p, button[data-baseweb="tab"][aria-selected="true"] span {
+    color: #1D4ED8 !important;
+    font-weight: bold !important;
+}
+.recommend-card {
+    background-color: #FFFFFF !important;
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.stock-title {
+    color: #0F172A !important;
+    font-size: 1.2rem;
+    font-weight: 800;
+}
+.stock-meta {
+    color: #64748B !important;
+    margin-left: 6px;
+}
+.signal-desc {
+    color: #334155 !important;
+    font-size: 0.92rem;
+}
+.badge-pill {
+    display: inline-block;
+    padding: 5px 14px;
+    border-radius: 9999px;
+    background-color: #EFF6FF !important;
+    color: #1D4ED8 !important;
+    font-weight: 700;
+    font-size: 0.85rem;
+    border: 1px solid #BFDBFE !important;
+    margin-bottom: 12px;
+}
+.hero-title {
+    font-size: 2.3rem;
+    font-weight: 900;
+    line-height: 1.35;
+    color: #0F172A !important;
+    margin-bottom: 12px;
+}
+.hero-subtitle {
+    font-size: 1.05rem;
+    color: #475569 !important;
+    line-height: 1.6;
+    margin-bottom: 24px;
+}
+.feature-card {
+    background-color: #FFFFFF !important;
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 12px;
+    padding: 22px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.04);
+    margin-bottom: 16px;
+}
+.feature-title {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: #0F172A !important;
+    margin-bottom: 8px;
+}
+.feature-desc {
+    font-size: 0.93rem;
+    color: #475569 !important;
+    line-height: 1.55;
+}
+.step-card {
+    background-color: #FFFFFF !important;
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+    margin-bottom: 14px;
+}
+.strategy-card {
+    background-color: #FFFFFF !important;
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 14px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+}
+.cta-banner {
+    background: linear-gradient(135deg, #1E3A8A 0%, #065F46 100%);
+    border-radius: 16px;
+    padding: 36px 24px;
+    text-align: center;
+    color: #FFFFFF !important;
+    margin-top: 32px;
+    margin-bottom: 20px;
+}
+"""
 else:
-    # 🌙 밤 모드 (다크)
-    st.markdown(
-        f"""
-        <meta name="google" content="notranslate">
-        <style>
-        {common_hide_css}
-        {intro_sidebar_hide_css}
-        .stApp {{
-            background-color: #0B0E14 !important;
-            color: #F1F5F9 !important;
-        }}
-        [data-testid="stSidebar"] {{
-            background-color: #151A23 !important;
-            border-right: 1px solid #242D3D !important;
-        }}
-        [data-testid="stSidebar"] label,
-        [data-testid="stSidebar"] p,
-        [data-testid="stSidebar"] span,
-        [data-testid="stSidebar"] div {{
-            color: #E2E8F0 !important;
-        }}
-        [data-testid="stSidebar"] [data-testid="stWidgetLabel"] p {{
-            color: #F8FAFC !important;
-            font-weight: 700 !important;
-        }}
-        [data-testid="stSidebar"] .stCaption, 
-        [data-testid="stSidebar"] small {{
-            color: #94A3B8 !important;
-        }}
-        .user-profile-card {{
-            background-color: #1E293B !important;
-            border: 1px solid #334155 !important;
-            border-radius: 10px;
-            padding: 12px 14px;
-            margin-bottom: 12px;
-        }}
-        .main-title {{
-            font-size: 2.2rem;
-            font-weight: 900;
-            background: linear-gradient(90deg, #60A5FA 0%, #34D399 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin-bottom: 0.2rem;
-        }}
-        .sub-title {{
-            font-size: 1rem;
-            color: #94A3B8 !important;
-            margin-bottom: 1.2rem;
-        }}
-        [data-testid="stMetricLabel"] * {{
-            color: #94A3B8 !important;
-            font-weight: 600 !important;
-        }}
-        [data-testid="stMetricValue"] * {{
-            color: #F8FAFC !important;
-            font-weight: 800 !important;
-        }}
-        button[data-baseweb="tab"] p, button[data-baseweb="tab"] span {{
-            color: #94A3B8 !important;
-            font-size: 0.95rem;
-        }}
-        button[data-baseweb="tab"][aria-selected="true"] p, button[data-baseweb="tab"][aria-selected="true"] span {{
-            color: #38BDF8 !important;
-            font-weight: bold !important;
-        }}
-        .recommend-card {{
-            background-color: #151A23 !important;
-            border: 1px solid #242D3D !important;
-            border-radius: 10px;
-            padding: 14px 18px;
-            margin-bottom: 12px;
-        }}
-        .stock-title {{
-            color: #FFFFFF !important;
-            font-size: 1.2rem;
-            font-weight: 800;
-        }}
-        .stock-meta {{
-            color: #94A3B8 !important;
-            margin-left: 6px;
-        }}
-        .signal-desc {{
-            color: #CBD5E1 !important;
-            font-size: 0.92rem;
-        }}
-        .badge-pill {{
-            display: inline-block;
-            padding: 5px 14px;
-            border-radius: 9999px;
-            background-color: #1E293B !important;
-            color: #60A5FA !important;
-            font-weight: 700;
-            font-size: 0.85rem;
-            border: 1px solid #3B82F6 !important;
-            margin-bottom: 12px;
-        }}
-        .hero-title {{
-            font-size: 2.3rem;
-            font-weight: 900;
-            line-height: 1.35;
-            color: #F8FAFC !important;
-            margin-bottom: 12px;
-        }}
-        .hero-subtitle {{
-            font-size: 1.05rem;
-            color: #94A3B8 !important;
-            line-height: 1.6;
-            margin-bottom: 24px;
-        }}
-        .feature-card {{
-            background-color: #151A23 !important;
-            border: 1px solid #242D3D !important;
-            border-radius: 12px;
-            padding: 22px;
-            margin-bottom: 16px;
-        }}
-        .feature-title {{
-            font-size: 1.15rem;
-            font-weight: 800;
-            color: #F8FAFC !important;
-            margin-bottom: 8px;
-        }}
-        .feature-desc {{
-            font-size: 0.93rem;
-            color: #94A3B8 !important;
-            line-height: 1.55;
-        }}
-        .step-card {{
-            background-color: #151A23 !important;
-            border: 1px solid #242D3D !important;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 14px;
-        }}
-        .strategy-card {{
-            background-color: #151A23 !important;
-            border: 1px solid #242D3D !important;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 14px;
-        }}
-        .cta-banner {{
-            background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
-            border: 1px solid #334155;
-            border-radius: 16px;
-            padding: 36px 24px;
-            text-align: center;
-            color: #FFFFFF !important;
-            margin-top: 32px;
-            margin-bottom: 20px;
-        }}
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+    theme_css = """
+.stApp {
+    background-color: #0B0E14 !important;
+    color: #F1F5F9 !important;
+}
+[data-testid="stSidebar"] {
+    background-color: #151A23 !important;
+    border-right: 1px solid #242D3D !important;
+}
+[data-testid="stSidebar"] label, [data-testid="stSidebar"] p, [data-testid="stSidebar"] span, [data-testid="stSidebar"] div {
+    color: #E2E8F0 !important;
+}
+[data-testid="stSidebar"] [data-testid="stWidgetLabel"] p {
+    color: #F8FAFC !important;
+    font-weight: 700 !important;
+}
+[data-testid="stSidebar"] .stCaption, [data-testid="stSidebar"] small {
+    color: #94A3B8 !important;
+}
+.user-profile-card {
+    background-color: #1E293B !important;
+    border: 1px solid #334155 !important;
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+}
+.main-title {
+    font-size: 2.2rem;
+    font-weight: 900;
+    background: linear-gradient(90deg, #60A5FA 0%, #34D399 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 0.2rem;
+}
+.sub-title {
+    font-size: 1rem;
+    color: #94A3B8 !important;
+    margin-bottom: 1.2rem;
+}
+[data-testid="stMetricLabel"] * {
+    color: #94A3B8 !important;
+    font-weight: 600 !important;
+}
+[data-testid="stMetricValue"] * {
+    color: #F8FAFC !important;
+    font-weight: 800 !important;
+}
+button[data-baseweb="tab"] p, button[data-baseweb="tab"] span {
+    color: #94A3B8 !important;
+    font-size: 0.95rem;
+}
+button[data-baseweb="tab"][aria-selected="true"] p, button[data-baseweb="tab"][aria-selected="true"] span {
+    color: #38BDF8 !important;
+    font-weight: bold !important;
+}
+.recommend-card {
+    background-color: #151A23 !important;
+    border: 1px solid #242D3D !important;
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin-bottom: 12px;
+}
+.stock-title {
+    color: #FFFFFF !important;
+    font-size: 1.2rem;
+    font-weight: 800;
+}
+.stock-meta {
+    color: #94A3B8 !important;
+    margin-left: 6px;
+}
+.signal-desc {
+    color: #CBD5E1 !important;
+    font-size: 0.92rem;
+}
+.badge-pill {
+    display: inline-block;
+    padding: 5px 14px;
+    border-radius: 9999px;
+    background-color: #1E293B !important;
+    color: #60A5FA !important;
+    font-weight: 700;
+    font-size: 0.85rem;
+    border: 1px solid #3B82F6 !important;
+    margin-bottom: 12px;
+}
+.hero-title {
+    font-size: 2.3rem;
+    font-weight: 900;
+    line-height: 1.35;
+    color: #F8FAFC !important;
+    margin-bottom: 12px;
+}
+.hero-subtitle {
+    font-size: 1.05rem;
+    color: #94A3B8 !important;
+    line-height: 1.6;
+    margin-bottom: 24px;
+}
+.feature-card {
+    background-color: #151A23 !important;
+    border: 1px solid #242D3D !important;
+    border-radius: 12px;
+    padding: 22px;
+    margin-bottom: 16px;
+}
+.feature-title {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: #F8FAFC !important;
+    margin-bottom: 8px;
+}
+.feature-desc {
+    font-size: 0.93rem;
+    color: #94A3B8 !important;
+    line-height: 1.55;
+}
+.step-card {
+    background-color: #151A23 !important;
+    border: 1px solid #242D3D !important;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 14px;
+}
+.strategy-card {
+    background-color: #151A23 !important;
+    border: 1px solid #242D3D !important;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 14px;
+}
+.cta-banner {
+    background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
+    border: 1px solid #334155;
+    border-radius: 16px;
+    padding: 36px 24px;
+    text-align: center;
+    color: #FFFFFF !important;
+    margin-top: 32px;
+    margin-bottom: 20px;
+}
+"""
+
+st.html(f"""<meta name="google" content="notranslate"><style>{common_css}\n{layout_css}\n{theme_css}</style>""")
 
 
 # ----------------------------------------------------
