@@ -46,6 +46,21 @@ if "user_info" not in st.session_state:
 if "theme_mode" not in st.session_state:
     st.session_state["theme_mode"] = "light"
 
+# URL 쿼리 파라미터 확인 (?nav=dashboard 또는 ?page=dashboard)
+if hasattr(st, "query_params"):
+    target_nav = st.query_params.get("nav") or st.query_params.get("page")
+    if target_nav in ["dashboard", "radar", "app"]:
+        st.session_state["is_authenticated"] = True
+        if not st.session_state.get("user_info"):
+            st.session_state["user_info"] = {
+                "name": "체험 투자자",
+                "email": "guest@stockradar.ai",
+                "provider": "Guest",
+                "badge": "🟢 체험 회원",
+            }
+        st.session_state["current_page"] = "dashboard"
+        st.query_params.clear()
+
 is_dark = (st.session_state.get("theme_mode", "light") == "dark")
 
 
@@ -438,27 +453,87 @@ div[data-testid="stTextInput"] input:focus {
     margin-top: 32px;
     margin-bottom: 20px;
 }
-.hero-cta-wrap button {
-    min-height: 66px !important;
-    height: 66px !important;
-    border-radius: 14px !important;
-    background: linear-gradient(90deg, #2563EB 0%, #1D4ED8 40%, #059669 100%) !important;
-    color: #FFFFFF !important;
-    border: 1px solid rgba(255, 255, 255, 0.3) !important;
-    box-shadow: 0 8px 25px rgba(37, 99, 235, 0.45) !important;
-    transition: all 0.25s ease-in-out !important;
+div[class*="st-key-hero_cta_box"] button,
+div[class*="st-key-bottom_cta_box"] button,
+div[class*="st-key-hero_cta_btn"] button,
+div[class*="st-key-bottom_cta_btn"] button,
+.st-key-hero_cta_box button,
+.st-key-bottom_cta_box button {
+    width: 100% !important;
+    min-height: 94px !important;
+    height: auto !important;
+    padding: 18px 24px !important;
+    border-radius: 18px !important;
+    background: linear-gradient(135deg, #1E3A8A 0%, #1D4ED8 35%, #059669 100%) !important;
+    border: 1.5px solid rgba(147, 197, 253, 0.45) !important;
+    box-shadow: 0 10px 28px rgba(30, 58, 138, 0.4), 0 2px 8px rgba(0, 0, 0, 0.15) !important;
     cursor: pointer !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
-.hero-cta-wrap button:hover {
-    transform: translateY(-2px) !important;
-    box-shadow: 0 12px 30px rgba(16, 185, 129, 0.55) !important;
-    background: linear-gradient(90deg, #1D4ED8 0%, #1E40AF 40%, #047857 100%) !important;
+div[class*="st-key-hero_cta_box"] button:hover,
+div[class*="st-key-bottom_cta_box"] button:hover,
+div[class*="st-key-hero_cta_btn"] button:hover,
+div[class*="st-key-bottom_cta_btn"] button:hover,
+.st-key-hero_cta_box button:hover,
+.st-key-bottom_cta_box button:hover {
+    transform: translateY(-3px) scale(1.012) !important;
+    background: linear-gradient(135deg, #1D4ED8 0%, #2563EB 35%, #047857 100%) !important;
+    box-shadow: 0 16px 36px rgba(16, 185, 129, 0.55), 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+    border-color: #60A5FA !important;
 }
-.hero-cta-wrap button p, .hero-cta-wrap button span {
-    font-size: 1.32rem !important;
-    font-weight: 900 !important;
+div[class*="st-key-hero_cta_box"] button:active,
+div[class*="st-key-bottom_cta_box"] button:active,
+.st-key-hero_cta_box button:active,
+.st-key-bottom_cta_box button:active {
+    transform: translateY(1px) scale(0.995) !important;
+}
+div[class*="st-key-hero_cta_box"] button div,
+div[class*="st-key-bottom_cta_box"] button div {
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+div[class*="st-key-hero_cta_box"] button p,
+div[class*="st-key-bottom_cta_box"] button p,
+div[class*="st-key-hero_cta_btn"] button p,
+div[class*="st-key-bottom_cta_btn"] button p,
+.st-key-hero_cta_box button p,
+.st-key-bottom_cta_box button p {
     color: #FFFFFF !important;
-    letter-spacing: -0.3px !important;
+    text-align: center !important;
+    margin: 0 !important;
+    line-height: 1.4 !important;
+}
+div[class*="st-key-hero_cta_box"] button p:first-of-type,
+div[class*="st-key-bottom_cta_box"] button p:first-of-type,
+div[class*="st-key-hero_cta_btn"] button p:first-of-type,
+div[class*="st-key-bottom_cta_btn"] button p:first-of-type,
+.st-key-hero_cta_box button p:first-of-type,
+.st-key-bottom_cta_box button p:first-of-type {
+    font-size: 1.38rem !important;
+    font-weight: 900 !important;
+    letter-spacing: -0.4px !important;
+    margin-bottom: 5px !important;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+}
+div[class*="st-key-hero_cta_box"] button p:last-of-type,
+div[class*="st-key-bottom_cta_box"] button p:last-of-type,
+div[class*="st-key-hero_cta_btn"] button p:last-of-type,
+div[class*="st-key-bottom_cta_btn"] button p:last-of-type,
+.st-key-hero_cta_box button p:last-of-type,
+.st-key-bottom_cta_box button p:last-of-type {
+    font-size: 0.94rem !important;
+    font-weight: 500 !important;
+    color: #A7F3D0 !important;
+    opacity: 0.96 !important;
+    letter-spacing: -0.2px !important;
 }
 """
 else:
@@ -619,27 +694,87 @@ div[data-testid="stTextInput"] input:focus {
     margin-top: 32px;
     margin-bottom: 20px;
 }
-.hero-cta-wrap button {
-    min-height: 66px !important;
-    height: 66px !important;
-    border-radius: 14px !important;
-    background: linear-gradient(90deg, #2563EB 0%, #3B82F6 40%, #10B981 100%) !important;
-    color: #FFFFFF !important;
-    border: 1px solid rgba(255, 255, 255, 0.35) !important;
-    box-shadow: 0 8px 28px rgba(56, 189, 248, 0.45) !important;
-    transition: all 0.25s ease-in-out !important;
+div[class*="st-key-hero_cta_box"] button,
+div[class*="st-key-bottom_cta_box"] button,
+div[class*="st-key-hero_cta_btn"] button,
+div[class*="st-key-bottom_cta_btn"] button,
+.st-key-hero_cta_box button,
+.st-key-bottom_cta_box button {
+    width: 100% !important;
+    min-height: 94px !important;
+    height: auto !important;
+    padding: 18px 24px !important;
+    border-radius: 18px !important;
+    background: linear-gradient(135deg, #1E3A8A 0%, #1D4ED8 35%, #059669 100%) !important;
+    border: 1.5px solid rgba(147, 197, 253, 0.45) !important;
+    box-shadow: 0 10px 28px rgba(30, 58, 138, 0.4), 0 2px 8px rgba(0, 0, 0, 0.15) !important;
     cursor: pointer !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
-.hero-cta-wrap button:hover {
-    transform: translateY(-2px) !important;
-    box-shadow: 0 12px 32px rgba(16, 185, 129, 0.65) !important;
-    background: linear-gradient(90deg, #1D4ED8 0%, #2563EB 40%, #059669 100%) !important;
+div[class*="st-key-hero_cta_box"] button:hover,
+div[class*="st-key-bottom_cta_box"] button:hover,
+div[class*="st-key-hero_cta_btn"] button:hover,
+div[class*="st-key-bottom_cta_btn"] button:hover,
+.st-key-hero_cta_box button:hover,
+.st-key-bottom_cta_box button:hover {
+    transform: translateY(-3px) scale(1.012) !important;
+    background: linear-gradient(135deg, #1D4ED8 0%, #2563EB 35%, #047857 100%) !important;
+    box-shadow: 0 16px 36px rgba(16, 185, 129, 0.55), 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+    border-color: #60A5FA !important;
 }
-.hero-cta-wrap button p, .hero-cta-wrap button span {
-    font-size: 1.32rem !important;
-    font-weight: 900 !important;
+div[class*="st-key-hero_cta_box"] button:active,
+div[class*="st-key-bottom_cta_box"] button:active,
+.st-key-hero_cta_box button:active,
+.st-key-bottom_cta_box button:active {
+    transform: translateY(1px) scale(0.995) !important;
+}
+div[class*="st-key-hero_cta_box"] button div,
+div[class*="st-key-bottom_cta_box"] button div {
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+div[class*="st-key-hero_cta_box"] button p,
+div[class*="st-key-bottom_cta_box"] button p,
+div[class*="st-key-hero_cta_btn"] button p,
+div[class*="st-key-bottom_cta_btn"] button p,
+.st-key-hero_cta_box button p,
+.st-key-bottom_cta_box button p {
     color: #FFFFFF !important;
-    letter-spacing: -0.3px !important;
+    text-align: center !important;
+    margin: 0 !important;
+    line-height: 1.4 !important;
+}
+div[class*="st-key-hero_cta_box"] button p:first-of-type,
+div[class*="st-key-bottom_cta_box"] button p:first-of-type,
+div[class*="st-key-hero_cta_btn"] button p:first-of-type,
+div[class*="st-key-bottom_cta_btn"] button p:first-of-type,
+.st-key-hero_cta_box button p:first-of-type,
+.st-key-bottom_cta_box button p:first-of-type {
+    font-size: 1.38rem !important;
+    font-weight: 900 !important;
+    letter-spacing: -0.4px !important;
+    margin-bottom: 5px !important;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+}
+div[class*="st-key-hero_cta_box"] button p:last-of-type,
+div[class*="st-key-bottom_cta_box"] button p:last-of-type,
+div[class*="st-key-hero_cta_btn"] button p:last-of-type,
+div[class*="st-key-bottom_cta_btn"] button p:last-of-type,
+.st-key-hero_cta_box button p:last-of-type,
+.st-key-bottom_cta_box button p:last-of-type {
+    font-size: 0.94rem !important;
+    font-weight: 500 !important;
+    color: #A7F3D0 !important;
+    opacity: 0.96 !important;
+    letter-spacing: -0.2px !important;
 }
 """
 

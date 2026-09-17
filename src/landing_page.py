@@ -143,54 +143,118 @@ def render_landing_page(is_dark: bool):
         unsafe_allow_html=True,
     )
 
-    # 대형 Hero CTA 전용 스타일
+    # 대형 Hero & 하단 통합 CTA 전용 스타일
     st.markdown(
         """
         <style>
-        .hero-cta-wrap button {
-            min-height: 66px !important;
-            height: 66px !important;
-            border-radius: 14px !important;
-            background: linear-gradient(90deg, #2563EB 0%, #1D4ED8 40%, #059669 100%) !important;
-            color: #FFFFFF !important;
-            border: 1px solid rgba(255, 255, 255, 0.3) !important;
-            box-shadow: 0 8px 25px rgba(37, 99, 235, 0.45) !important;
-            transition: all 0.25s ease-in-out !important;
+        /* Hero & Bottom Grand Banner CTA Buttons */
+        div[class*="st-key-hero_cta_box"] button,
+        div[class*="st-key-bottom_cta_box"] button,
+        div[class*="st-key-hero_cta_btn"] button,
+        div[class*="st-key-bottom_cta_btn"] button,
+        .st-key-hero_cta_box button,
+        .st-key-bottom_cta_box button {
+            width: 100% !important;
+            min-height: 94px !important;
+            height: auto !important;
+            padding: 18px 24px !important;
+            border-radius: 18px !important;
+            background: linear-gradient(135deg, #1E3A8A 0%, #1D4ED8 35%, #059669 100%) !important;
+            border: 1.5px solid rgba(147, 197, 253, 0.45) !important;
+            box-shadow: 0 10px 28px rgba(30, 58, 138, 0.4), 0 2px 8px rgba(0, 0, 0, 0.15) !important;
             cursor: pointer !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            justify-content: center !important;
+            text-align: center !important;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
         }
-        .hero-cta-wrap button:hover {
-            transform: translateY(-2px) !important;
-            box-shadow: 0 12px 30px rgba(16, 185, 129, 0.55) !important;
-            background: linear-gradient(90deg, #1D4ED8 0%, #1E40AF 40%, #047857 100%) !important;
+        div[class*="st-key-hero_cta_box"] button:hover,
+        div[class*="st-key-bottom_cta_box"] button:hover,
+        div[class*="st-key-hero_cta_btn"] button:hover,
+        div[class*="st-key-bottom_cta_btn"] button:hover,
+        .st-key-hero_cta_box button:hover,
+        .st-key-bottom_cta_box button:hover {
+            transform: translateY(-3px) scale(1.012) !important;
+            background: linear-gradient(135deg, #1D4ED8 0%, #2563EB 35%, #047857 100%) !important;
+            box-shadow: 0 16px 36px rgba(16, 185, 129, 0.55), 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+            border-color: #60A5FA !important;
         }
-        .hero-cta-wrap button p, .hero-cta-wrap button span {
-            font-size: 1.32rem !important;
-            font-weight: 900 !important;
+        div[class*="st-key-hero_cta_box"] button:active,
+        div[class*="st-key-bottom_cta_box"] button:active,
+        .st-key-hero_cta_box button:active,
+        .st-key-bottom_cta_box button:active {
+            transform: translateY(1px) scale(0.995) !important;
+        }
+        div[class*="st-key-hero_cta_box"] button div,
+        div[class*="st-key-bottom_cta_box"] button div {
+            width: 100% !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+        div[class*="st-key-hero_cta_box"] button p,
+        div[class*="st-key-bottom_cta_box"] button p,
+        div[class*="st-key-hero_cta_btn"] button p,
+        div[class*="st-key-bottom_cta_btn"] button p,
+        .st-key-hero_cta_box button p,
+        .st-key-bottom_cta_box button p {
             color: #FFFFFF !important;
-            letter-spacing: -0.3px !important;
+            text-align: center !important;
+            margin: 0 !important;
+            line-height: 1.4 !important;
+        }
+        div[class*="st-key-hero_cta_box"] button p:first-of-type,
+        div[class*="st-key-bottom_cta_box"] button p:first-of-type,
+        div[class*="st-key-hero_cta_btn"] button p:first-of-type,
+        div[class*="st-key-bottom_cta_btn"] button p:first-of-type,
+        .st-key-hero_cta_box button p:first-of-type,
+        .st-key-bottom_cta_box button p:first-of-type {
+            font-size: 1.38rem !important;
+            font-weight: 900 !important;
+            letter-spacing: -0.4px !important;
+            margin-bottom: 5px !important;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+        }
+        div[class*="st-key-hero_cta_box"] button p:last-of-type,
+        div[class*="st-key-bottom_cta_box"] button p:last-of-type,
+        div[class*="st-key-hero_cta_btn"] button p:last-of-type,
+        div[class*="st-key-bottom_cta_btn"] button p:last-of-type,
+        .st-key-hero_cta_box button p:last-of-type,
+        .st-key-bottom_cta_box button p:last-of-type {
+            font-size: 0.94rem !important;
+            font-weight: 500 !important;
+            color: #A7F3D0 !important;
+            opacity: 0.96 !important;
+            letter-spacing: -0.2px !important;
         }
         </style>
         """,
         unsafe_allow_html=True,
     )
 
-    # Hero 메인 대형 CTA 버튼
-    st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
-    _, col_cta, _ = st.columns([1, 2.2, 1])
+    # Hero 메인 대형 CTA 배너 버튼
+    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+    _, col_cta, _ = st.columns([1.2, 3.6, 1.2])
     with col_cta:
-        st.markdown('<div class="hero-cta-wrap">', unsafe_allow_html=True)
-        if st.button("🚀 지금 바로 AI 급등주 분석 시작하기", type="primary", use_container_width=True, key="hero_cta_btn"):
-            if not is_authed:
-                st.session_state["is_authenticated"] = True
-                st.session_state["user_info"] = {
-                    "name": "체험 투자자",
-                    "email": "guest@stockradar.ai",
-                    "provider": "Guest",
-                    "badge": "🟢 체험 회원",
-                }
-            st.session_state["current_page"] = "dashboard"
-            st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
+        with st.container(key="hero_cta_box"):
+            if st.button(
+                "🚀 지금 바로 AI 급등주 분석 시작하기\n\n⚡ 코스피·코스닥 2,870개 전 종목 실시간 퀀트 레이더 즉시 무료 입장",
+                use_container_width=True,
+                key="hero_cta_btn",
+            ):
+                if not is_authed:
+                    st.session_state["is_authenticated"] = True
+                    st.session_state["user_info"] = {
+                        "name": "체험 투자자",
+                        "email": "guest@stockradar.ai",
+                        "provider": "Guest",
+                        "badge": "🟢 체험 회원",
+                    }
+                st.session_state["current_page"] = "dashboard"
+                st.rerun()
 
     # 핵심 신뢰 지표 4선
     st.markdown("<div style='height: 25px;'></div>", unsafe_allow_html=True)
@@ -469,34 +533,26 @@ def render_landing_page(is_dark: bool):
         )
 
     # ----------------------------------------------------
-    # 6. 하단 전환 유도 배너 (CTA Banner)
+    # 6. 하단 전환 유도 통합 배너 버튼 (CTA Grand Banner Button)
     # ----------------------------------------------------
-    st.markdown(
-        """
-        <div class="cta-banner">
-            <div style="font-size: 1.8rem; font-weight: 900; margin-bottom: 8px;">🚀 지금 시장을 주도하는 진짜 급등주를 확인해보세요</div>
-            <div style="font-size: 1.05rem; opacity: 0.92; margin-bottom: 22px;">
-                소셜 로그인으로 1초 만에 입장하고, 검증된 실시간 빅데이터로 스마트하게 투자하세요!
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    _, col_cta_bottom, _ = st.columns([1, 2.2, 1])
+    st.markdown("<div style='height: 36px;'></div>", unsafe_allow_html=True)
+    _, col_cta_bottom, _ = st.columns([1.2, 3.6, 1.2])
     with col_cta_bottom:
-        st.markdown('<div class="hero-cta-wrap">', unsafe_allow_html=True)
-        if st.button("📈 AI 급등주 분석 레이더 입장하기", type="primary", use_container_width=True, key="bottom_cta_btn"):
-            if not is_authed:
-                st.session_state["is_authenticated"] = True
-                st.session_state["user_info"] = {
-                    "name": "체험 투자자",
-                    "email": "guest@stockradar.ai",
-                    "provider": "Guest",
-                    "badge": "🟢 체험 회원",
-                }
-            st.session_state["current_page"] = "dashboard"
-            st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
+        with st.container(key="bottom_cta_box"):
+            if st.button(
+                "🚀 지금 시장을 주도하는 진짜 급등주 확인하기\n\n⚡ 코스피·코스닥 2,870개 전 종목 실시간 퀀트 레이더 즉시 무료 입장",
+                use_container_width=True,
+                key="bottom_cta_btn",
+            ):
+                if not is_authed:
+                    st.session_state["is_authenticated"] = True
+                    st.session_state["user_info"] = {
+                        "name": "체험 투자자",
+                        "email": "guest@stockradar.ai",
+                        "provider": "Guest",
+                        "badge": "🟢 체험 회원",
+                    }
+                st.session_state["current_page"] = "dashboard"
+                st.rerun()
 
-    st.markdown("<div style='height: 30px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True)
