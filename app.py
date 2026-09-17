@@ -165,7 +165,7 @@ else:
 is_intro = (st.session_state.get("current_page", "intro") == "intro")
 
 common_css = """
-#MainMenu, footer, [data-testid="stToolbar"], [data-testid="stDecoration"], [data-testid="stStatusWidget"], div[class*="viewerBadge"] {
+#MainMenu, footer, [data-testid="stDeployButton"], [data-testid="stDecoration"], [data-testid="stStatusWidget"], div[class*="viewerBadge"], [data-testid="stToolbarActions"] {
     visibility: hidden !important;
     display: none !important;
 }
@@ -174,6 +174,54 @@ header[data-testid="stHeader"] {
     height: 0px !important;
     min-height: 0px !important;
     border: none !important;
+    overflow: visible !important;
+}
+[data-testid="stToolbar"] {
+    background: transparent !important;
+    overflow: visible !important;
+}
+[data-testid="stExpandSidebarButton"], [data-testid="collapsedControl"] {
+    display: flex !important;
+    visibility: visible !important;
+    position: fixed !important;
+    top: 14px !important;
+    left: 14px !important;
+    z-index: 999999 !important;
+    background-color: #2563EB !important;
+    color: #FFFFFF !important;
+    border: 1px solid #1D4ED8 !important;
+    border-radius: 8px !important;
+    padding: 6px 12px !important;
+    box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3) !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+}
+[data-testid="stExpandSidebarButton"]:hover, [data-testid="collapsedControl"]:hover {
+    background-color: #1D4ED8 !important;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 14px rgba(37, 99, 235, 0.4) !important;
+}
+[data-testid="stExpandSidebarButton"] button, [data-testid="collapsedControl"] button {
+    background: transparent !important;
+    border: none !important;
+    color: #FFFFFF !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    cursor: pointer !important;
+    padding: 0 !important;
+}
+[data-testid="stExpandSidebarButton"] *, [data-testid="collapsedControl"] * {
+    color: #FFFFFF !important;
+    fill: #FFFFFF !important;
+    stroke: #FFFFFF !important;
+}
+[data-testid="stExpandSidebarButton"] button::after, [data-testid="collapsedControl"] button::after {
+    content: " 메뉴 열기";
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #FFFFFF !important;
+    white-space: nowrap !important;
+    margin-left: 6px;
 }
 div.st-key-modal_kakao_btn button, div.st-key-hero_kakao_btn button {
     background-color: #FEE500 !important;
@@ -201,7 +249,7 @@ div.st-key-modal_google_btn button:hover, div.st-key-hero_google_btn button:hove
 
 if is_intro:
     layout_css = """
-[data-testid="stSidebar"], section[data-testid="stSidebar"], [data-testid="collapsedControl"] {
+[data-testid="stSidebar"], section[data-testid="stSidebar"], [data-testid="stExpandSidebarButton"], [data-testid="collapsedControl"] {
     display: none !important;
 }
 .main .block-container {
