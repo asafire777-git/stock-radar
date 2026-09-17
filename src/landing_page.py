@@ -11,61 +11,36 @@ def create_showcase_figure(pattern_type: str = "breakout", is_dark: bool = True)
     - pullback: 1차 급등 후 20일선 지지 반등 + 외인/기관 쌍끌이
     - ipo: 상장 후 바닥 다지기 탈출 첫 장대양봉
     """
-    dates = pd.date_range(end="2026-03-17", periods=20, freq="B")
-    base_price = 50000
-    opens, closes, highs, lows, vols = [], [], [], [], []
+    dates = [
+        "02/16", "02/17", "02/18", "02/19", "02/20",
+        "02/23", "02/24", "02/25", "02/26", "02/27",
+        "03/02", "03/03", "03/04", "03/05", "03/06",
+        "03/09", "03/10", "03/11", "03/12", "03/13"
+    ]
 
     if pattern_type == "breakout":
-        for i in range(18):
-            o = base_price + (i % 3) * 300 - 400
-            c = o + (i % 2 * 600) - 250
-            h = max(o, c) + 350
-            l = min(o, c) - 300
-            v = 150000 + (i * 8000)
-            opens.append(o); closes.append(c); highs.append(h); lows.append(l); vols.append(v)
-        opens.extend([51200, 53500])
-        closes.extend([53400, 58200])
-        highs.extend([53900, 59000])
-        lows.extend([51000, 53200])
-        vols.extend([750000, 2480000])
-        signal_idx = 18
+        opens =  [48500, 48800, 48200, 49500, 49200, 50200, 49800, 50600, 51000, 50800, 51500, 51200, 52000, 52600, 52200, 53500, 53200, 54600, 56500, 58800]
+        highs =  [49200, 49600, 49000, 50200, 50000, 51000, 50500, 51500, 51800, 51600, 52400, 52000, 52800, 53400, 53000, 54200, 54500, 56200, 58800, 63800]
+        lows =   [48000, 48200, 47800, 48800, 48700, 49500, 49200, 50000, 50400, 50200, 50900, 50600, 51400, 51800, 51600, 52800, 52900, 54000, 55800, 58200]
+        closes = [48800, 48400, 49400, 49200, 50100, 49900, 50500, 51200, 50900, 51600, 51200, 51900, 52500, 52100, 53300, 53100, 54400, 56000, 58500, 63200]
+        vols =   [350000, 310000, 420000, 360000, 480000, 410000, 390000, 520000, 460000, 500000, 430000, 490000, 560000, 470000, 640000, 530000, 780000, 1250000, 2450000, 5200000]
+        signal_idx = 17
         signal_text = "🎯 AI 골든크로스 & 돌파 포착"
     elif pattern_type == "pullback":
-        for i in range(10):
-            o = 35000 + i * 800
-            c = o + 600
-            h = c + 400
-            l = o - 200
-            v = 300000 + i * 20000
-            opens.append(o); closes.append(c); highs.append(h); lows.append(l); vols.append(v)
-        for i in range(7):
-            o = 43000 - i * 600
-            c = o - 400
-            h = o + 200
-            l = c - 300
-            v = 120000 - i * 10000
-            opens.append(o); closes.append(c); highs.append(h); lows.append(l); vols.append(v)
-        opens.extend([39200, 39600, 41200])
-        closes.extend([39800, 41000, 43500])
-        highs.extend([40100, 41500, 44000])
-        lows.extend([39000, 39400, 41000])
-        vols.extend([280000, 550000, 1420000])
-        signal_idx = 17
+        opens =  [33000, 33800, 34600, 34200, 35500, 36400, 37600, 37200, 38800, 39600, 39200, 38600, 38000, 37400, 37200, 37800, 38400, 39200, 40400, 41900]
+        highs =  [34000, 34900, 35200, 35800, 36700, 37900, 38400, 39200, 40200, 40600, 39700, 39000, 38500, 37900, 37900, 38600, 39400, 40600, 42200, 44000]
+        lows =   [32800, 33400, 34000, 33800, 35000, 36100, 37000, 36800, 38300, 38900, 38400, 37800, 37200, 36800, 36800, 37400, 38000, 38900, 40000, 41500]
+        closes = [33700, 34500, 34300, 35600, 36500, 37700, 37300, 38900, 39900, 39100, 38500, 38000, 37300, 37100, 37800, 38500, 39200, 40500, 42000, 43600]
+        vols =   [260000, 420000, 380000, 490000, 540000, 690000, 460000, 740000, 910000, 520000, 390000, 320000, 250000, 195000, 280000, 450000, 640000, 980000, 1620000, 2950000]
+        signal_idx = 14
         signal_text = "🎯 AI 20일선 지지 반등 포착"
     else:  # ipo
-        for i in range(16):
-            o = 22000 - i * 250
-            c = o - 100
-            h = o + 200
-            l = c - 200
-            v = 80000 + i * 2000
-            opens.append(o); closes.append(c); highs.append(h); lows.append(l); vols.append(v)
-        opens.extend([18200, 18500, 19200, 21000])
-        closes.extend([18600, 19100, 20800, 24500])
-        highs.extend([18800, 19300, 21200, 25200])
-        lows.extend([18100, 18400, 19100, 20800])
-        vols.extend([180000, 320000, 950000, 3850000])
-        signal_idx = 17
+        opens =  [19500, 19200, 18800, 18600, 18300, 18200, 17900, 18200, 18000, 17800, 18100, 18300, 18200, 18500, 18400, 18700, 19300, 20200, 21600, 23400]
+        highs =  [19800, 19400, 19100, 18800, 18600, 18400, 18300, 18400, 18300, 18200, 18400, 18600, 18700, 18900, 19000, 19500, 20400, 21900, 23700, 26000]
+        lows =   [19000, 18700, 18400, 18200, 18000, 17800, 17700, 17800, 17700, 17600, 17800, 18000, 18100, 18200, 18300, 18500, 19100, 19900, 21300, 23000]
+        closes = [19200, 18800, 18600, 18300, 18200, 17900, 18200, 18000, 17800, 18100, 18300, 18200, 18500, 18400, 18900, 19400, 20300, 21700, 23500, 25600]
+        vols =   [125000, 98000, 89000, 76000, 69000, 63000, 86000, 80000, 72000, 84000, 96000, 108000, 120000, 138000, 190000, 360000, 750000, 1480000, 2750000, 5400000]
+        signal_idx = 15
         signal_text = "🎯 AI 바닥 턴어라운드 포착"
 
     df = pd.DataFrame({"Open": opens, "Close": closes, "High": highs, "Low": lows, "Volume": vols}, index=dates)
@@ -114,12 +89,12 @@ def create_showcase_figure(pattern_type: str = "breakout", is_dark: bool = True)
         font=dict(color=font_color, family="system-ui, sans-serif"),
         xaxis_rangeslider_visible=False,
         margin=dict(l=10, r=10, t=25, b=10),
-        height=390,
+        height=410,
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        xaxis=dict(gridcolor=grid_color),
-        yaxis=dict(gridcolor=grid_color),
-        xaxis2=dict(gridcolor=grid_color),
-        yaxis2=dict(gridcolor=grid_color),
+        xaxis=dict(type="category", gridcolor=grid_color),
+        yaxis=dict(gridcolor=grid_color, autorange=True),
+        xaxis2=dict(type="category", gridcolor=grid_color),
+        yaxis2=dict(gridcolor=grid_color, autorange=True),
     )
     return fig
 
@@ -623,9 +598,8 @@ def render_landing_page(is_dark: bool):
             fig1 = create_showcase_figure("breakout", is_dark)
             st.plotly_chart(fig1, use_container_width=True, config={"displayModeBar": False})
         with col_m1:
-            st.markdown(
-                f"""
-                <div class="chart-score-box" style="background-color: {card_bg}; border: 1px solid {card_border}; box-shadow: {box_shadow};">
+            st.html(
+                f"""<div class="chart-score-box" style="background-color: {card_bg}; border: 1px solid {card_border}; box-shadow: {box_shadow};">
                     <div>
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                             <span class="badge-pill notranslate" translate="no" style="background-color: rgba(239, 68, 68, 0.15) !important; color: #EF4444 !important; border-color: #EF4444 !important; margin: 0; font-size: 0.76rem;">🏆 S등급 초강력 추천</span>
@@ -637,7 +611,6 @@ def render_landing_page(is_dark: bool):
                         <div style="font-size: 0.86rem; color: {sub_color}; margin-bottom: 14px;">
                             5일 이내 추가 상승 확률: <b style="color: #10B981; font-size: 0.98rem;">74.8% (매우 유력)</b>
                         </div>
-                        
                         <div style="background: {sub_bg}; border-radius: 10px; padding: 12px; margin-bottom: 12px; border: 1px solid {card_border};">
                             <div style="display: flex; justify-content: space-between; font-weight: 800; font-size: 0.92rem; margin-bottom: 4px; color: {text_color};">
                                 <span>AI 퀀트 종합 스코어</span>
@@ -647,7 +620,6 @@ def render_landing_page(is_dark: bool):
                                 <div style="background: linear-gradient(90deg, #2563EB, #10B981); width: 96%; height: 100%;"></div>
                             </div>
                         </div>
-
                         <div style="font-size: 0.84rem; line-height: 1.8; color: {text_color}; margin-bottom: 14px;">
                             <div style="display: flex; justify-content: space-between;">
                                 <span>🚀 상승 모멘텀</span><b>25 / 25 만점</b>
@@ -663,16 +635,13 @@ def render_landing_page(is_dark: bool):
                             </div>
                         </div>
                     </div>
-
                     <div style="background: rgba(37, 99, 235, 0.08); border-left: 4px solid #2563EB; border-radius: 0 8px 8px 0; padding: 10px 12px; font-size: 0.85rem; line-height: 1.55; color: {text_color};">
                         <div style="font-weight: 800; color: #2563EB; margin-bottom: 3px;">🎯 AI 실전 매매 가이드</div>
                         <div>• <b>분할 매수가:</b> 51,500원 ~ 53,000원</div>
                         <div>• <b>1차 목표가:</b> <span style="color: #10B981; font-weight: 800;">56,800원 (+7.2%)</span></div>
                         <div>• <b>원칙 손절가:</b> <span style="color: #EF4444; font-weight: 800;">49,900원 (-3.0%)</span></div>
                     </div>
-                </div>
-                """,
-                unsafe_allow_html=True,
+                </div>"""
             )
 
     with tab_pullback:
@@ -681,9 +650,8 @@ def render_landing_page(is_dark: bool):
             fig2 = create_showcase_figure("pullback", is_dark)
             st.plotly_chart(fig2, use_container_width=True, config={"displayModeBar": False})
         with col_m2:
-            st.markdown(
-                f"""
-                <div class="chart-score-box" style="background-color: {card_bg}; border: 1px solid {card_border}; box-shadow: {box_shadow};">
+            st.html(
+                f"""<div class="chart-score-box" style="background-color: {card_bg}; border: 1px solid {card_border}; box-shadow: {box_shadow};">
                     <div>
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                             <span class="badge-pill notranslate" translate="no" style="background-color: rgba(16, 185, 129, 0.15) !important; color: #10B981 !important; border-color: #10B981 !important; margin: 0; font-size: 0.76rem;">💎 S등급 스윙 원픽</span>
@@ -695,7 +663,6 @@ def render_landing_page(is_dark: bool):
                         <div style="font-size: 0.86rem; color: {sub_color}; margin-bottom: 14px;">
                             5일 이내 추가 상승 확률: <b style="color: #10B981; font-size: 0.98rem;">71.5% (유력)</b>
                         </div>
-                        
                         <div style="background: {sub_bg}; border-radius: 10px; padding: 12px; margin-bottom: 12px; border: 1px solid {card_border};">
                             <div style="display: flex; justify-content: space-between; font-weight: 800; font-size: 0.92rem; margin-bottom: 4px; color: {text_color};">
                                 <span>AI 퀀트 종합 스코어</span>
@@ -705,7 +672,6 @@ def render_landing_page(is_dark: bool):
                                 <div style="background: linear-gradient(90deg, #10B981, #059669); width: 94%; height: 100%;"></div>
                             </div>
                         </div>
-
                         <div style="font-size: 0.84rem; line-height: 1.8; color: {text_color}; margin-bottom: 14px;">
                             <div style="display: flex; justify-content: space-between;">
                                 <span>🚀 상승 모멘텀</span><b>22 / 25 점 (눌림 안착)</b>
@@ -721,16 +687,13 @@ def render_landing_page(is_dark: bool):
                             </div>
                         </div>
                     </div>
-
                     <div style="background: rgba(16, 185, 129, 0.08); border-left: 4px solid #10B981; border-radius: 0 8px 8px 0; padding: 10px 12px; font-size: 0.85rem; line-height: 1.55; color: {text_color};">
                         <div style="font-weight: 800; color: #10B981; margin-bottom: 3px;">🎯 AI 실전 매매 가이드</div>
                         <div>• <b>눌림 매수가:</b> 39,500원 ~ 40,500원</div>
                         <div>• <b>1차 목표가:</b> <span style="color: #10B981; font-weight: 800;">43,800원 (+8.1%)</span></div>
                         <div>• <b>원칙 손절가:</b> <span style="color: #EF4444; font-weight: 800;">38,300원 (-3.0%)</span></div>
                     </div>
-                </div>
-                """,
-                unsafe_allow_html=True,
+                </div>"""
             )
 
     with tab_ipo:
@@ -739,9 +702,8 @@ def render_landing_page(is_dark: bool):
             fig3 = create_showcase_figure("ipo", is_dark)
             st.plotly_chart(fig3, use_container_width=True, config={"displayModeBar": False})
         with col_m3:
-            st.markdown(
-                f"""
-                <div class="chart-score-box" style="background-color: {card_bg}; border: 1px solid {card_border}; box-shadow: {box_shadow};">
+            st.html(
+                f"""<div class="chart-score-box" style="background-color: {card_bg}; border: 1px solid {card_border}; box-shadow: {box_shadow};">
                     <div>
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                             <span class="badge-pill notranslate" translate="no" style="background-color: rgba(139, 92, 246, 0.15) !important; color: #8B5CF6 !important; border-color: #8B5CF6 !important; margin: 0; font-size: 0.76rem;">🚀 턴어라운드 원픽</span>
@@ -753,7 +715,6 @@ def render_landing_page(is_dark: bool):
                         <div style="font-size: 0.86rem; color: {sub_color}; margin-bottom: 14px;">
                             5일 이내 추가 상승 확률: <b style="color: #10B981; font-size: 0.98rem;">69.2% (유력)</b>
                         </div>
-                        
                         <div style="background: {sub_bg}; border-radius: 10px; padding: 12px; margin-bottom: 12px; border: 1px solid {card_border};">
                             <div style="display: flex; justify-content: space-between; font-weight: 800; font-size: 0.92rem; margin-bottom: 4px; color: {text_color};">
                                 <span>AI 퀀트 종합 스코어</span>
@@ -763,7 +724,6 @@ def render_landing_page(is_dark: bool):
                                 <div style="background: linear-gradient(90deg, #8B5CF6, #EC4899); width: 93%; height: 100%;"></div>
                             </div>
                         </div>
-
                         <div style="font-size: 0.84rem; line-height: 1.8; color: {text_color}; margin-bottom: 14px;">
                             <div style="display: flex; justify-content: space-between;">
                                 <span>🚀 상승 모멘텀</span><b>24 / 25 점 (바닥 탈출)</b>
@@ -779,16 +739,13 @@ def render_landing_page(is_dark: bool):
                             </div>
                         </div>
                     </div>
-
                     <div style="background: rgba(139, 92, 246, 0.08); border-left: 4px solid #8B5CF6; border-radius: 0 8px 8px 0; padding: 10px 12px; font-size: 0.85rem; line-height: 1.55; color: {text_color};">
                         <div style="font-weight: 800; color: #8B5CF6; margin-bottom: 3px;">🎯 AI 실전 매매 가이드</div>
                         <div>• <b>바닥 매수가:</b> 18,800원 ~ 19,500원</div>
                         <div>• <b>1차 목표가:</b> <span style="color: #10B981; font-weight: 800;">21,200원 (+9.0%)</span></div>
                         <div>• <b>원칙 손절가:</b> <span style="color: #EF4444; font-weight: 800;">18,200원 (-3.5%)</span></div>
                     </div>
-                </div>
-                """,
-                unsafe_allow_html=True,
+                </div>"""
             )
 
     st.markdown("<div style='height: 25px;'></div>", unsafe_allow_html=True)
@@ -797,64 +754,51 @@ def render_landing_page(is_dark: bool):
     st.markdown("#### 💡 초보자도 1초 만에 끝내는 AI 차트 판독 4대 핵심 체크포인트")
     cp1, cp2, cp3, cp4 = st.columns(4)
     with cp1:
-        st.markdown(
-            f"""
-            <div class="step-card" style="padding: 18px 16px;">
+        st.html(
+            f"""<div class="step-card" style="padding: 18px 16px;">
                 <div style="font-size: 1.5rem; margin-bottom: 6px;">📈</div>
                 <div style="font-weight: 800; font-size: 1.02rem; color: #2563EB; margin-bottom: 6px;">01. 정배열 골든크로스</div>
                 <div style="font-size: 0.85rem; color: {sub_color}; line-height: 1.55;">
                     5일선이 20일선을 상향 돌파하며 정배열을 완성할 때가 가장 안전하고 폭발적인 1차 매수 타점입니다.
                 </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
+            </div>"""
         )
     with cp2:
-        st.markdown(
-            f"""
-            <div class="step-card" style="padding: 18px 16px;">
+        st.html(
+            f"""<div class="step-card" style="padding: 18px 16px;">
                 <div style="font-size: 1.5rem; margin-bottom: 6px;">🔥</div>
                 <div style="font-weight: 800; font-size: 1.02rem; color: #EF4444; margin-bottom: 6px;">02. 거래량 300% 폭증</div>
                 <div style="font-size: 0.85rem; color: {sub_color}; line-height: 1.55;">
                     전일 대비 거래량이 300% 이상 폭증하는 것은 개미가 아닌 메이저 세력의 실제 자금이 유입된 명백한 증거입니다.
                 </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
+            </div>"""
         )
     with cp3:
-        st.markdown(
-            f"""
-            <div class="step-card" style="padding: 18px 16px;">
+        st.html(
+            f"""<div class="step-card" style="padding: 18px 16px;">
                 <div style="font-size: 1.5rem; margin-bottom: 6px;">👥</div>
                 <div style="font-weight: 800; font-size: 1.02rem; color: #10B981; margin-bottom: 6px;">03. 외인·기관 수급 일치</div>
                 <div style="font-size: 0.85rem; color: {sub_color}; line-height: 1.55;">
                     차트만 그럴듯한 껍데기 테마주를 배제하고, 외국인과 기관이 3일 이상 동반 순매수한 진짜 주도주만 선별합니다.
                 </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
+            </div>"""
         )
     with cp4:
-        st.markdown(
-            f"""
-            <div class="step-card" style="padding: 18px 16px;">
+        st.html(
+            f"""<div class="step-card" style="padding: 18px 16px;">
                 <div style="font-size: 1.5rem; margin-bottom: 6px;">🛡️</div>
                 <div style="font-weight: 800; font-size: 1.02rem; color: #8B5CF6; margin-bottom: 6px;">04. 기계적 칼손절 원칙</div>
                 <div style="font-size: 0.85rem; color: {sub_color}; line-height: 1.55;">
                     아무리 좋은 분석도 시장 급변 시 -3.0% 지지선 이탈 즉시 칼손절하여 내 원금을 100% 지키고 다음 기회를 노립니다.
                 </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
+            </div>"""
         )
 
     # ⚖️ 일반 개인 매매 vs Stock Radar AI 퀀트 차트 분석표 비교표
     st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
     st.markdown("#### ⚖️ 일반 개인 매매 vs Stock Radar AI 퀀트 차트 분석표")
-    st.markdown(
-        f"""
-        <table class="comparison-table notranslate" translate="no">
+    st.html(
+        f"""<table class="comparison-table notranslate" translate="no">
             <thead>
                 <tr>
                     <th style="width: 20%;">비교 항목</th>
@@ -889,9 +833,7 @@ def render_landing_page(is_dark: bool):
                     <td><b>머신러닝 AI 앙상블 5일 이내 상승 확률(%) 명확 제시</b></td>
                 </tr>
             </tbody>
-        </table>
-        """,
-        unsafe_allow_html=True,
+        </table>"""
     )
     st.markdown("<div style='height: 35px;'></div>", unsafe_allow_html=True)
 
