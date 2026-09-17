@@ -77,15 +77,12 @@ if st.session_state["current_page"] == "dashboard":
             u_name = user.get("name", "회원")
             u_email = user.get("email", "")
             u_badge = user.get("badge", "VIP")
-            st.markdown(
-                f"""
-                <div class="user-profile-card">
+            st.html(
+                f"""<div class="user-profile-card">
                     <div style="font-size: 1.05rem; font-weight: 800; margin-bottom: 2px;">👤 {u_name}님</div>
                     <div style="font-size: 0.8rem; opacity: 0.75; margin-bottom: 6px;">{u_email}</div>
                     <span class="badge-pill notranslate" translate="no" style="padding: 2px 8px; font-size: 0.72rem; margin-bottom: 0;">{u_badge}</span>
-                </div>
-                """,
-                unsafe_allow_html=True,
+                </div>"""
             )
             col_sb1, col_sb2 = st.columns(2)
             with col_sb1:
@@ -1182,10 +1179,11 @@ def display_investor_table(investor_df: pd.DataFrame, rows: int = 5):
         return
     disp_df = format_investor_df(investor_df.tail(rows))
     st.dataframe(disp_df, use_container_width=True, hide_index=True)
-    st.caption(
-        "💡 **단위: 억원** | **(+)** 순매수, **(-)** 순매도 | **'0'**은 순매매액 100만원 미만 또는 거래 없는 중립 상태<br>"
-        "⏰ **갱신 조건:** 장중(09:00~15:30) 잠정 집계 순차 반영 → 매일 18:00경 KRX 거래소 최종 확정치 반영",
-        unsafe_allow_html=True,
+    st.html(
+        """<div style="font-size:0.8rem; color:#64748B; margin-top:4px; line-height:1.5;">
+            💡 <b>단위: 억원</b> | <b>(+)</b> 순매수, <b>(-)</b> 순매도 | <b>'0'</b>은 순매매액 100만원 미만 또는 거래 없는 중립 상태<br>
+            ⏰ <b>갱신 조건:</b> 장중(09:00~15:30) 잠정 집계 순차 반영 → 매일 18:00경 KRX 거래소 최종 확정치 반영
+        </div>"""
     )
 
 
@@ -1240,9 +1238,9 @@ def render_stock_detailed_section(code: str, name: str, is_dark: bool, in_modal:
     pred_res = predictor.predict_probability(ohlcv_ind, quant_score=quant_res["total_score"])
 
     # 1. 상단 요약 헤더 & 이평선 상태
-    st.markdown(
-        f"""
-        <div style="background:{'#1E293B' if is_dark else '#F8FAFC'}; border:1.5px solid {'#334155' if is_dark else '#CBD5E1'}; border-radius:12px; padding:16px 20px; margin-bottom:14px;">
+    trade_meta = f"<span style='margin-left:8px; font-size:0.85rem; color:#64748B;'>거래대금: {trade_val:,.1f}억 / 시총: {marcap_val:,.1f}억</span>" if trade_val > 0 else ""
+    st.html(
+        f"""<div style="background:{'#1E293B' if is_dark else '#F8FAFC'}; border:1.5px solid {'#334155' if is_dark else '#CBD5E1'}; border-radius:12px; padding:16px 20px; margin-bottom:14px;">
             <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
                 <div>
                     <span style="font-size:1.5rem; font-weight:900; color:{'#FFFFFF' if is_dark else '#0F172A'};">{name}</span>
@@ -1250,7 +1248,7 @@ def render_stock_detailed_section(code: str, name: str, is_dark: bool, in_modal:
                     <span style="margin-left:12px; font-size:1.35rem; font-weight:bold; color:{'#EF4444' if change_rate > 0 else '#3B82F6'};">
                         {curr_price:,}원 ({change_rate:+.2f}%)
                     </span>
-                    {f"<span style='margin-left:8px; font-size:0.85rem; color:#64748B;'>거래대금: {trade_val:,.1f}억 / 시총: {marcap_val:,.1f}억</span>" if trade_val > 0 else ""}
+                    {trade_meta}
                 </div>
                 <div style="display:flex; gap:8px; align-items:center;">
                     <span style="background:{'#DC2626' if quant_res['grade']=='S' else '#EA580C' if quant_res['grade']=='A' else '#2563EB'}; color:white; padding:5px 12px; border-radius:6px; font-weight:bold; font-size:0.9rem;">
@@ -1264,9 +1262,7 @@ def render_stock_detailed_section(code: str, name: str, is_dark: bool, in_modal:
             <div style="margin-top:10px; font-size:0.92rem; font-weight:700; color:{status_color};">
                 ⚡ <b>이평선 추세 진단:</b> {ma_status}
             </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
+        </div>"""
     )
 
     # 2. 이동평균선(5일, 20일, 60일) 직접 비교 메트릭 카드
@@ -1350,9 +1346,8 @@ def render_stock_detailed_section(code: str, name: str, is_dark: bool, in_modal:
         f_sum = inv_df["foreign"].tail(5).sum() if not inv_df.empty and "foreign" in inv_df.columns else 0.0
         org_sum = inv_df["institution"].tail(5).sum() if not inv_df.empty and "institution" in inv_df.columns else 0.0
 
-        st.markdown(
-            f"""
-            <div style="background:{'#151A23' if is_dark else '#FFFFFF'}; border:1px solid {'#334155' if is_dark else '#E2E8F0'}; border-radius:10px; padding:16px; font-size:0.92rem; line-height:1.65;">
+        st.html(
+            f"""<div style="background:{'#151A23' if is_dark else '#FFFFFF'}; border:1px solid {'#334155' if is_dark else '#E2E8F0'}; border-radius:10px; padding:16px; font-size:0.92rem; line-height:1.65;">
                 <div style="font-weight:800; color:{'#38BDF8' if is_dark else '#1D4ED8'}; font-size:1.05rem; margin-bottom:10px;">🎯 초보자 실전 매매 가이드</div>
                 <div style="margin-bottom:6px;">• <b>1차 목표가:</b> <span style="color:#EF4444; font-weight:bold;">{target_p:,}원 (+6.0%)</span></div>
                 <div style="margin-bottom:6px;">• <b>권장 손절선:</b> <span style="color:#3B82F6; font-weight:bold;">{stop_p:,}원 (-3.0%)</span></div>
@@ -1361,14 +1356,12 @@ def render_stock_detailed_section(code: str, name: str, is_dark: bool, in_modal:
                 <div style="margin-top:10px; padding-top:10px; border-top:1px dashed {'#475569' if is_dark else '#CBD5E1'}; color:{'#CBD5E1' if is_dark else '#475569'}; font-size:0.88rem;">
                     💡 <b>AI 진단 총평:</b> {quant_res['key_reasons']}
                 </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
+            </div>"""
         )
 
     with col_g2:
         if not inv_df.empty:
-            st.markdown("<div style='font-size:0.92rem; font-weight:700; margin-bottom:4px;'>👥 최근 5거래일 외국인·기관 순매수 상세 내역</div>", unsafe_allow_html=True)
+            st.html("<div style='font-size:0.92rem; font-weight:700; margin-bottom:4px;'>👥 최근 5거래일 외국인·기관 순매수 상세 내역</div>")
             display_investor_table(inv_df, 5)
         else:
             st.info("수급 데이터를 집계 중입니다.")
@@ -1459,21 +1452,18 @@ if show_matrix:
 # ----------------------------------------------------
 head_c1, head_c2 = st.columns([5, 3.2])
 with head_c1:
-    st.markdown('<div class="main-title notranslate" translate="no">📈 Stock Radar : AI 급등주 & 신규상장 분석기</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sub-title">어려운 차트 공부 없이, 큰손(외인·기관) 수급과 상승 확률 높은 종목만 한눈에 확인하세요!</div>', unsafe_allow_html=True)
+    st.html('<div class="main-title notranslate" translate="no">📈 Stock Radar : AI 급등주 & 신규상장 분석기</div>')
+    st.html('<div class="sub-title">어려운 차트 공부 없이, 큰손(외인·기관) 수급과 상승 확률 높은 종목만 한눈에 확인하세요!</div>')
 with head_c2:
     user = st.session_state.get("user_info")
     if user:
         u_name = user.get("name", "회원")
         u_badge = user.get("badge", "VIP")
-        st.markdown(
-            f"""
-            <div style="text-align: right; padding-top: 2px; margin-bottom: 6px;">
+        st.html(
+            f"""<div style="text-align: right; padding-top: 2px; margin-bottom: 6px;">
                 <span style="font-weight: 800; font-size: 0.95rem;">👤 {u_name}님</span>
                 <span class="badge-pill notranslate" translate="no" style="margin-left: 6px; padding: 2px 8px; font-size: 0.75rem;">{u_badge}</span>
-            </div>
-            """,
-            unsafe_allow_html=True
+            </div>"""
         )
     h_btn1, h_btn2 = st.columns(2)
     with h_btn1:
@@ -1507,9 +1497,8 @@ else:
     badge_border = "#3B82F6"
     badge_color = "#1D4ED8" if not is_dark else "#60A5FA"
 
-st.markdown(
-    f"""
-    <div style="background:{badge_bg}; border:1px solid {badge_border}; border-radius:10px; padding:10px 16px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+st.html(
+    f"""<div style="background:{badge_bg}; border:1px solid {badge_border}; border-radius:10px; padding:10px 16px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
         <div>
             <span style="font-weight:800; color:{badge_color}; font-size:0.95rem;">{status_icon} {status_title}</span>
             <span style="color:{'#94A3B8' if is_dark else '#64748B'}; font-size:0.85rem; margin-left:8px;">• {status_desc}</span>
@@ -1517,9 +1506,7 @@ st.markdown(
         <div style="font-size:0.82rem; color:{'#94A3B8' if is_dark else '#64748B'};">
             📡 분석 주기: <b>{analysis_period.split(' ')[1] if ' ' in analysis_period else '실시간'}</b> | 최종 갱신: <b>{now_kst.strftime('%H:%M:%S')}</b>
         </div>
-    </div>
-    """,
-    unsafe_allow_html=True,
+    </div>"""
 )
 
 # 초보자 3초 투자 가이드 배너
@@ -1556,9 +1543,8 @@ st.markdown("---")
 # ----------------------------------------------------
 all_options, code_map, all_stocks_df = load_all_stocks()
 
-st.markdown(
-    f"""
-    <div style="background:{'#151A23' if is_dark else '#FFFFFF'}; border:2px solid {'#38BDF8' if is_dark else '#2563EB'}; border-radius:12px; padding:16px 20px; margin-bottom:14px; box-shadow:0 4px 14px rgba(37,99,235,0.12);">
+st.html(
+    f"""<div style="background:{'#151A23' if is_dark else '#FFFFFF'}; border:2px solid {'#38BDF8' if is_dark else '#2563EB'}; border-radius:12px; padding:16px 20px; margin-bottom:14px; box-shadow:0 4px 14px rgba(37,99,235,0.12);">
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
             <div>
                 <span style="font-size:1.25rem; font-weight:900; color:{'#F8FAFC' if is_dark else '#0F172A'};">🔍 전 종목 프리미엄 AI 즉시 검색기</span>
@@ -1568,9 +1554,7 @@ st.markdown(
                 ⚡ 종목명이나 6자리 코드 입력 후 <b>Enter</b>를 누르면 즉시 AI 정밀 진단이 실행됩니다
             </div>
         </div>
-    </div>
-    """,
-    unsafe_allow_html=True,
+    </div>"""
 )
 
 with st.form("main_stock_search_form", clear_on_submit=False):
@@ -1619,10 +1603,7 @@ for i, chip in enumerate(chips):
 # 연관 종목 바로가기 칩 (복수 매칭 시)
 related = st.session_state.get("related_search_matches", [])
 if related:
-    st.markdown(
-        "<div style='margin-top:6px; margin-bottom:8px; font-size:0.88rem; color:#64748B;'>💡 <b>연관 검색 종목:</b> 다른 종목을 분석하시려면 아래를 클릭하세요:</div>",
-        unsafe_allow_html=True,
-    )
+    st.html("<div style='margin-top:6px; margin-bottom:8px; font-size:0.88rem; color:#64748B;'>💡 <b>연관 검색 종목:</b> 다른 종목을 분석하시려면 아래를 클릭하세요:</div>")
     r_cols = st.columns(min(len(related), 6))
     for idx, r_item in enumerate(related[:6]):
         with r_cols[idx]:
@@ -1671,9 +1652,8 @@ with tab_ai:
         vip_border = "#22C55E" if not is_dark else "#10B981"
         vip_text = "#FFFFFF" if is_dark else "#14532D"
 
-        st.markdown(
-            f"""
-            <div style="background:{vip_bg}; border:2px solid {vip_border}; border-radius:12px; padding:18px 22px; margin-bottom:14px; box-shadow:0 4px 6px -1px rgba(0,0,0,0.06);">
+        st.html(
+            f"""<div style="background:{vip_bg}; border:2px solid {vip_border}; border-radius:12px; padding:18px 22px; margin-bottom:14px; box-shadow:0 4px 6px -1px rgba(0,0,0,0.06);">
                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
                     <div>
                         <span style="background:#16A34A; color:white; font-size:0.85rem; font-weight:bold; padding:4px 12px; border-radius:20px;">🏆 [{preset_style}] AI 추천 1위 (원픽)</span>
@@ -1702,9 +1682,7 @@ with tab_ai:
                         🎯 <b>초보자 매매 가이드:</b> 목표가 약 <span style="color:#EF4444;">{target_high:,}원 (+6%)</span> | 손절선 약 <span style="color:#3B82F6;">{stop_loss:,}원 (-3%)</span>
                     </div>
                 </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
+            </div>"""
         )
 
         with st.expander(f"📈 [원픽 1위] {top1['name']} ({top1['code']}) - 실시간 캔들 차트(5일·20일선) & 초보자 상세 매매 가이드 펼치기", expanded=True):
@@ -1718,9 +1696,8 @@ with tab_ai:
                 f_sum1 = top1_inv["foreign"].tail(5).sum() if not top1_inv.empty and "foreign" in top1_inv.columns else 0.0
                 org_sum1 = top1_inv["institution"].tail(5).sum() if not top1_inv.empty and "institution" in top1_inv.columns else 0.0
 
-                st.markdown(
-                    f"""
-                    <div style="background:{'#1E293B' if is_dark else '#F8FAFC'}; border:1px solid {'#334155' if is_dark else '#E2E8F0'}; border-radius:10px; padding:16px; font-size:0.92rem; line-height:1.6;">
+                st.html(
+                    f"""<div style="background:{'#1E293B' if is_dark else '#F8FAFC'}; border:1px solid {'#334155' if is_dark else '#E2E8F0'}; border-radius:10px; padding:16px; font-size:0.92rem; line-height:1.6;">
                         <div style="font-weight:800; color:{'#38BDF8' if is_dark else '#1D4ED8'}; font-size:1.02rem; margin-bottom:10px;">🎯 초보자 실전 매매 가이드</div>
                         <div style="margin-bottom:6px;">• <b>1차 목표가:</b> <span style="color:#EF4444; font-weight:bold;">{target_high:,}원 (+6.0%)</span></div>
                         <div style="margin-bottom:6px;">• <b>권장 손절선:</b> <span style="color:#3B82F6; font-weight:bold;">{stop_loss:,}원 (-3.0%)</span></div>
@@ -1728,13 +1705,11 @@ with tab_ai:
                         <div style="margin-top:10px; padding-top:10px; border-top:1px dashed {'#475569' if is_dark else '#CBD5E1'}; color:{'#CBD5E1' if is_dark else '#475569'};">
                             💡 <b>핵심 포착 이유:</b> {top1['reasons']}
                         </div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
+                    </div>"""
                 )
 
                 if not top1_inv.empty:
-                    st.markdown("<div style='font-size:0.9rem; font-weight:700; margin-top:10px; margin-bottom:4px;'>👥 최근 5거래일 외국인·기관 순매수 현황</div>", unsafe_allow_html=True)
+                    st.html("<div style='font-size:0.9rem; font-weight:700; margin-top:10px; margin-bottom:4px;'>👥 최근 5거래일 외국인·기관 순매수 현황</div>")
                     display_investor_table(top1_inv, 5)
 
             with col_t2:
@@ -1750,9 +1725,8 @@ with tab_ai:
             r_stop = int(r['price'] * 0.97)
 
             with st.container():
-                st.markdown(
-                    f"""
-                    <div class="recommend-card">
+                st.html(
+                    f"""<div class="recommend-card">
                         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
                             <div>
                                 <span class="stock-title">#{r['rank']} {r['name']}</span>
@@ -1773,9 +1747,7 @@ with tab_ai:
                         <div style="margin-top:8px;">
                             <span class="signal-desc">📌 <b>포착 신호:</b> {r['signals']}</span>
                         </div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
+                    </div>"""
                 )
 
                 with st.expander(f"🔰 [추천 #{r['rank']}] {r['name']} ({r_code}) - 초보자 실전 매매 가이드 & 캔들 차트 펼치기", expanded=False):
@@ -1788,9 +1760,8 @@ with tab_ai:
                         f_val = r_inv['foreign'].tail(5).sum() if not r_inv.empty and 'foreign' in r_inv.columns else 0.0
                         org_val = r_inv['institution'].tail(5).sum() if not r_inv.empty and 'institution' in r_inv.columns else 0.0
 
-                        st.markdown(
-                            f"""
-                            <div style="background:{'#1E293B' if is_dark else '#F8FAFC'}; border:1px solid {'#334155' if is_dark else '#E2E8F0'}; border-radius:10px; padding:14px; font-size:0.9rem; line-height:1.6;">
+                        st.html(
+                            f"""<div style="background:{'#1E293B' if is_dark else '#F8FAFC'}; border:1px solid {'#334155' if is_dark else '#E2E8F0'}; border-radius:10px; padding:14px; font-size:0.9rem; line-height:1.6;">
                                 <div style="font-weight:800; color:{'#38BDF8' if is_dark else '#1D4ED8'}; margin-bottom:8px;">🎯 {r['name']} 초보자 실전 매매 가이드</div>
                                 <div style="margin-bottom:6px;">• <b>1차 목표가:</b> <span style="color:#EF4444; font-weight:bold;">{r_target:,}원 (+6.0%)</span></div>
                                 <div style="margin-bottom:6px;">• <b>권장 손절선:</b> <span style="color:#3B82F6; font-weight:bold;">{r_stop:,}원 (-3.0%)</span></div>
@@ -1799,13 +1770,11 @@ with tab_ai:
                                     💡 <b>AI 포착 신호:</b> {r['signals']}<br>
                                     📌 <b>핵심 추천 사유:</b> {r['reasons']}
                                 </div>
-                            </div>
-                            """,
-                            unsafe_allow_html=True,
+                            </div>"""
                         )
 
                         if not r_inv.empty:
-                            st.markdown("<div style='font-size:0.9rem; font-weight:700; margin-top:10px; margin-bottom:4px;'>👥 최근 5거래일 외국인·기관 순매수 현황</div>", unsafe_allow_html=True)
+                            st.html("<div style='font-size:0.9rem; font-weight:700; margin-top:10px; margin-bottom:4px;'>👥 최근 5거래일 외국인·기관 순매수 현황</div>")
                             display_investor_table(r_inv, 5)
 
                     with col_rg2:
