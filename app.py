@@ -333,6 +333,22 @@ button[data-baseweb="tab"][aria-selected="true"] p, button[data-baseweb="tab"][a
     color: #1D4ED8 !important;
     font-weight: bold !important;
 }
+/* 검색창 전용 선명한 테두리 및 입력박스 스타일 */
+div[data-testid="stTextInput"] input {
+    border: 2px solid #2563EB !important;
+    border-radius: 10px !important;
+    padding: 12px 16px !important;
+    font-size: 1.05rem !important;
+    font-weight: 600 !important;
+    color: #0F172A !important;
+    background-color: #FFFFFF !important;
+    box-shadow: 0 2px 10px rgba(37, 99, 235, 0.15) !important;
+}
+div[data-testid="stTextInput"] input:focus {
+    border-color: #1D4ED8 !important;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.3) !important;
+    outline: none !important;
+}
 .recommend-card {
     background-color: #FFFFFF !important;
     border: 1px solid #E2E8F0 !important;
@@ -478,6 +494,22 @@ button[data-baseweb="tab"] p, button[data-baseweb="tab"] span {
 button[data-baseweb="tab"][aria-selected="true"] p, button[data-baseweb="tab"][aria-selected="true"] span {
     color: #38BDF8 !important;
     font-weight: bold !important;
+}
+/* 검색창 전용 선명한 테두리 및 입력박스 스타일 */
+div[data-testid="stTextInput"] input {
+    border: 2px solid #38BDF8 !important;
+    border-radius: 10px !important;
+    padding: 12px 16px !important;
+    font-size: 1.05rem !important;
+    font-weight: 600 !important;
+    color: #FFFFFF !important;
+    background-color: #151A23 !important;
+    box-shadow: 0 2px 10px rgba(56, 189, 248, 0.2) !important;
+}
+div[data-testid="stTextInput"] input:focus {
+    border-color: #0EA5E9 !important;
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.35) !important;
+    outline: none !important;
 }
 .recommend-card {
     background-color: #151A23 !important;
@@ -645,18 +677,73 @@ def evaluate_candidates(pool_records: list, strategy_key: str) -> list:
 def load_all_stocks():
     """전체 한국 상장 종목(코스피/코스닥 ~2,800개) 메타데이터 로드"""
     try:
-        df = fdr.StockListing("KRX-DESC")
-        if df.empty:
-            return [], {}
+        import FinanceDataReader as fdr
+        df = fdr.StockListing("KRX")
+        if df is None or df.empty:
+            df = fdr.StockListing("KRX-DESC")
+        if df is None or df.empty:
+            return [], {}, pd.DataFrame()
         df["Code"] = df["Code"].astype(str)
         df["Name"] = df["Name"].astype(str)
         df["Market"] = df["Market"].astype(str)
         options = [f"{r['Name']} ({r['Code']}) · {r['Market']}" for _, r in df.iterrows()]
-        code_map = {f"{r['Name']} ({r['Code']}) · {r['Market']}": r['Code'] for _, r in df.iterrows()}
-        return options, code_map
+        code_map = {}
+        for _, r in df.iterrows():
+            code_map[f"{r['Name']} ({r['Code']}) · {r['Market']}"] = r['Code']
+            code_map[r['Name']] = r['Code']
+            code_map[r['Code']] = r['Code']
+        return options, code_map, df
     except Exception as e:
         print(f"[Error] load_all_stocks: {e}")
-        return [], {}
+        return [], {}, pd.DataFrame()
+
+
+def resolve_stock_search(query: str, all_stocks_df: pd.DataFrame, code_map: dict) -> list:
+    """사용자가 입력한 검색어로 종목을 지능적으로 매칭 (코드, 종목명, 영문, 접두사, 부분 일치)"""
+    if not query:
+        return []
+    q = query.strip()
+    # 1. code_map 완전 일치
+    if q in code_map:
+        c = code_map[q]
+        name = q
+        if all_stocks_df is not None and not all_stocks_df.empty:
+            row = all_stocks_df[all_stocks_df["Code"] == c]
+            if not row.empty:
+                name = str(row["Name"].iloc[0])
+        return [{"code": c, "name": name}]
+
+    if all_stocks_df is None or all_stocks_df.empty:
+        return []
+
+    q_up = q.upper()
+    # 2. 6자리 코드 일치
+    m_code = all_stocks_df[all_stocks_df["Code"] == q_up]
+    if not m_code.empty:
+        r = m_code.iloc[0]
+        return [{"code": r["Code"], "name": r["Name"]}]
+
+    # 3. 종목명 대소문자 무시 완전 일치
+    m_name = all_stocks_df[all_stocks_df["Name"].str.upper() == q_up]
+    if not m_name.empty:
+        r = m_name.iloc[0]
+        return [{"code": r["Code"], "name": r["Name"]}]
+
+    # 4. 접두사 일치
+    m_pre = all_stocks_df[all_stocks_df["Name"].str.upper().str.startswith(q_up)]
+    if not m_pre.empty:
+        if "Amount" in m_pre.columns:
+            m_pre = m_pre.sort_values(by="Amount", ascending=False)
+        return [{"code": r["Code"], "name": r["Name"]} for _, r in m_pre.head(8).iterrows()]
+
+    # 5. 부분 일치
+    m_sub = all_stocks_df[all_stocks_df["Name"].str.upper().str.contains(q_up, regex=False)]
+    if not m_sub.empty:
+        if "Amount" in m_sub.columns:
+            m_sub = m_sub.sort_values(by="Amount", ascending=False)
+        return [{"code": r["Code"], "name": r["Name"]} for _, r in m_sub.head(8).iterrows()]
+
+    return []
 
 
 def render_stock_mini_chart(ohlcv_ind: pd.DataFrame, target_name: str = "", is_dark: bool = False):
@@ -745,6 +832,196 @@ def display_investor_table(investor_df: pd.DataFrame, rows: int = 5):
         "⏰ **갱신 조건:** 장중(09:00~15:30) 잠정 집계 순차 반영 → 매일 18:00경 KRX 거래소 최종 확정치 반영",
         unsafe_allow_html=True,
     )
+
+
+def render_stock_detailed_section(code: str, name: str, is_dark: bool, in_modal: bool = False, days: int = 100, key_prefix: str = "sec"):
+    """
+    종목의 5일/20일/60일 이동평균선 비교 지표 카드, 3단 인터랙티브 캔들 차트,
+    초보자 실전 매매 가이드 및 외인/기관 일별 수급 테이블을 일체형으로 렌더링
+    """
+    with st.spinner(f"'{name}'({code}) 실시간 기술 지표 및 캔들 차트 분석 중..."):
+        ohlcv = load_stock_chart(code, days=days)
+        detail = fetch_stock_realtime_detail(code)
+        inv_df = load_stock_investors(code)
+
+    if ohlcv.empty or len(ohlcv) < 5:
+        st.warning(f"'{name}'({code})의 차트 데이터를 불러올 수 없습니다.")
+        return
+
+    ohlcv_ind = compute_technical_indicators(ohlcv)
+    signals = analyze_stock_signals(ohlcv_ind)
+
+    curr_price = int(detail.get("price", ohlcv["close"].iloc[-1])) if detail else int(ohlcv["close"].iloc[-1])
+    change_rate = float(detail.get("change_rate", 0.0)) if detail else float(signals.get("change_rate", 0.0))
+    trade_val = float(detail.get("trade_value_억", 0.0)) if detail else 0.0
+    marcap_val = float(detail.get("marcap_억", 0.0)) if detail else 0.0
+
+    # 이동평균선 값 및 이격도 계산
+    sma5 = float(ohlcv_ind["sma5"].iloc[-1]) if "sma5" in ohlcv_ind.columns and not pd.isna(ohlcv_ind["sma5"].iloc[-1]) else float(curr_price)
+    sma20 = float(ohlcv_ind["sma20"].iloc[-1]) if "sma20" in ohlcv_ind.columns and not pd.isna(ohlcv_ind["sma20"].iloc[-1]) else float(curr_price)
+    sma60 = float(ohlcv_ind["sma60"].iloc[-1]) if "sma60" in ohlcv_ind.columns and not pd.isna(ohlcv_ind["sma60"].iloc[-1]) else float(curr_price)
+
+    d5 = ((curr_price - sma5) / sma5 * 100) if sma5 > 0 else 0.0
+    d20 = ((curr_price - sma20) / sma20 * 100) if sma20 > 0 else 0.0
+    d60 = ((curr_price - sma60) / sma60 * 100) if sma60 > 0 else 0.0
+
+    # 이평선 정배열 / 역배열 추세 판정
+    if sma5 >= sma20 >= sma60:
+        ma_status = "🔥 5일 > 20일 > 60일선 완전 정배열 (강력 상승 탄력 지속)"
+        status_color = "#EF4444"
+    elif sma5 <= sma20 <= sma60:
+        ma_status = "⚠️ 5일 < 20일 < 60일선 완전 역배열 (하락 추세, 신중한 접근 권장)"
+        status_color = "#3B82F6"
+    elif curr_price >= sma20:
+        ma_status = "📈 20일 생명선 상회 (단기 반등 및 눌림목 지지선 유효)"
+        status_color = "#10B981"
+    else:
+        ma_status = "🔄 이평선 수렴 구간 (변곡점 돌파 방향 탐색 중)"
+        status_color = "#F59E0B"
+
+    # AI 퀀트 및 상승확률
+    item_dict = {"change_rate": change_rate, "trade_value_억": trade_val, "days_since_listing": 90}
+    quant_res = calculate_quant_score(item_dict, signals, inv_df, strategy="스윙")
+    pred_res = predictor.predict_probability(ohlcv_ind, quant_score=quant_res["total_score"])
+
+    # 1. 상단 요약 헤더 & 이평선 상태
+    st.markdown(
+        f"""
+        <div style="background:{'#1E293B' if is_dark else '#F8FAFC'}; border:1.5px solid {'#334155' if is_dark else '#CBD5E1'}; border-radius:12px; padding:16px 20px; margin-bottom:14px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                <div>
+                    <span style="font-size:1.5rem; font-weight:900; color:{'#FFFFFF' if is_dark else '#0F172A'};">{name}</span>
+                    <span style="font-size:1rem; color:#64748B; margin-left:6px;">({code})</span>
+                    <span style="margin-left:12px; font-size:1.35rem; font-weight:bold; color:{'#EF4444' if change_rate > 0 else '#3B82F6'};">
+                        {curr_price:,}원 ({change_rate:+.2f}%)
+                    </span>
+                    {f"<span style='margin-left:8px; font-size:0.85rem; color:#64748B;'>거래대금: {trade_val:,.1f}억 / 시총: {marcap_val:,.1f}억</span>" if trade_val > 0 else ""}
+                </div>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <span style="background:{'#DC2626' if quant_res['grade']=='S' else '#EA580C' if quant_res['grade']=='A' else '#2563EB'}; color:white; padding:5px 12px; border-radius:6px; font-weight:bold; font-size:0.9rem;">
+                        AI 등급: {quant_res['grade']} ({quant_res['total_score']}점)
+                    </span>
+                    <span style="background:#059669; color:white; padding:5px 12px; border-radius:6px; font-weight:bold; font-size:0.9rem;">
+                        5일 상승확률: {pred_res['upside_probability']}%
+                    </span>
+                </div>
+            </div>
+            <div style="margin-top:10px; font-size:0.92rem; font-weight:700; color:{status_color};">
+                ⚡ <b>이평선 추세 진단:</b> {ma_status}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # 2. 이동평균선(5일, 20일, 60일) 직접 비교 메트릭 카드
+    m1, m2, m3, m4 = st.columns(4)
+    with m1:
+        st.metric("현재가", f"{curr_price:,}원", f"{change_rate:+.2f}%")
+    with m2:
+        st.metric("5일선 (단기 탄력)", f"{sma5:,.0f}원", f"이격도 {d5:+.1f}%", delta_color="normal" if d5 > 0 else "inverse")
+    with m3:
+        st.metric("20일선 (생명선/추세)", f"{sma20:,.0f}원", f"이격도 {d20:+.1f}%", delta_color="normal" if d20 > 0 else "inverse")
+    with m4:
+        st.metric("60일선 (중기 수급)", f"{sma60:,.0f}원", f"이격도 {d60:+.1f}%", delta_color="normal" if d60 > 0 else "inverse")
+
+    # 3. 3단 인터랙티브 캔들 차트 (주가+이평선+볼린저밴드 / 거래량 / RSI)
+    fig = make_subplots(
+        rows=3, cols=1,
+        shared_xaxes=True,
+        vertical_spacing=0.04,
+        row_heights=[0.60, 0.20, 0.20],
+        subplot_titles=(f"{name} ({code}) 캔들 & 이동평균선 (5/20/60일선) / 볼린저밴드", "거래량", "RSI (14)"),
+    )
+    # 캔들
+    fig.add_trace(
+        go.Candlestick(
+            x=ohlcv_ind.index,
+            open=ohlcv_ind["open"],
+            high=ohlcv_ind["high"],
+            low=ohlcv_ind["low"],
+            close=ohlcv_ind["close"],
+            name="주가",
+            increasing_line_color="#EF4444",
+            decreasing_line_color="#2563EB",
+        ),
+        row=1, col=1,
+    )
+    # 이동평균선
+    if "sma5" in ohlcv_ind.columns:
+        fig.add_trace(go.Scatter(x=ohlcv_ind.index, y=ohlcv_ind["sma5"], line=dict(color="#FF9500", width=1.5), name="5일선(단기)"), row=1, col=1)
+    if "sma20" in ohlcv_ind.columns:
+        fig.add_trace(go.Scatter(x=ohlcv_ind.index, y=ohlcv_ind["sma20"], line=dict(color="#EAB308", width=2.0), name="20일선(생명선)"), row=1, col=1)
+    if "sma60" in ohlcv_ind.columns:
+        fig.add_trace(go.Scatter(x=ohlcv_ind.index, y=ohlcv_ind["sma60"], line=dict(color="#10B981", width=2.0), name="60일선(수급선)"), row=1, col=1)
+
+    # 볼린저밴드
+    if "bb_upper" in ohlcv_ind.columns and "bb_lower" in ohlcv_ind.columns:
+        fig.add_trace(go.Scatter(x=ohlcv_ind.index, y=ohlcv_ind["bb_upper"], line=dict(color="rgba(147, 51, 234, 0.45)", width=1, dash="dot"), name="볼린저상단"), row=1, col=1)
+        fig.add_trace(go.Scatter(x=ohlcv_ind.index, y=ohlcv_ind["bb_lower"], line=dict(color="rgba(147, 51, 234, 0.45)", width=1, dash="dot"), name="볼린저하단"), row=1, col=1)
+
+    # 거래량
+    colors = ["#EF4444" if c >= o else "#2563EB" for c, o in zip(ohlcv_ind["close"], ohlcv_ind["open"])]
+    fig.add_trace(go.Bar(x=ohlcv_ind.index, y=ohlcv_ind["volume"], marker_color=colors, name="거래량"), row=2, col=1)
+
+    # RSI
+    if "rsi14" in ohlcv_ind.columns:
+        fig.add_trace(go.Scatter(x=ohlcv_ind.index, y=ohlcv_ind["rsi14"], line=dict(color="#8B5CF6", width=1.5), name="RSI"), row=3, col=1)
+    fig.add_hline(y=70, line_dash="dash", line_color="#EF4444", row=3, col=1)
+    fig.add_hline(y=30, line_dash="dash", line_color="#2563EB", row=3, col=1)
+
+    bg_color = "#151A23" if is_dark else "#FFFFFF"
+    text_color = "#F8FAFC" if is_dark else "#1E293B"
+    grid_color = "#2D3748" if is_dark else "#E2E8F0"
+
+    fig.update_layout(
+        height=520 if not in_modal else 580,
+        xaxis_rangeslider_visible=False,
+        paper_bgcolor=bg_color,
+        plot_bgcolor=bg_color,
+        font=dict(color=text_color, size=11),
+        margin=dict(l=10, r=10, t=30, b=10),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=10)),
+    )
+    fig.update_xaxes(gridcolor=grid_color, showgrid=True)
+    fig.update_yaxes(gridcolor=grid_color, showgrid=True)
+    st.plotly_chart(fig, use_container_width=True, key=f"{key_prefix}_{code}_{'modal' if in_modal else 'inline'}")
+
+    # 4. 하단 상세: 초보자 실전 매매 가이드 + 외인/기관 일별 수급 현황
+    col_g1, col_g2 = st.columns([1.15, 1.85])
+    with col_g1:
+        target_p = int(curr_price * 1.06)
+        stop_p = int(curr_price * 0.97)
+        f_sum = inv_df["foreign"].tail(5).sum() if not inv_df.empty and "foreign" in inv_df.columns else 0.0
+        org_sum = inv_df["institution"].tail(5).sum() if not inv_df.empty and "institution" in inv_df.columns else 0.0
+
+        st.markdown(
+            f"""
+            <div style="background:{'#151A23' if is_dark else '#FFFFFF'}; border:1px solid {'#334155' if is_dark else '#E2E8F0'}; border-radius:10px; padding:16px; font-size:0.92rem; line-height:1.65;">
+                <div style="font-weight:800; color:{'#38BDF8' if is_dark else '#1D4ED8'}; font-size:1.05rem; margin-bottom:10px;">🎯 초보자 실전 매매 가이드</div>
+                <div style="margin-bottom:6px;">• <b>1차 목표가:</b> <span style="color:#EF4444; font-weight:bold;">{target_p:,}원 (+6.0%)</span></div>
+                <div style="margin-bottom:6px;">• <b>권장 손절선:</b> <span style="color:#3B82F6; font-weight:bold;">{stop_p:,}원 (-3.0%)</span></div>
+                <div style="margin-bottom:6px;">• <b>최근 5일 큰손 수급:</b> 외인 <span style="color:{'#EF4444' if f_sum>0 else '#3B82F6'}; font-weight:bold;">{f_sum:+.1f}억</span> / 기관 <span style="color:{'#EF4444' if org_sum>0 else '#3B82F6'}; font-weight:bold;">{org_sum:+.1f}억</span></div>
+                <div style="margin-bottom:8px;">• <b>포착 신호:</b> {', '.join(signals['signals'][:3]) if signals['signals'] else '기본 추세 유지'}</div>
+                <div style="margin-top:10px; padding-top:10px; border-top:1px dashed {'#475569' if is_dark else '#CBD5E1'}; color:{'#CBD5E1' if is_dark else '#475569'}; font-size:0.88rem;">
+                    💡 <b>AI 진단 총평:</b> {quant_res['key_reasons']}
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with col_g2:
+        if not inv_df.empty:
+            st.markdown("<div style='font-size:0.92rem; font-weight:700; margin-bottom:4px;'>👥 최근 5거래일 외국인·기관 순매수 상세 내역</div>", unsafe_allow_html=True)
+            display_investor_table(inv_df, 5)
+        else:
+            st.info("수급 데이터를 집계 중입니다.")
+
+
+@st.dialog("📊 종목 정밀 진단 및 캔들 차트", width="large")
+def show_stock_chart_dialog(code: str, name: str, is_dark: bool):
+    render_stock_detailed_section(code, name, is_dark, in_modal=True, key_prefix="modal_dialog")
 
 
 
@@ -870,18 +1147,18 @@ st.markdown("---")
 # ----------------------------------------------------
 # 🔍 전 종목 프리미엄 AI 즉시 검색기
 # ----------------------------------------------------
-all_options, code_map = load_all_stocks()
+all_options, code_map, all_stocks_df = load_all_stocks()
 
 st.markdown(
     f"""
-    <div style="background:{'#151A23' if is_dark else '#FFFFFF'}; border:1.5px solid {'#3B82F6' if is_dark else '#93C5FD'}; border-radius:12px; padding:14px 18px; margin-bottom:12px; box-shadow:0 4px 12px rgba(59,130,246,0.06);">
+    <div style="background:{'#151A23' if is_dark else '#FFFFFF'}; border:2px solid {'#38BDF8' if is_dark else '#2563EB'}; border-radius:12px; padding:16px 20px; margin-bottom:14px; box-shadow:0 4px 14px rgba(37,99,235,0.12);">
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
             <div>
-                <span style="font-size:1.15rem; font-weight:900; color:{'#F8FAFC' if is_dark else '#0F172A'};">🔍 전 종목 프리미엄 AI 즉시 검색기</span>
-                <span style="font-size:0.85rem; color:#64748B; margin-left:8px;">(코스피·코스닥 2,800+ 전 종목 실시간 진단)</span>
+                <span style="font-size:1.25rem; font-weight:900; color:{'#F8FAFC' if is_dark else '#0F172A'};">🔍 전 종목 프리미엄 AI 즉시 검색기</span>
+                <span style="font-size:0.9rem; color:#64748B; margin-left:8px;">(코스피·코스닥 2,800+ 전 종목 실시간 연동)</span>
             </div>
-            <div style="font-size:0.8rem; color:#2563EB; font-weight:700;">
-                ⚡ 종목명 또는 6자리 코드만 입력하면 1초 만에 퀀트+차트+초보자 가이드 출력
+            <div style="font-size:0.85rem; color:#2563EB; font-weight:700;">
+                ⚡ 종목명이나 6자리 코드 입력 후 <b>Enter</b>를 누르면 즉시 AI 정밀 진단이 실행됩니다
             </div>
         </div>
     </div>
@@ -889,122 +1166,70 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-search_c1, search_c2 = st.columns([4.2, 1])
-with search_c1:
-    selected_search = st.selectbox(
-        "궁금한 종목명을 입력하거나 선택하세요",
-        options=all_options,
-        index=None,
-        placeholder="궁금한 종목을 검색하세요 (예: 삼성전자, 카카오, SK하이닉스, 에코프로, 현대차...)",
-        label_visibility="collapsed",
-        key="main_stock_search",
-    )
-with search_c2:
-    if st.button("🔄 검색 초기화", use_container_width=True, key="btn_clear_search"):
-        st.session_state["main_stock_search"] = None
-        st.rerun()
+with st.form("main_stock_search_form", clear_on_submit=False):
+    search_c1, search_c2, search_c3 = st.columns([4.2, 1.1, 0.9])
+    with search_c1:
+        query_text = st.text_input(
+            "궁금한 종목명을 입력하세요",
+            value=st.session_state.get("search_query_buffer", ""),
+            placeholder="🔍 궁금한 종목명이나 6자리 코드 입력 후 Enter (예: 비츠로테크, 삼성전자, 042370, 카카오, SK하이닉스...)",
+            label_visibility="collapsed",
+            key="main_stock_search_input",
+        )
+    with search_c2:
+        btn_search = st.form_submit_button("🔍 AI 정밀 진단", use_container_width=True, type="primary")
+    with search_c3:
+        btn_clear = st.form_submit_button("🔄 초기화", use_container_width=True)
+
+if btn_clear:
+    st.session_state["diagnosed_stock"] = None
+    st.session_state["search_query_buffer"] = ""
+    st.session_state["related_search_matches"] = []
+    st.rerun()
+
+if btn_search and query_text:
+    matches = resolve_stock_search(query_text, all_stocks_df, code_map)
+    if matches:
+        st.session_state["diagnosed_stock"] = matches[0]
+        st.session_state["related_search_matches"] = matches[1:6]
+        st.session_state["search_query_buffer"] = query_text
+    else:
+        st.warning(f"'{query_text}'에 해당하는 상장 종목을 찾지 못했습니다. 종목명이나 6자리 코드를 다시 확인해 주세요.")
 
 # 인기 검색어 칩
-chip_cols = st.columns(6)
-chips = ["삼성전자", "SK하이닉스", "카카오", "현대차", "에코프로", "NAVER"]
+chip_cols = st.columns(7)
+chips = ["비츠로테크", "삼성전자", "SK하이닉스", "카카오", "현대차", "에코프로", "대한광통신"]
 for i, chip in enumerate(chips):
     with chip_cols[i]:
         if st.button(f"#{chip}", key=f"chip_btn_{chip}", use_container_width=True):
-            for opt in all_options:
-                if opt.startswith(chip + " (") or opt.startswith(chip + "("):
-                    st.session_state["main_stock_search"] = opt
-                    st.rerun()
+            matches = resolve_stock_search(chip, all_stocks_df, code_map)
+            if matches:
+                st.session_state["diagnosed_stock"] = matches[0]
+                st.session_state["related_search_matches"] = matches[1:6]
+                st.session_state["search_query_buffer"] = chip
+                st.rerun()
 
-if selected_search:
-    search_code = code_map.get(selected_search)
-    if not search_code:
-        import re
-        m = re.search(r"\((\d{6})\)", selected_search)
-        search_code = m.group(1) if m else None
+# 연관 종목 바로가기 칩 (복수 매칭 시)
+related = st.session_state.get("related_search_matches", [])
+if related:
+    st.markdown(
+        "<div style='margin-top:6px; margin-bottom:8px; font-size:0.88rem; color:#64748B;'>💡 <b>연관 검색 종목:</b> 다른 종목을 분석하시려면 아래를 클릭하세요:</div>",
+        unsafe_allow_html=True,
+    )
+    r_cols = st.columns(min(len(related), 6))
+    for idx, r_item in enumerate(related[:6]):
+        with r_cols[idx]:
+            if st.button(f"👉 {r_item['name']} ({r_item['code']})", key=f"btn_rel_{r_item['code']}", use_container_width=True):
+                st.session_state["diagnosed_stock"] = r_item
+                st.session_state["search_query_buffer"] = r_item["name"]
+                st.rerun()
 
-    if search_code:
-        search_name = selected_search.split("(")[0].strip()
-        with st.spinner(f"'{search_name}'({search_code}) AI 정밀 진단 및 캔들 차트 분석 중..."):
-            s_ohlcv = load_stock_chart(search_code, days=60)
-            s_detail = fetch_stock_realtime_detail(search_code)
-            s_inv = load_stock_investors(search_code)
-
-            if not s_ohlcv.empty and len(s_ohlcv) >= 10:
-                s_ind = compute_technical_indicators(s_ohlcv)
-                s_signals = analyze_stock_signals(s_ind)
-
-                s_price = s_detail.get("price", int(s_ohlcv["close"].iloc[-1])) if s_detail else int(s_ohlcv["close"].iloc[-1])
-                s_rate = s_detail.get("change_rate", 0.0) if s_detail else 0.0
-                s_marcap = s_detail.get("marcap_억", 0.0) if s_detail else 0.0
-                s_val = s_detail.get("trade_value_억", 0.0) if s_detail else 0.0
-
-                item_dict = {
-                    "change_rate": float(s_rate),
-                    "trade_value_억": float(s_val),
-                    "days_since_listing": 90,
-                }
-                s_quant = calculate_quant_score(item_dict, s_signals, s_inv, strategy="스윙")
-                s_pred = predictor.predict_probability(s_ind, quant_score=s_quant["total_score"])
-
-                st.markdown(
-                    f"""
-                    <div style="background:{'#1E293B' if is_dark else '#F0FDF4'}; border:2px solid {'#10B981' if is_dark else '#22C55E'}; border-radius:12px; padding:16px 20px; margin-top:12px; margin-bottom:16px;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-                            <div>
-                                <span style="background:#2563EB; color:white; font-size:0.85rem; font-weight:bold; padding:4px 12px; border-radius:20px;">👑 검색 종목 AI 정밀 진단</span>
-                                <div style="margin-top:8px;">
-                                    <span style="font-size:1.6rem; font-weight:900; color:{'#FFFFFF' if is_dark else '#14532D'};">{search_name}</span>
-                                    <span style="color:#64748B; font-size:1.05rem; margin-left:8px;">({search_code})</span>
-                                    <span style="margin-left:14px; font-size:1.4rem; font-weight:bold; color:{'#EF4444' if s_rate > 0 else '#3B82F6'};">
-                                        {s_price:,}원 ({s_rate:+.2f}%)
-                                    </span>
-                                </div>
-                            </div>
-                            <div style="display:flex; gap:8px;">
-                                <span style="background:{'#DC2626' if s_quant['grade']=='S' else '#EA580C' if s_quant['grade']=='A' else '#2563EB'}; color:white; padding:6px 14px; border-radius:8px; font-weight:bold; font-size:1rem;">
-                                    AI 등급: {s_quant['grade']} ({s_quant['total_score']}점)
-                                </span>
-                                <span style="background:#059669; color:white; padding:6px 14px; border-radius:8px; font-weight:bold; font-size:1rem;">
-                                    5일 상승 확률: {s_pred['upside_probability']}%
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-
-                col_diag1, col_diag2 = st.columns([1.1, 1.9])
-                with col_diag1:
-                    s_target = int(s_price * 1.06)
-                    s_stop = int(s_price * 0.97)
-                    f_sum = s_inv["foreign"].tail(5).sum() if not s_inv.empty and "foreign" in s_inv.columns else 0.0
-                    org_sum = s_inv["institution"].tail(5).sum() if not s_inv.empty and "institution" in s_inv.columns else 0.0
-
-                    st.markdown(
-                        f"""
-                        <div style="background:{'#151A23' if is_dark else '#FFFFFF'}; border:1px solid {'#334155' if is_dark else '#E2E8F0'}; border-radius:10px; padding:16px; font-size:0.92rem; line-height:1.6;">
-                            <div style="font-weight:800; color:{'#38BDF8' if is_dark else '#1D4ED8'}; font-size:1.05rem; margin-bottom:10px;">🎯 초보자 실전 매매 가이드</div>
-                            <div style="margin-bottom:6px;">• <b>1차 목표가:</b> <span style="color:#EF4444; font-weight:bold;">{s_target:,}원 (+6.0%)</span></div>
-                            <div style="margin-bottom:6px;">• <b>권장 손절선:</b> <span style="color:#3B82F6; font-weight:bold;">{s_stop:,}원 (-3.0%)</span></div>
-                            <div style="margin-bottom:6px;">• <b>최근 5일 큰손 수급:</b> 외인 <span style="color:{'#EF4444' if f_sum>0 else '#3B82F6'}; font-weight:bold;">{f_sum:+.1f}억</span> / 기관 <span style="color:{'#EF4444' if org_sum>0 else '#3B82F6'}; font-weight:bold;">{org_sum:+.1f}억</span></div>
-                            <div style="margin-bottom:8px;">• <b>포착 신호:</b> {', '.join(s_signals['signals'][:3]) if s_signals['signals'] else '기본 추세 흐름 유지'}</div>
-                            <div style="margin-top:10px; padding-top:10px; border-top:1px dashed {'#475569' if is_dark else '#CBD5E1'}; color:{'#CBD5E1' if is_dark else '#475569'};">
-                                💡 <b>AI 진단 총평:</b> {s_quant['key_reasons']}
-                            </div>
-                        </div>
-                        """,
-                        unsafe_allow_html=True,
-                    )
-
-                    if not s_inv.empty:
-                        st.markdown("<div style='font-size:0.9rem; font-weight:700; margin-top:10px; margin-bottom:4px;'>👥 최근 5거래일 외국인·기관 순매수 현황</div>", unsafe_allow_html=True)
-                        display_investor_table(s_inv, 5)
-
-                with col_diag2:
-                    st.plotly_chart(render_stock_mini_chart(s_ind, search_name, is_dark), use_container_width=True, key=f"search_chart_{search_code}")
-            else:
-                st.warning(f"'{search_name}'({search_code})의 일봉 차트 데이터를 불러올 수 없습니다.")
+# 진단 종목 렌더링
+active_diag = st.session_state.get("diagnosed_stock")
+if active_diag:
+    search_code = active_diag["code"]
+    search_name = active_diag["name"]
+    render_stock_detailed_section(search_code, search_name, is_dark, in_modal=False, key_prefix="search_main")
 
 st.markdown("---")
 
@@ -1232,7 +1457,7 @@ with tab_ai:
 # ====================================================
 with tab_rising:
     st.subheader("🔥 당일 실시간 급등주 순위 (TOP 100)")
-    st.caption("오늘 코스피·코스닥 전체 시장에서 가장 강력하게 상승 중인 종목들입니다.")
+    st.caption("오늘 코스피·코스닥 전체 시장에서 가장 강력하게 상승 중인 종목들입니다. 표의 행을 클릭하거나 아래에서 선택하면 캔들 차트 및 5일/20일/60일 이평선 지표가 바로 표시됩니다.")
     if not df_rising_filtered.empty:
         candidate_cols = ["rank", "code", "name", "market", "price", "change_rate", "trade_value_억", "marcap_억", "volume"]
         disp_cols = [c for c in candidate_cols if c in df_rising_filtered.columns]
@@ -1249,7 +1474,42 @@ with tab_rising:
             "volume": "거래량",
         }
         disp_df = disp_df.rename(columns=rename_map)
-        st.dataframe(disp_df, use_container_width=True, hide_index=True)
+
+        rising_labels = [f"#{r['순위']} {r['종목명']} ({r['종목코드']}) | {r['등락률(%)']:+.2f}%" for _, r in disp_df.iterrows()]
+
+        col_ctl1, col_ctl2 = st.columns([3.2, 1.3])
+        with col_ctl1:
+            sel_idx = st.selectbox(
+                "👇 표에서 행을 직접 클릭하거나, 여기서 분석할 급등주를 선택하세요:",
+                options=range(len(disp_df)),
+                format_func=lambda i: rising_labels[i],
+                key="rising_stock_selectbox",
+            )
+
+        table_event = st.dataframe(
+            disp_df,
+            use_container_width=True,
+            hide_index=True,
+            on_select="rerun",
+            selection_mode="single-row",
+            key="rising_stock_table",
+        )
+
+        active_idx = sel_idx
+        if table_event and table_event.selection and table_event.selection.rows:
+            active_idx = table_event.selection.rows[0]
+
+        target_row = disp_df.iloc[active_idx]
+        t_code = str(target_row["종목코드"])
+        t_name = str(target_row["종목명"])
+
+        with col_ctl2:
+            st.write("")
+            if st.button(f"🔍 '{t_name}' 모달 팝업 열기", key=f"btn_rising_modal_{t_code}", use_container_width=True, type="primary"):
+                show_stock_chart_dialog(t_code, t_name, is_dark)
+
+        st.markdown(f"#### 📊 #{target_row['순위']} {t_name} ({t_code}) 실시간 캔들 차트 & 이동평균선(5/20/60일선) 정밀 분석")
+        render_stock_detailed_section(t_code, t_name, is_dark, in_modal=False, key_prefix="rising_tab")
     else:
         st.warning("조건에 부합하는 급등주 데이터가 없습니다.")
 
@@ -1259,7 +1519,7 @@ with tab_rising:
 # ====================================================
 with tab_new:
     st.subheader(f"🚀 최근 {new_listing_months}개월 이내 신규 상장주 모니터링")
-    st.caption("신규 상장주는 상장 초기 매물 소화 후 바닥을 다지고 반등할 때 강한 상승 탄력을 보입니다.")
+    st.caption("신규 상장주는 상장 초기 매물 소화 후 바닥을 다지고 반등할 때 강한 상승 탄력을 보입니다. 표의 행을 클릭하거나 아래에서 선택하면 캔들 차트 및 이평선 지표가 바로 표시됩니다.")
 
     if not df_new.empty:
         candidate_cols = ["code", "name", "market", "listing_date", "days_since_listing", "price", "change_rate", "trade_value_억", "sector"]
@@ -1277,131 +1537,101 @@ with tab_new:
             "sector": "업종",
         }
         new_disp = new_disp.rename(columns=rename_dict)
-        st.dataframe(new_disp, use_container_width=True, hide_index=True)
+
+        new_labels = [f"{r['종목명']} ({r['종목코드']}) · {r['상장일']} 상장 ({r['등락률(%)']:+.2f}%)" for _, r in new_disp.iterrows()]
+
+        col_nctl1, col_nctl2 = st.columns([3.2, 1.3])
+        with col_nctl1:
+            sel_new_idx = st.selectbox(
+                "👇 표에서 행을 직접 클릭하거나, 여기서 분석할 신규 상장주를 선택하세요:",
+                options=range(len(new_disp)),
+                format_func=lambda i: new_labels[i],
+                key="new_stock_selectbox",
+            )
+
+        new_table_event = st.dataframe(
+            new_disp,
+            use_container_width=True,
+            hide_index=True,
+            on_select="rerun",
+            selection_mode="single-row",
+            key="new_stock_table",
+        )
+
+        active_new_idx = sel_new_idx
+        if new_table_event and new_table_event.selection and new_table_event.selection.rows:
+            active_new_idx = new_table_event.selection.rows[0]
+
+        target_new_row = new_disp.iloc[active_new_idx]
+        tn_code = str(target_new_row["종목코드"])
+        tn_name = str(target_new_row["종목명"])
+
+        with col_nctl2:
+            st.write("")
+            if st.button(f"🔍 '{tn_name}' 모달 팝업 열기", key=f"btn_new_modal_{tn_code}", use_container_width=True, type="primary"):
+                show_stock_chart_dialog(tn_code, tn_name, is_dark)
+
+        st.markdown(f"#### 📊 {tn_name} ({tn_code}) 신규 상장주 캔들 차트 & 이평선(5/20/60일선) 정밀 분석")
+        render_stock_detailed_section(tn_code, tn_name, is_dark, in_modal=False, key_prefix="new_tab")
     else:
         st.info("신규 상장주 데이터를 불러오는 중입니다.")
 
 
 # ====================================================
-# TAB 4: 종목 정밀 진단실 (인터랙티브 차트 & 수급)
+# TAB 4: 종목 정밀 진단실 (전면 AI 검색 연동)
 # ====================================================
 with tab_chart:
     st.subheader("📊 1초 종목 정밀 진단 및 캔들 차트 분석")
+    st.caption("AI 검색 시스템과 100% 연동되어 국내 상장 2,800개 전 종목의 캔들 차트, 5일/20일/60일 이동평균선 이격도, 볼린저밴드, RSI, 수급을 분석합니다.")
 
-    col_s1, col_s2 = st.columns([3, 1])
-    with col_s1:
-        sample_options = []
+    # 1. 퀵 필터 칩
+    t4_chip_cols = st.columns(7)
+    t4_chips = ["비츠로테크", "삼성전자", "SK하이닉스", "카카오", "현대차", "에코프로", "대한광통신"]
+    for i, t4_chip in enumerate(t4_chips):
+        with t4_chip_cols[i]:
+            if st.button(f"#{t4_chip}", key=f"t4_chip_{t4_chip}", use_container_width=True):
+                m = resolve_stock_search(t4_chip, all_stocks_df, code_map)
+                if m:
+                    st.session_state["diagnosed_stock"] = m[0]
+                    st.session_state["search_query_buffer"] = t4_chip
+                    st.rerun()
+
+    # 2. 검색 및 조회 기간 선택
+    col_t4_search, col_t4_days, col_t4_modal = st.columns([3.0, 1.0, 1.2])
+
+    # 기본 종목 결정
+    default_stock = st.session_state.get("diagnosed_stock")
+    if not default_stock:
         if not df_rising.empty:
-            sample_options += [f"{row['name']} ({row['code']})" for _, row in df_rising.head(20).iterrows()]
-        if not df_new.empty:
-            sample_options += [f"{row['name']} ({row['code']})" for _, row in df_new.head(10).iterrows()]
+            default_stock = {"code": str(df_rising.iloc[0]["code"]), "name": str(df_rising.iloc[0]["name"])}
+        else:
+            default_stock = {"code": "005930", "name": "삼성전자"}
 
-        selected_stock_str = st.selectbox("진단할 종목 선택 또는 검색", sample_options if sample_options else ["삼성전자 (005930)"])
-    with col_s2:
-        chart_days = st.selectbox("조회 기간", [60, 100, 150, 200], index=1)
+    with col_t4_search:
+        default_opt_idx = 0
+        target_token = f"({default_stock['code']})"
+        for idx, opt in enumerate(all_options):
+            if target_token in opt:
+                default_opt_idx = idx
+                break
+
+        selected_t4_str = st.selectbox(
+            "진단할 종목 선택 또는 검색 (2,800+ 전 종목)",
+            options=all_options if all_options else [f"{default_stock['name']} ({default_stock['code']})"],
+            index=default_opt_idx if all_options else 0,
+            key="t4_stock_selectbox",
+        )
+    with col_t4_days:
+        chart_days = st.selectbox("조회 기간", [60, 100, 150, 200], index=1, key="t4_chart_days")
 
     import re
-    code_match = re.search(r"\((\d{6})\)", selected_stock_str)
-    target_code = code_match.group(1) if code_match else "005930"
-    target_name = selected_stock_str.split("(")[0].strip()
+    m_code = re.search(r"\((\d{6})\)", selected_t4_str)
+    t4_target_code = m_code.group(1) if m_code else default_stock["code"]
+    t4_target_name = selected_t4_str.split("(")[0].strip()
 
-    ohlcv_df = load_stock_chart(target_code, days=chart_days)
+    with col_t4_modal:
+        st.write("")
+        if st.button(f"🔍 '{t4_target_name}' 모달 팝업", key=f"btn_t4_modal_{t4_target_code}", use_container_width=True, type="primary"):
+            show_stock_chart_dialog(t4_target_code, t4_target_name, is_dark)
 
-    if not ohlcv_df.empty and len(ohlcv_df) >= 20:
-        ohlcv_with_ind = compute_technical_indicators(ohlcv_df)
-        signals = analyze_stock_signals(ohlcv_with_ind)
-        investor_df = load_stock_investors(target_code)
-
-        fig = make_subplots(
-            rows=3, cols=1,
-            shared_xaxes=True,
-            vertical_spacing=0.04,
-            row_heights=[0.6, 0.2, 0.2],
-            subplot_titles=(f"{target_name} ({target_code}) 캔들 & 이동평균선 / 볼린저밴드", "거래량", "RSI (14)"),
-        )
-
-        # 1. 캔들스틱 차트
-        fig.add_trace(
-            go.Candlestick(
-                x=ohlcv_with_ind.index,
-                open=ohlcv_with_ind["open"],
-                high=ohlcv_with_ind["high"],
-                low=ohlcv_with_ind["low"],
-                close=ohlcv_with_ind["close"],
-                name="가격",
-                increasing_line_color="#EF4444",  # 한국식 빨간색 양봉
-                decreasing_line_color="#2563EB",  # 한국식 파란색 음봉
-            ),
-            row=1, col=1,
-        )
-
-        fig.add_trace(go.Scatter(x=ohlcv_with_ind.index, y=ohlcv_with_ind["sma5"], line=dict(color="#FF9500", width=1.2), name="5일선"), row=1, col=1)
-        fig.add_trace(go.Scatter(x=ohlcv_with_ind.index, y=ohlcv_with_ind["sma20"], line=dict(color="#FBBF24", width=1.5), name="20일선"), row=1, col=1)
-        fig.add_trace(go.Scatter(x=ohlcv_with_ind.index, y=ohlcv_with_ind["sma60"], line=dict(color="#10B981", width=1.5), name="60일선"), row=1, col=1)
-
-        fig.add_trace(go.Scatter(x=ohlcv_with_ind.index, y=ohlcv_with_ind["bb_upper"], line=dict(color="rgba(99, 102, 241, 0.4)", width=1, dash="dot"), name="볼린저상단"), row=1, col=1)
-        fig.add_trace(go.Scatter(x=ohlcv_with_ind.index, y=ohlcv_with_ind["bb_lower"], line=dict(color="rgba(99, 102, 241, 0.4)", width=1, dash="dot"), name="볼린저하단"), row=1, col=1)
-
-        # 2. 거래량 바 차트
-        colors = ["#EF4444" if c >= o else "#2563EB" for c, o in zip(ohlcv_with_ind["close"], ohlcv_with_ind["open"])]
-        fig.add_trace(
-            go.Bar(x=ohlcv_with_ind.index, y=ohlcv_with_ind["volume"], marker_color=colors, name="거래량"),
-            row=2, col=1,
-        )
-
-        # 3. RSI 차트
-        fig.add_trace(
-            go.Scatter(x=ohlcv_with_ind.index, y=ohlcv_with_ind["rsi14"], line=dict(color="#8B5CF6", width=1.5), name="RSI"),
-            row=3, col=1,
-        )
-        fig.add_hline(y=70, line_dash="dash", line_color="#EF4444", row=3, col=1)
-        fig.add_hline(y=30, line_dash="dash", line_color="#2563EB", row=3, col=1)
-
-        fig.update_layout(
-            height=720,
-            xaxis_rangeslider_visible=False,
-            template="plotly_dark" if is_dark else "plotly_white",
-            margin=dict(l=10, r=10, t=40, b=10),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        )
-        st.plotly_chart(fig, use_container_width=True)
-
-        # AI 진단 결과 요약
-        st.markdown("#### 🧠 AI 기술적 분석 및 수급 진단 결과")
-        dc1, dc2, dc3 = st.columns(3)
-        with dc1:
-            st.metric("RSI (14)", f"{signals['rsi']}")
-            st.caption("30 이하: 바닥 반등 / 70 이상: 단기 과열")
-        with dc2:
-            st.metric("20일선 이격도", f"{signals['disparity_20']}%")
-            st.caption("100% 기준 위/아래 이탈 정도")
-        with dc3:
-            st.metric("20일 평균대비 거래량", f"{signals['vol_ratio_20d']} 배")
-            st.caption("2.0배 이상일 시 거래량 급증")
-
-        st.markdown("**포착된 핵심 차트 신호:**")
-        if signals["signals"]:
-            for sig in signals["signals"]:
-                st.markdown(f"- 🟢 **{sig}**")
-        else:
-            st.markdown("- ⚪ 현재 특이 신호 없음 (일반 횡보)")
-
-        # 수급 추이 차트 (외인, 기관)
-        if investor_df is not None and not investor_df.empty:
-            st.markdown("#### 👥 최근 20거래일 외국인 / 기관 순매수 추이 (단위: 억원)")
-            inv_fig = go.Figure()
-            if "foreign" in investor_df.columns:
-                inv_fig.add_trace(go.Bar(x=investor_df.index, y=investor_df["foreign"], name="외국인 순매수", marker_color="#F59E0B"))
-            if "institution" in investor_df.columns:
-                inv_fig.add_trace(go.Bar(x=investor_df.index, y=investor_df["institution"], name="기관 순매수", marker_color="#10B981"))
-            inv_fig.update_layout(
-                height=280,
-                barmode="group",
-                template="plotly_dark" if is_dark else "plotly_white",
-                margin=dict(l=10, r=10, t=20, b=10),
-            )
-            st.plotly_chart(inv_fig, use_container_width=True)
-            st.markdown("<div style='font-size:0.95rem; font-weight:700; margin-top:16px; margin-bottom:6px;'>📋 최근 10거래일 일별 수급 상세 내역</div>", unsafe_allow_html=True)
-            display_investor_table(investor_df, 10)
-    else:
-        st.warning(f"선택한 종목({target_code})의 차트 데이터를 불러올 수 없습니다.")
+    render_stock_detailed_section(t4_target_code, t4_target_name, is_dark, in_modal=False, days=chart_days, key_prefix="tab4_diag")
