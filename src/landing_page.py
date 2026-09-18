@@ -195,6 +195,80 @@ def render_landing_page(is_dark: bool):
     st.markdown(
         f"""
         <style>
+        /* Streamlit Cloud 하단 Manage app 버튼, 워터마크, 뱃지, 푸터 완전 박멸 */
+        footer,
+        footer *,
+        [data-testid="stFooter"],
+        #MainMenu,
+        [data-testid="stDeployButton"],
+        [data-testid="stDecoration"],
+        [data-testid="stStatusWidget"],
+        [data-testid="stStatusWidget"] *,
+        [data-testid="stToolbarActions"],
+        [data-testid="manage-app-button"],
+        button[data-testid="manage-app-button"],
+        div[class*="viewerBadge"],
+        a[class*="viewerBadge"],
+        span[class*="viewerBadge"],
+        div[class*="manageApp"],
+        button[class*="manageApp"],
+        a[class*="manageApp"],
+        div[class*="styles_viewerBadge"],
+        div[class*="viewerBadge_container"],
+        .viewerBadge_container__1QSob,
+        .styles_viewerBadge__1A-45,
+        .viewerBadge_link__1S137,
+        div[class*="StatusWidget"],
+        div[class*="FloatingBadge"],
+        div[class*="floatingBadge"],
+        div[class*="ProfileBadge"],
+        div[class*="profileBadge"],
+        div[class*="HostBadge"],
+        div[class*="hostBadge"],
+        div[class*="cloudBadge"],
+        div[class*="CloudBadge"],
+        div[class*="viewer_badge"],
+        div[class*="manage_app"],
+        div[class*="hostedWith"],
+        div[class*="hosted_with"],
+        div[data-testid="stBottom"],
+        div[class*="stBottom"],
+        .stApp ~ div,
+        body > div[class*="viewerBadge"],
+        body > div[class*="manageApp"],
+        body > div:last-child[class*="container"] {{
+            display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+            height: 0px !important;
+            width: 0px !important;
+            max-height: 0px !important;
+            max-width: 0px !important;
+            overflow: hidden !important;
+            position: absolute !important;
+            left: -99999px !important;
+            top: -99999px !important;
+            z-index: -999999 !important;
+        }}
+
+        div:has(> a[href*="streamlit.io"]),
+        div:has(> a[href*="share.streamlit"]),
+        div:has(> button[aria-label*="Manage app"]),
+        div:has(> button[aria-label*="manage app"]),
+        div:has(> button[aria-label*="Manage"]),
+        div:has(> a[class*="viewerBadge"]),
+        div:has(> div[class*="viewerBadge"]),
+        div:has(> div[class*="manageApp"]) {{
+            display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+            height: 0px !important;
+            position: absolute !important;
+            left: -99999px !important;
+        }}
+
         /* 부드러운 스크롤 & 앵커 마커 오프셋 */
         html {{
             scroll-behavior: smooth !important;
