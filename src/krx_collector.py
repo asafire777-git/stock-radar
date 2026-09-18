@@ -16,7 +16,10 @@ def get_newly_listed_stocks(months: int = 12) -> pd.DataFrame:
     """
     # 1. 네이버 실시간 신규 상장주 API 호출
     try:
-        from naver_collector import fetch_from_naver_api
+        try:
+            from naver_collector import fetch_from_naver_api
+        except ImportError:
+            from src.naver_collector import fetch_from_naver_api
 
         df_naver = fetch_from_naver_api("listedAtDesc", limit=100)
         if not df_naver.empty:

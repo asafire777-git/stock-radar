@@ -3,30 +3,53 @@ import os
 import sys
 import time
 
-# src 경로 추가
-sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
+# src 경로를 sys.path 최상단에 절대경로로 등록
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+SRC_DIR = os.path.join(CURRENT_DIR, "src")
+if SRC_DIR not in sys.path:
+    sys.path.insert(0, SRC_DIR)
+if CURRENT_DIR not in sys.path:
+    sys.path.insert(0, CURRENT_DIR)
 
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import streamlit as st
 
-from krx_collector import (
-    get_investor_net_purchases,
-    get_newly_listed_stocks,
-    get_stock_ohlcv,
-    get_stock_timeframe_ohlcv,
-)
-from naver_collector import (
-    fetch_stock_realtime_detail,
-    fetch_top_rising_stocks,
-    fetch_top_volume_stocks,
-)
-from landing_page import render_landing_page
-from matrix_loader import render_matrix_loader
-from prediction_model import predictor
-from quant_scorer import calculate_quant_score
-from technical_analysis import analyze_stock_signals, compute_technical_indicators
+try:
+    from krx_collector import (
+        get_investor_net_purchases,
+        get_newly_listed_stocks,
+        get_stock_ohlcv,
+        get_stock_timeframe_ohlcv,
+    )
+    from naver_collector import (
+        fetch_stock_realtime_detail,
+        fetch_top_rising_stocks,
+        fetch_top_volume_stocks,
+    )
+    from landing_page import render_landing_page
+    from matrix_loader import render_matrix_loader
+    from prediction_model import predictor
+    from quant_scorer import calculate_quant_score
+    from technical_analysis import analyze_stock_signals, compute_technical_indicators
+except ImportError:
+    from src.krx_collector import (
+        get_investor_net_purchases,
+        get_newly_listed_stocks,
+        get_stock_ohlcv,
+        get_stock_timeframe_ohlcv,
+    )
+    from src.naver_collector import (
+        fetch_stock_realtime_detail,
+        fetch_top_rising_stocks,
+        fetch_top_volume_stocks,
+    )
+    from src.landing_page import render_landing_page
+    from src.matrix_loader import render_matrix_loader
+    from src.prediction_model import predictor
+    from src.quant_scorer import calculate_quant_score
+    from src.technical_analysis import analyze_stock_signals, compute_technical_indicators
 
 
 # ----------------------------------------------------
