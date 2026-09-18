@@ -15,6 +15,7 @@ from krx_collector import (
     get_investor_net_purchases,
     get_newly_listed_stocks,
     get_stock_ohlcv,
+    get_stock_timeframe_ohlcv,
 )
 from naver_collector import (
     fetch_stock_realtime_detail,
@@ -977,6 +978,11 @@ def load_stock_chart(code: str, days: int = 100):
     return get_stock_ohlcv(code, days=days)
 
 
+@st.cache_data(ttl=60)
+def load_stock_timeframe_chart(code: str, timeframe: str = "1달"):
+    return get_stock_timeframe_ohlcv(code, timeframe=timeframe)
+
+
 @st.cache_data(ttl=180)
 def load_stock_investors(code: str):
     return get_investor_net_purchases(code, days=20)
@@ -1141,10 +1147,11 @@ def render_stock_mini_chart(ohlcv_ind: pd.DataFrame, target_name: str = "", is_d
         plot_bgcolor=bg_color,
         font=dict(color=text_color, size=11),
         showlegend=True,
+        dragmode=False,
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=10)),
     )
-    fig.update_xaxes(gridcolor=grid_color, showgrid=True)
-    fig.update_yaxes(gridcolor=grid_color, showgrid=True)
+    fig.update_xaxes(gridcolor=grid_color, showgrid=True, fixedrange=True)
+    fig.update_yaxes(gridcolor=grid_color, showgrid=True, fixedrange=True)
     return fig
 
 
@@ -1276,22 +1283,47 @@ def render_stock_detailed_section(code: str, name: str, is_dark: bool, in_modal:
     with m4:
         st.metric("60일선 (중기 수급)", f"{sma60:,.0f}원", f"이격도 {d60:+.1f}%", delta_color="normal" if d60 > 0 else "inverse")
 
+    # 2-2. 캔들 차트 주기 선택 (1분, 5분, 1시간, 24시간, 1주일, 1달, 1년)
+    tf_c1, tf_c2 = st.columns([1.5, 4.5])
+    with tf_c1:
+        st.html("<div style='font-size:0.92rem; font-weight:800; padding-top:6px; color:#2563EB;'>⏱️ 캔들 차트 주기 선택:</div>")
+    with tf_c2:
+        selected_tf = st.segmented_control(
+            "차트 주기 선택",
+            options=["1분", "5분", "1시간", "24시간", "1주일", "1달", "1년"],
+            default="1달",
+            key=f"tf_ctrl_{key_prefix}_{code}",
+            label_visibility="collapsed",
+        )
+    if not selected_tf:
+        selected_tf = "1달"
+
+    # 주기별 캔들 데이터 로드 및 보조지표 산출
+    if selected_tf != "1달":
+        chart_data = load_stock_timeframe_chart(code, timeframe=selected_tf)
+        if not chart_data.empty and len(chart_data) >= 2:
+            chart_ind = compute_technical_indicators(chart_data)
+        else:
+            chart_ind = ohlcv_ind
+    else:
+        chart_ind = ohlcv_ind
+
     # 3. 3단 인터랙티브 캔들 차트 (주가+이평선+볼린저밴드 / 거래량 / RSI)
     fig = make_subplots(
         rows=3, cols=1,
         shared_xaxes=True,
         vertical_spacing=0.04,
         row_heights=[0.60, 0.20, 0.20],
-        subplot_titles=(f"{name} ({code}) 캔들 & 이동평균선 (5/20/60일선) / 볼린저밴드", "거래량", "RSI (14)"),
+        subplot_titles=(f"{name} ({code}) [{selected_tf}] 캔들 & 이동평균선 / 볼린저밴드", "거래량", "RSI (14)"),
     )
     # 캔들
     fig.add_trace(
         go.Candlestick(
-            x=ohlcv_ind.index,
-            open=ohlcv_ind["open"],
-            high=ohlcv_ind["high"],
-            low=ohlcv_ind["low"],
-            close=ohlcv_ind["close"],
+            x=chart_ind.index,
+            open=chart_ind["open"],
+            high=chart_ind["high"],
+            low=chart_ind["low"],
+            close=chart_ind["close"],
             name="주가",
             increasing_line_color="#EF4444",
             decreasing_line_color="#2563EB",
@@ -1299,25 +1331,25 @@ def render_stock_detailed_section(code: str, name: str, is_dark: bool, in_modal:
         row=1, col=1,
     )
     # 이동평균선
-    if "sma5" in ohlcv_ind.columns:
-        fig.add_trace(go.Scatter(x=ohlcv_ind.index, y=ohlcv_ind["sma5"], line=dict(color="#FF9500", width=1.5), name="5일선(단기)"), row=1, col=1)
-    if "sma20" in ohlcv_ind.columns:
-        fig.add_trace(go.Scatter(x=ohlcv_ind.index, y=ohlcv_ind["sma20"], line=dict(color="#EAB308", width=2.0), name="20일선(생명선)"), row=1, col=1)
-    if "sma60" in ohlcv_ind.columns:
-        fig.add_trace(go.Scatter(x=ohlcv_ind.index, y=ohlcv_ind["sma60"], line=dict(color="#10B981", width=2.0), name="60일선(수급선)"), row=1, col=1)
+    if "sma5" in chart_ind.columns:
+        fig.add_trace(go.Scatter(x=chart_ind.index, y=chart_ind["sma5"], line=dict(color="#FF9500", width=1.5), name="5선(단기)"), row=1, col=1)
+    if "sma20" in chart_ind.columns:
+        fig.add_trace(go.Scatter(x=chart_ind.index, y=chart_ind["sma20"], line=dict(color="#EAB308", width=2.0), name="20선(생명선)"), row=1, col=1)
+    if "sma60" in chart_ind.columns:
+        fig.add_trace(go.Scatter(x=chart_ind.index, y=chart_ind["sma60"], line=dict(color="#10B981", width=2.0), name="60선(수급선)"), row=1, col=1)
 
     # 볼린저밴드
-    if "bb_upper" in ohlcv_ind.columns and "bb_lower" in ohlcv_ind.columns:
-        fig.add_trace(go.Scatter(x=ohlcv_ind.index, y=ohlcv_ind["bb_upper"], line=dict(color="rgba(147, 51, 234, 0.45)", width=1, dash="dot"), name="볼린저상단"), row=1, col=1)
-        fig.add_trace(go.Scatter(x=ohlcv_ind.index, y=ohlcv_ind["bb_lower"], line=dict(color="rgba(147, 51, 234, 0.45)", width=1, dash="dot"), name="볼린저하단"), row=1, col=1)
+    if "bb_upper" in chart_ind.columns and "bb_lower" in chart_ind.columns:
+        fig.add_trace(go.Scatter(x=chart_ind.index, y=chart_ind["bb_upper"], line=dict(color="rgba(147, 51, 234, 0.45)", width=1, dash="dot"), name="볼린저상단"), row=1, col=1)
+        fig.add_trace(go.Scatter(x=chart_ind.index, y=chart_ind["bb_lower"], line=dict(color="rgba(147, 51, 234, 0.45)", width=1, dash="dot"), name="볼린저하단"), row=1, col=1)
 
     # 거래량
-    colors = ["#EF4444" if c >= o else "#2563EB" for c, o in zip(ohlcv_ind["close"], ohlcv_ind["open"])]
-    fig.add_trace(go.Bar(x=ohlcv_ind.index, y=ohlcv_ind["volume"], marker_color=colors, name="거래량"), row=2, col=1)
+    colors = ["#EF4444" if c >= o else "#2563EB" for c, o in zip(chart_ind["close"], chart_ind["open"])]
+    fig.add_trace(go.Bar(x=chart_ind.index, y=chart_ind["volume"], marker_color=colors, name="거래량"), row=2, col=1)
 
     # RSI
-    if "rsi14" in ohlcv_ind.columns:
-        fig.add_trace(go.Scatter(x=ohlcv_ind.index, y=ohlcv_ind["rsi14"], line=dict(color="#8B5CF6", width=1.5), name="RSI"), row=3, col=1)
+    if "rsi14" in chart_ind.columns:
+        fig.add_trace(go.Scatter(x=chart_ind.index, y=chart_ind["rsi14"], line=dict(color="#8B5CF6", width=1.5), name="RSI"), row=3, col=1)
     fig.add_hline(y=70, line_dash="dash", line_color="#EF4444", row=3, col=1)
     fig.add_hline(y=30, line_dash="dash", line_color="#2563EB", row=3, col=1)
 
@@ -1332,11 +1364,23 @@ def render_stock_detailed_section(code: str, name: str, is_dark: bool, in_modal:
         plot_bgcolor=bg_color,
         font=dict(color=text_color, size=11),
         margin=dict(l=10, r=10, t=30, b=10),
+        dragmode=False,
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=10)),
     )
-    fig.update_xaxes(gridcolor=grid_color, showgrid=True)
-    fig.update_yaxes(gridcolor=grid_color, showgrid=True)
-    st.plotly_chart(fig, use_container_width=True, key=f"{key_prefix}_{code}_{'modal' if in_modal else 'inline'}")
+    fig.update_xaxes(gridcolor=grid_color, showgrid=True, fixedrange=True)
+    fig.update_yaxes(gridcolor=grid_color, showgrid=True, fixedrange=True)
+    st.plotly_chart(
+        fig,
+        use_container_width=True,
+        key=f"{key_prefix}_{code}_{selected_tf}_{'modal' if in_modal else 'inline'}",
+        config={
+            "scrollZoom": False,
+            "displayModeBar": False,
+            "showTips": False,
+            "doubleClick": False,
+            "responsive": True,
+        },
+    )
 
     # 4. 하단 상세: 초보자 실전 매매 가이드 + 외인/기관 일별 수급 현황
     col_g1, col_g2 = st.columns([1.15, 1.85])
@@ -1369,7 +1413,25 @@ def render_stock_detailed_section(code: str, name: str, is_dark: bool, in_modal:
 
 @st.dialog("📊 종목 정밀 진단 및 캔들 차트", width="large")
 def show_stock_chart_dialog(code: str, name: str, is_dark: bool):
+    loader_ph = st.empty()
+    loader_ph.html(
+        f"""<div style="background:{'#0F172A' if is_dark else '#F0FDF4'}; border:1.5px solid {'#10B981' if is_dark else '#059669'}; border-radius:12px; padding:20px 24px; text-align:center; margin-bottom:14px; box-shadow:0 4px 16px {'rgba(16,185,129,0.15)' if is_dark else 'rgba(2,132,199,0.12)'};">
+            <div style="display:flex; justify-content:center; align-items:center; gap:10px; margin-bottom:6px;">
+                <span style="font-size:1.35rem;">📡</span>
+                <span style="font-size:1.08rem; font-weight:800; color:{'#34D399' if is_dark else '#065F46'};">
+                    AI 퀀트 레이더 정밀 분석 가동 중...
+                </span>
+            </div>
+            <div style="font-size:0.88rem; color:{'#94A3B8' if is_dark else '#047857'}; font-weight:600;">
+                [{name} ({code})] 실시간 시세, 이동평균선(5·20·60일) 및 큰손 수급 패킷을 초고속 수신·디코딩하고 있습니다
+            </div>
+            <div style="max-width:280px; margin:12px auto 0 auto; height:4px; background:{'#1E293B' if is_dark else '#D1FAE5'}; border-radius:10px; overflow:hidden;">
+                <div style="width:100%; height:100%; background:linear-gradient(90deg, #10B981, #38BDF8); animation:pulse 1s infinite;"></div>
+            </div>
+        </div>"""
+    )
     render_stock_detailed_section(code, name, is_dark, in_modal=True, key_prefix="modal_dialog")
+    loader_ph.empty()
 
 
 
@@ -1714,7 +1776,12 @@ with tab_ai:
 
             with col_t2:
                 if not top1_ind.empty and len(top1_ind) >= 10:
-                    st.plotly_chart(render_stock_mini_chart(top1_ind, top1['name'], is_dark), use_container_width=True, key=f"chart_top1_{top1_code}")
+                    st.plotly_chart(
+                        render_stock_mini_chart(top1_ind, top1['name'], is_dark),
+                        use_container_width=True,
+                        key=f"chart_top1_{top1_code}",
+                        config={"scrollZoom": False, "displayModeBar": False, "showTips": False, "doubleClick": False, "responsive": True},
+                    )
 
         st.markdown("---")
         st.markdown("#### ⭐ 오늘의 추천 TOP 2~5 상세 분석 & 매매 가이드")
@@ -1779,7 +1846,12 @@ with tab_ai:
 
                     with col_rg2:
                         if not r_ohlcv_ind.empty and len(r_ohlcv_ind) >= 10:
-                            st.plotly_chart(render_stock_mini_chart(r_ohlcv_ind, r['name'], is_dark), use_container_width=True, key=f"chart_top_{r['rank']}_{r_code}")
+                            st.plotly_chart(
+                                render_stock_mini_chart(r_ohlcv_ind, r['name'], is_dark),
+                                use_container_width=True,
+                                key=f"chart_top_{r['rank']}_{r_code}",
+                                config={"scrollZoom": False, "displayModeBar": False, "showTips": False, "doubleClick": False, "responsive": True},
+                            )
                         else:
                             st.caption("차트 데이터를 불러오는 중입니다.")
 
@@ -1803,7 +1875,8 @@ with tab_ai:
 # ====================================================
 with tab_rising:
     st.subheader("🔥 당일 실시간 급등주 순위 (TOP 100)")
-    st.caption("오늘 코스피·코스닥 전체 시장에서 가장 강력하게 상승 중인 종목들입니다. 표의 행을 클릭하거나 아래에서 선택하면 캔들 차트 및 5일/20일/60일 이평선 지표가 바로 표시됩니다.")
+    st.caption("오늘 코스피·코스닥 전체 시장에서 가장 강력하게 상승 중인 종목들입니다. 종목명이나 코드를 클릭하거나 검색하시면 별도 버튼 없이 즉시 정밀 캔들 차트 모달 팝업이 부드럽게 열립니다.")
+
     if not df_rising_filtered.empty:
         candidate_cols = ["rank", "code", "name", "market", "price", "change_rate", "trade_value_억", "marcap_억", "volume"]
         disp_cols = [c for c in candidate_cols if c in df_rising_filtered.columns]
@@ -1821,41 +1894,70 @@ with tab_rising:
         }
         disp_df = disp_df.rename(columns=rename_map)
 
-        rising_labels = [f"#{r['순위']} {r['종목명']} ({r['종목코드']}) | {r['등락률(%)']:+.2f}%" for _, r in disp_df.iterrows()]
+        # 1. 상단 빠른 종목 검색 & 즉시 모달 열기 드롭다운
+        rising_options = ["선택하여 모달 열기..."] + [f"#{r['순위']} {r['종목명']} ({r['종목코드']}) | {r['현재가(원)']:,}원 ({r['등락률(%)']:+.2f}%)" for _, r in disp_df.iterrows()]
 
-        col_ctl1, col_ctl2 = st.columns([3.2, 1.3])
+        col_ctl1, col_ctl2 = st.columns([3.3, 1.7])
         with col_ctl1:
-            sel_idx = st.selectbox(
-                "👇 표에서 행을 직접 클릭하거나, 여기서 분석할 급등주를 선택하세요:",
-                options=range(len(disp_df)),
-                format_func=lambda i: rising_labels[i],
-                key="rising_stock_selectbox",
+            sel_rising_str = st.selectbox(
+                "⚡ 분석할 급등주 검색 또는 선택 (선택 즉시 모달 팝업이 부드럽게 열립니다):",
+                options=rising_options,
+                index=0,
+                key="rising_quick_select",
             )
-
-        table_event = st.dataframe(
-            disp_df,
-            use_container_width=True,
-            hide_index=True,
-            on_select="rerun",
-            selection_mode="single-row",
-            key="rising_stock_table",
-        )
-
-        active_idx = sel_idx
-        if table_event and table_event.selection and table_event.selection.rows:
-            active_idx = table_event.selection.rows[0]
-
-        target_row = disp_df.iloc[active_idx]
-        t_code = str(target_row["종목코드"])
-        t_name = str(target_row["종목명"])
+            if sel_rising_str != "선택하여 모달 열기...":
+                import re
+                m_code = re.search(r"\((\d{6})\)", sel_rising_str)
+                if m_code:
+                    t_code = m_code.group(1)
+                    matched_row = disp_df[disp_df["종목코드"] == t_code]
+                    t_name = str(matched_row.iloc[0]["종목명"]) if not matched_row.empty else t_code
+                    show_stock_chart_dialog(t_code, t_name, is_dark)
 
         with col_ctl2:
-            st.write("")
-            if st.button(f"🔍 '{t_name}' 모달 팝업 열기", key=f"btn_rising_modal_{t_code}", use_container_width=True, type="primary"):
-                show_stock_chart_dialog(t_code, t_name, is_dark)
+            view_mode = st.segmented_control(
+                "화면 보기",
+                options=["📱 원클릭 종목 리스트", "📋 전체 100개 순위표"],
+                default="📱 원클릭 종목 리스트",
+                key="rising_view_mode",
+            )
+            if not view_mode:
+                view_mode = "📱 원클릭 종목 리스트"
 
-        st.markdown(f"#### 📊 #{target_row['순위']} {t_name} ({t_code}) 실시간 캔들 차트 & 이동평균선(5/20/60일선) 정밀 분석")
-        render_stock_detailed_section(t_code, t_name, is_dark, in_modal=False, key_prefix="rising_tab")
+        if view_mode == "📱 원클릭 종목 리스트":
+            page_choice = st.segmented_control(
+                "순위 구간",
+                options=["1~20위", "21~40위", "41~60위", "61~80위", "81~100위"],
+                default="1~20위",
+                key="rising_page_choice",
+            )
+            if not page_choice:
+                page_choice = "1~20위"
+
+            page_idx = {"1~20위": 0, "21~40위": 20, "41~60위": 40, "61~80위": 60, "81~100위": 80}.get(page_choice, 0)
+            page_df = disp_df.iloc[page_idx:page_idx + 20]
+
+            st.html(
+                f"""<div style="font-size:0.86rem; color:{'#94A3B8' if is_dark else '#64748B'}; margin-bottom:8px;">
+                    💡 <b>모바일/PC 공통:</b> 아래 종목을 누르시면 별도 확인 절차 없이 <b>즉시 화려한 모달 팝업</b>으로 캔들 차트와 지표가 열립니다.
+                </div>"""
+            )
+
+            for _, row in page_df.iterrows():
+                r_code = str(row["종목코드"])
+                r_name = str(row["종목명"])
+                r_rank = row["순위"]
+                r_price = int(row["현재가(원)"])
+                r_chg = float(row["등락률(%)"])
+                r_val = float(row.get("거래대금(억원)", 0))
+                r_mar = float(row.get("시가총액(억원)", 0))
+
+                btn_label = f"#{r_rank}  {r_name} ({r_code})  |  {r_price:,}원 ({r_chg:+.2f}%)  |  거래대금: {r_val:,.0f}억  |  시총: {r_mar:,.0f}억"
+                if st.button(f"📊  {btn_label}", key=f"r_btn_{r_code}_{r_rank}", use_container_width=True):
+                    show_stock_chart_dialog(r_code, r_name, is_dark)
+        else:
+            st.dataframe(disp_df, use_container_width=True, hide_index=True)
+            st.caption("💡 특정 종목의 캔들 차트와 5일/20일/60일 이평선 정밀 분석은 상단 빠른 선택 드롭다운 또는 [📱 원클릭 종목 리스트]에서 종목을 클릭하세요.")
     else:
         st.warning("조건에 부합하는 급등주 데이터가 없습니다.")
 
@@ -1865,7 +1967,7 @@ with tab_rising:
 # ====================================================
 with tab_new:
     st.subheader(f"🚀 최근 {new_listing_months}개월 이내 신규 상장주 모니터링")
-    st.caption("신규 상장주는 상장 초기 매물 소화 후 바닥을 다지고 반등할 때 강한 상승 탄력을 보입니다. 표의 행을 클릭하거나 아래에서 선택하면 캔들 차트 및 이평선 지표가 바로 표시됩니다.")
+    st.caption("신규 상장주는 상장 초기 매물 소화 후 바닥을 다지고 반등할 때 강한 상승 탄력을 보입니다. 종목을 클릭하거나 검색하시면 즉시 모달 팝업으로 정밀 캔들 차트와 지표가 열립니다.")
 
     if not df_new.empty:
         candidate_cols = ["code", "name", "market", "listing_date", "days_since_listing", "price", "change_rate", "trade_value_억", "sector"]
@@ -1884,41 +1986,57 @@ with tab_new:
         }
         new_disp = new_disp.rename(columns=rename_dict)
 
-        new_labels = [f"{r['종목명']} ({r['종목코드']}) · {r['상장일']} 상장 ({r['등락률(%)']:+.2f}%)" for _, r in new_disp.iterrows()]
+        new_options = ["선택하여 모달 열기..."] + [f"{r['종목명']} ({r['종목코드']}) · {r['상장일']} 상장 ({r['등락률(%)']:+.2f}%) | {r.get('업종', '-')}" for _, r in new_disp.iterrows()]
 
-        col_nctl1, col_nctl2 = st.columns([3.2, 1.3])
+        col_nctl1, col_nctl2 = st.columns([3.3, 1.7])
         with col_nctl1:
-            sel_new_idx = st.selectbox(
-                "👇 표에서 행을 직접 클릭하거나, 여기서 분석할 신규 상장주를 선택하세요:",
-                options=range(len(new_disp)),
-                format_func=lambda i: new_labels[i],
-                key="new_stock_selectbox",
+            sel_new_str = st.selectbox(
+                "⚡ 분석할 신규 상장주 검색 또는 선택 (선택 즉시 모달 팝업이 부드럽게 열립니다):",
+                options=new_options,
+                index=0,
+                key="new_quick_select",
             )
-
-        new_table_event = st.dataframe(
-            new_disp,
-            use_container_width=True,
-            hide_index=True,
-            on_select="rerun",
-            selection_mode="single-row",
-            key="new_stock_table",
-        )
-
-        active_new_idx = sel_new_idx
-        if new_table_event and new_table_event.selection and new_table_event.selection.rows:
-            active_new_idx = new_table_event.selection.rows[0]
-
-        target_new_row = new_disp.iloc[active_new_idx]
-        tn_code = str(target_new_row["종목코드"])
-        tn_name = str(target_new_row["종목명"])
+            if sel_new_str != "선택하여 모달 열기...":
+                import re
+                m_code = re.search(r"\((\d{6})\)", sel_new_str)
+                if m_code:
+                    tn_code = m_code.group(1)
+                    matched_new = new_disp[new_disp["종목코드"] == tn_code]
+                    tn_name = str(matched_new.iloc[0]["종목명"]) if not matched_new.empty else tn_code
+                    show_stock_chart_dialog(tn_code, tn_name, is_dark)
 
         with col_nctl2:
-            st.write("")
-            if st.button(f"🔍 '{tn_name}' 모달 팝업 열기", key=f"btn_new_modal_{tn_code}", use_container_width=True, type="primary"):
-                show_stock_chart_dialog(tn_code, tn_name, is_dark)
+            new_view_mode = st.segmented_control(
+                "화면 보기",
+                options=["🚀 원클릭 종목 리스트", "📋 전체 신규상장 표"],
+                default="🚀 원클릭 종목 리스트",
+                key="new_view_mode",
+            )
+            if not new_view_mode:
+                new_view_mode = "🚀 원클릭 종목 리스트"
 
-        st.markdown(f"#### 📊 {tn_name} ({tn_code}) 신규 상장주 캔들 차트 & 이평선(5/20/60일선) 정밀 분석")
-        render_stock_detailed_section(tn_code, tn_name, is_dark, in_modal=False, key_prefix="new_tab")
+        if new_view_mode == "🚀 원클릭 종목 리스트":
+            st.html(
+                f"""<div style="font-size:0.86rem; color:{'#94A3B8' if is_dark else '#64748B'}; margin-bottom:8px;">
+                    💡 <b>모바일/PC 공통:</b> 아래 신규 상장주를 누르시면 <b>즉시 화려한 모달 팝업</b>으로 캔들 차트와 지표가 열립니다.
+                </div>"""
+            )
+            for _, row in new_disp.iterrows():
+                rn_code = str(row["종목코드"])
+                rn_name = str(row["종목명"])
+                rn_date = str(row.get("상장일", ""))
+                rn_days = row.get("상장 경과일수", 0)
+                rn_price = int(row.get("현재가(원)", 0))
+                rn_chg = float(row.get("등락률(%)", 0.0))
+                rn_val = float(row.get("거래대금(억원)", 0.0))
+                rn_sec = str(row.get("업종", "-"))
+
+                btn_label = f"🚀  {rn_name} ({rn_code})  |  {rn_price:,}원 ({rn_chg:+.2f}%)  |  {rn_date} 상장 ({rn_days}일차)  |  거래대금: {rn_val:,.0f}억  |  {rn_sec}"
+                if st.button(btn_label, key=f"n_btn_{rn_code}", use_container_width=True):
+                    show_stock_chart_dialog(rn_code, rn_name, is_dark)
+        else:
+            st.dataframe(new_disp, use_container_width=True, hide_index=True)
+            st.caption("💡 특정 종목의 캔들 차트와 5일/20일/60일 이평선 정밀 분석은 상단 빠른 선택 드롭다운 또는 [🚀 원클릭 종목 리스트]에서 종목을 클릭하세요.")
     else:
         st.info("신규 상장주 데이터를 불러오는 중입니다.")
 

@@ -7,7 +7,7 @@ def compute_technical_indicators(df: pd.DataFrame) -> pd.DataFrame:
     """
     일봉 OHLCV 데이터프레임에 이동평균, 볼린저밴드, RSI, MACD 등의 보조지표를 계산하여 추가합니다.
     """
-    if df.empty or len(df) < 20:
+    if df.empty or len(df) < 5:
         return df
 
     df = df.copy()

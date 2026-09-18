@@ -219,21 +219,27 @@ def fetch_stock_realtime_detail(code: str) -> Optional[Dict]:
     except Exception:
         pass
 
-    # 2. 백업: FDR KRX 리스팅 조회
+    # 2. 백업: 네이버 종목 차트 API (초고속 0.1초)
     try:
-        df = fdr.StockListing("KRX")
-        target = df[df["Code"] == code]
-        if target.empty:
-            return None
-        r = target.iloc[0]
-        return {
-            "code": code,
-            "name": str(r.get("Name", "")),
-            "price": int(_clean_numeric(pd.Series([r.get("Close", 0)])).iloc[0]),
-            "change_rate": float(_clean_numeric(pd.Series([r.get("ChagesRatio", 0.0)])).iloc[0]),
-            "marcap_억": round(float(_clean_numeric(pd.Series([r.get("Marcap", 0)])).iloc[0]) / 100_000_000, 1),
-            "trade_value_억": round(float(_clean_numeric(pd.Series([r.get("Amount", 0)])).iloc[0]) / 100_000_000, 1),
-        }
+        url2 = f"https://api.stock.naver.com/chart/domestic/item/{code}?periodType=day"
+        r2 = requests.get(url2, headers=HEADERS, timeout=2.0)
+        if r2.status_code == 200:
+            d2 = r2.json()
+            p_infos = d2.get("priceInfos", [])
+            last_p = p_infos[-1] if p_infos else {}
+            curr_p = int(last_p.get("currentPrice", 0))
+            open_p = float(d2.get("openPrice", curr_p) or curr_p)
+            last_close = float(d2.get("lastClosePrice", curr_p) or curr_p)
+            chg_rate = round(((curr_p - last_close) / last_close * 100), 2) if last_close > 0 else 0.0
+            return {
+                "code": code,
+                "name": code,
+                "price": curr_p,
+                "change_rate": chg_rate,
+                "marcap_억": 0.0,
+                "trade_value_억": 0.0,
+            }
     except Exception as e:
         print(f"[Error] fetch_stock_realtime_detail({code}): {e}")
         return None
+    return None

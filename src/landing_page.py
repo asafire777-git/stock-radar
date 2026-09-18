@@ -90,11 +90,12 @@ def create_showcase_figure(pattern_type: str = "breakout", is_dark: bool = True)
         xaxis_rangeslider_visible=False,
         margin=dict(l=10, r=10, t=25, b=10),
         height=410,
+        dragmode=False,
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        xaxis=dict(type="category", gridcolor=grid_color),
-        yaxis=dict(gridcolor=grid_color, autorange=True),
-        xaxis2=dict(type="category", gridcolor=grid_color),
-        yaxis2=dict(gridcolor=grid_color, autorange=True),
+        xaxis=dict(type="category", gridcolor=grid_color, fixedrange=True),
+        yaxis=dict(gridcolor=grid_color, autorange=True, fixedrange=True),
+        xaxis2=dict(type="category", gridcolor=grid_color, fixedrange=True),
+        yaxis2=dict(gridcolor=grid_color, autorange=True, fixedrange=True),
     )
     return fig
 
@@ -601,7 +602,7 @@ def render_landing_page(is_dark: bool):
         col_c1, col_m1 = st.columns([1.55, 1.1])
         with col_c1:
             fig1 = create_showcase_figure("breakout", is_dark)
-            st.plotly_chart(fig1, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig1, use_container_width=True, config={"scrollZoom": False, "displayModeBar": False, "showTips": False, "doubleClick": False, "responsive": True})
         with col_m1:
             st.html(
                 f"""<div class="chart-score-box" style="background-color: {card_bg}; border: 1px solid {card_border}; box-shadow: {box_shadow};">
@@ -653,7 +654,7 @@ def render_landing_page(is_dark: bool):
         col_c2, col_m2 = st.columns([1.55, 1.1])
         with col_c2:
             fig2 = create_showcase_figure("pullback", is_dark)
-            st.plotly_chart(fig2, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig2, use_container_width=True, config={"scrollZoom": False, "displayModeBar": False, "showTips": False, "doubleClick": False, "responsive": True})
         with col_m2:
             st.html(
                 f"""<div class="chart-score-box" style="background-color: {card_bg}; border: 1px solid {card_border}; box-shadow: {box_shadow};">
@@ -705,7 +706,7 @@ def render_landing_page(is_dark: bool):
         col_c3, col_m3 = st.columns([1.55, 1.1])
         with col_c3:
             fig3 = create_showcase_figure("ipo", is_dark)
-            st.plotly_chart(fig3, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig3, use_container_width=True, config={"scrollZoom": False, "displayModeBar": False, "showTips": False, "doubleClick": False, "responsive": True})
         with col_m3:
             st.html(
                 f"""<div class="chart-score-box" style="background-color: {card_bg}; border: 1px solid {card_border}; box-shadow: {box_shadow};">
