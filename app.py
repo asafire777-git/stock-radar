@@ -1095,22 +1095,27 @@ def load_new_listings(months=12):
     return get_newly_listed_stocks(months=months)
 
 
-@st.cache_data(ttl=180)
+@st.cache_data(ttl=300)
 def load_stock_chart(code: str, days: int = 100):
     return get_stock_ohlcv(code, days=days)
 
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=180)
 def load_stock_timeframe_chart(code: str, timeframe: str = "1달"):
     return get_stock_timeframe_ohlcv(code, timeframe=timeframe)
 
 
-@st.cache_data(ttl=180)
+@st.cache_data(ttl=300)
 def load_stock_investors(code: str):
     return get_investor_net_purchases(code, days=20)
 
 
-@st.cache_data(ttl=120)
+@st.cache_data(ttl=180)
+def load_stock_realtime_detail(code: str):
+    return fetch_stock_realtime_detail(code)
+
+
+@st.cache_data(ttl=600)
 def evaluate_candidates(pool_records: list, strategy_key: str) -> list:
     """선정된 종목 풀에 대해 기술적 지표, 퀀트 점수, 상승 확률을 일괄 평가 (캐싱 적용)"""
     results = []
@@ -1316,15 +1321,18 @@ def display_investor_table(investor_df: pd.DataFrame, rows: int = 5):
     )
 
 
-def render_stock_detailed_section(code: str, name: str, is_dark: bool, in_modal: bool = False, days: int = 100, key_prefix: str = "sec"):
+def render_stock_detailed_section(code: str, name: str, is_dark: bool, in_modal: bool = False, days: int = 100, key_prefix: str = "sec", preloaded_data: tuple = None):
     """
     종목의 5일/20일/60일 이동평균선 비교 지표 카드, 3단 인터랙티브 캔들 차트,
     초보자 실전 매매 가이드 및 외인/기관 일별 수급 테이블을 일체형으로 렌더링
     """
-    with st.spinner(f"'{name}'({code}) 실시간 기술 지표 및 캔들 차트 분석 중..."):
-        ohlcv = load_stock_chart(code, days=days)
-        detail = fetch_stock_realtime_detail(code)
-        inv_df = load_stock_investors(code)
+    if preloaded_data:
+        ohlcv, detail, inv_df = preloaded_data
+    else:
+        with st.spinner(f"'{name}'({code}) 실시간 기술 지표 및 캔들 차트 분석 중..."):
+            ohlcv = load_stock_chart(code, days=days)
+            detail = load_stock_realtime_detail(code)
+            inv_df = load_stock_investors(code)
 
     if ohlcv.empty or len(ohlcv) < 5:
         st.warning(f"'{name}'({code})의 차트 데이터를 불러올 수 없습니다.")
@@ -1552,8 +1560,13 @@ def show_stock_chart_dialog(code: str, name: str, is_dark: bool):
             </div>
         </div>"""
     )
-    render_stock_detailed_section(code, name, is_dark, in_modal=True, key_prefix="modal_dialog")
+    # 데이터 사전 로드 (로더가 떠 있는 동안 고속 실행)
+    ohlcv = load_stock_chart(code, days=100)
+    detail = load_stock_realtime_detail(code)
+    inv_df = load_stock_investors(code)
+
     loader_ph.empty()
+    render_stock_detailed_section(code, name, is_dark, in_modal=True, key_prefix="modal_dialog", preloaded_data=(ohlcv, detail, inv_df))
 
 
 
@@ -1995,9 +2008,59 @@ with tab_ai:
 # ====================================================
 # TAB 2: 실시간 급등주 TOP 100
 # ====================================================
+@st.fragment
+def render_rising_tab_fragment(disp_df: pd.DataFrame, is_dark_mode: bool):
+    rising_options = ["선택하여 모달 열기..."] + [f"#{r['순위']} {r['종목명']} ({r['종목코드']}) | {r['현재가(원)']:,}원 ({r['등락률(%)']:+.2f}%)" for _, r in disp_df.iterrows()]
+
+    col_ctl1, col_ctl2 = st.columns([3.3, 1.7])
+    with col_ctl1:
+        sel_rising_str = st.selectbox(
+            "⚡ 분석할 급등주 검색 또는 선택 (선택 즉시 모달 팝업이 열립니다):",
+            options=rising_options,
+            index=0,
+            key="rising_quick_select",
+        )
+    with col_ctl2:
+        st.caption("💡 **Tip:** 표에서 원하는 행을 직접 클릭·터치하셔도 즉시 모달 팝업이 열립니다.")
+
+    if sel_rising_str != "선택하여 모달 열기...":
+        import re
+        m_code = re.search(r"\((\d{6})\)", sel_rising_str)
+        if m_code:
+            t_code = m_code.group(1)
+            matched_row = disp_df[disp_df["종목코드"] == t_code]
+            t_name = str(matched_row.iloc[0]["종목명"]) if not matched_row.empty else t_code
+            if st.session_state.get("last_rising_sel") != sel_rising_str:
+                st.session_state["last_rising_sel"] = sel_rising_str
+                show_stock_chart_dialog(t_code, t_name, is_dark_mode)
+    else:
+        st.session_state["last_rising_sel"] = None
+
+    table_event = st.dataframe(
+        disp_df,
+        use_container_width=True,
+        hide_index=True,
+        on_select="rerun",
+        selection_mode="single-row",
+        key="rising_stock_table",
+    )
+
+    if table_event and table_event.selection and table_event.selection.rows:
+        active_idx = table_event.selection.rows[0]
+        target_row = disp_df.iloc[active_idx]
+        t_code = str(target_row["종목코드"])
+        t_name = str(target_row["종목명"])
+        key_tag = f"{t_code}_{active_idx}"
+        if st.session_state.get("last_rising_row") != key_tag:
+            st.session_state["last_rising_row"] = key_tag
+            show_stock_chart_dialog(t_code, t_name, is_dark_mode)
+    else:
+        st.session_state["last_rising_row"] = None
+
+
 with tab_rising:
     st.subheader("🔥 당일 실시간 급등주 순위 (TOP 100)")
-    st.caption("오늘 코스피·코스닥 전체 시장에서 가장 강력하게 상승 중인 종목들입니다. 종목명이나 코드를 클릭하거나 검색하시면 별도 버튼 없이 즉시 정밀 캔들 차트 모달 팝업이 부드럽게 열립니다.")
+    st.caption("오늘 코스피·코스닥 전체 시장에서 가장 강력하게 상승 중인 종목들입니다. 종목명이나 코드를 클릭하거나 검색하시면 별도 대기 없이 즉시 정밀 캔들 차트 모달 팝업이 열립니다.")
 
     if not df_rising_filtered.empty:
         candidate_cols = ["rank", "code", "name", "market", "price", "change_rate", "trade_value_억", "marcap_억", "volume"]
@@ -2015,71 +2078,7 @@ with tab_rising:
             "volume": "거래량",
         }
         disp_df = disp_df.rename(columns=rename_map)
-
-        # 1. 상단 빠른 종목 검색 & 즉시 모달 열기 드롭다운
-        rising_options = ["선택하여 모달 열기..."] + [f"#{r['순위']} {r['종목명']} ({r['종목코드']}) | {r['현재가(원)']:,}원 ({r['등락률(%)']:+.2f}%)" for _, r in disp_df.iterrows()]
-
-        col_ctl1, col_ctl2 = st.columns([3.3, 1.7])
-        with col_ctl1:
-            sel_rising_str = st.selectbox(
-                "⚡ 분석할 급등주 검색 또는 선택 (선택 즉시 모달 팝업이 부드럽게 열립니다):",
-                options=rising_options,
-                index=0,
-                key="rising_quick_select",
-            )
-            if sel_rising_str != "선택하여 모달 열기...":
-                import re
-                m_code = re.search(r"\((\d{6})\)", sel_rising_str)
-                if m_code:
-                    t_code = m_code.group(1)
-                    matched_row = disp_df[disp_df["종목코드"] == t_code]
-                    t_name = str(matched_row.iloc[0]["종목명"]) if not matched_row.empty else t_code
-                    show_stock_chart_dialog(t_code, t_name, is_dark)
-
-        with col_ctl2:
-            view_mode = st.segmented_control(
-                "화면 보기",
-                options=["📱 원클릭 종목 리스트", "📋 전체 100개 순위표"],
-                default="📱 원클릭 종목 리스트",
-                key="rising_view_mode",
-            )
-            if not view_mode:
-                view_mode = "📱 원클릭 종목 리스트"
-
-        if view_mode == "📱 원클릭 종목 리스트":
-            page_choice = st.segmented_control(
-                "순위 구간",
-                options=["1~20위", "21~40위", "41~60위", "61~80위", "81~100위"],
-                default="1~20위",
-                key="rising_page_choice",
-            )
-            if not page_choice:
-                page_choice = "1~20위"
-
-            page_idx = {"1~20위": 0, "21~40위": 20, "41~60위": 40, "61~80위": 60, "81~100위": 80}.get(page_choice, 0)
-            page_df = disp_df.iloc[page_idx:page_idx + 20]
-
-            st.html(
-                f"""<div style="font-size:0.86rem; color:{'#94A3B8' if is_dark else '#64748B'}; margin-bottom:8px;">
-                    💡 <b>모바일/PC 공통:</b> 아래 종목을 누르시면 별도 확인 절차 없이 <b>즉시 화려한 모달 팝업</b>으로 캔들 차트와 지표가 열립니다.
-                </div>"""
-            )
-
-            for _, row in page_df.iterrows():
-                r_code = str(row["종목코드"])
-                r_name = str(row["종목명"])
-                r_rank = row["순위"]
-                r_price = int(row["현재가(원)"])
-                r_chg = float(row["등락률(%)"])
-                r_val = float(row.get("거래대금(억원)", 0))
-                r_mar = float(row.get("시가총액(억원)", 0))
-
-                btn_label = f"#{r_rank}  {r_name} ({r_code})  |  {r_price:,}원 ({r_chg:+.2f}%)  |  거래대금: {r_val:,.0f}억  |  시총: {r_mar:,.0f}억"
-                if st.button(f"📊  {btn_label}", key=f"r_btn_{r_code}_{r_rank}", use_container_width=True):
-                    show_stock_chart_dialog(r_code, r_name, is_dark)
-        else:
-            st.dataframe(disp_df, use_container_width=True, hide_index=True)
-            st.caption("💡 특정 종목의 캔들 차트와 5일/20일/60일 이평선 정밀 분석은 상단 빠른 선택 드롭다운 또는 [📱 원클릭 종목 리스트]에서 종목을 클릭하세요.")
+        render_rising_tab_fragment(disp_df, is_dark)
     else:
         st.warning("조건에 부합하는 급등주 데이터가 없습니다.")
 
@@ -2087,9 +2086,59 @@ with tab_rising:
 # ====================================================
 # TAB 3: 신규 상장주 레이더
 # ====================================================
+@st.fragment
+def render_new_listings_tab_fragment(new_disp: pd.DataFrame, is_dark_mode: bool):
+    new_options = ["선택하여 모달 열기..."] + [f"{r['종목명']} ({r['종목코드']}) · {r['상장일']} 상장 ({r['등락률(%)']:+.2f}%) | {r.get('업종', '-')}" for _, r in new_disp.iterrows()]
+
+    col_nctl1, col_nctl2 = st.columns([3.3, 1.7])
+    with col_nctl1:
+        sel_new_str = st.selectbox(
+            "⚡ 분석할 신규 상장주 검색 또는 선택 (선택 즉시 모달 팝업이 열립니다):",
+            options=new_options,
+            index=0,
+            key="new_quick_select",
+        )
+    with col_nctl2:
+        st.caption("💡 **Tip:** 표에서 원하는 행을 직접 클릭·터치하셔도 즉시 모달 팝업이 열립니다.")
+
+    if sel_new_str != "선택하여 모달 열기...":
+        import re
+        m_code = re.search(r"\((\d{6})\)", sel_new_str)
+        if m_code:
+            tn_code = m_code.group(1)
+            matched_new = new_disp[new_disp["종목코드"] == tn_code]
+            tn_name = str(matched_new.iloc[0]["종목명"]) if not matched_new.empty else tn_code
+            if st.session_state.get("last_new_sel") != sel_new_str:
+                st.session_state["last_new_sel"] = sel_new_str
+                show_stock_chart_dialog(tn_code, tn_name, is_dark_mode)
+    else:
+        st.session_state["last_new_sel"] = None
+
+    new_table_event = st.dataframe(
+        new_disp,
+        use_container_width=True,
+        hide_index=True,
+        on_select="rerun",
+        selection_mode="single-row",
+        key="new_stock_table",
+    )
+
+    if new_table_event and new_table_event.selection and new_table_event.selection.rows:
+        active_new_idx = new_table_event.selection.rows[0]
+        target_new_row = new_disp.iloc[active_new_idx]
+        tn_code = str(target_new_row["종목코드"])
+        tn_name = str(target_new_row["종목명"])
+        key_tag = f"{tn_code}_{active_new_idx}"
+        if st.session_state.get("last_new_row") != key_tag:
+            st.session_state["last_new_row"] = key_tag
+            show_stock_chart_dialog(tn_code, tn_name, is_dark_mode)
+    else:
+        st.session_state["last_new_row"] = None
+
+
 with tab_new:
     st.subheader(f"🚀 최근 {new_listing_months}개월 이내 신규 상장주 모니터링")
-    st.caption("신규 상장주는 상장 초기 매물 소화 후 바닥을 다지고 반등할 때 강한 상승 탄력을 보입니다. 종목을 클릭하거나 검색하시면 즉시 모달 팝업으로 정밀 캔들 차트와 지표가 열립니다.")
+    st.caption("신규 상장주는 상장 초기 매물 소화 후 바닥을 다지고 반등할 때 강한 상승 탄력을 보입니다. 종목을 클릭하거나 검색하시면 별도 대기 없이 즉시 모달 팝업으로 정밀 캔들 차트가 열립니다.")
 
     if not df_new.empty:
         candidate_cols = ["code", "name", "market", "listing_date", "days_since_listing", "price", "change_rate", "trade_value_억", "sector"]
@@ -2107,58 +2156,7 @@ with tab_new:
             "sector": "업종",
         }
         new_disp = new_disp.rename(columns=rename_dict)
-
-        new_options = ["선택하여 모달 열기..."] + [f"{r['종목명']} ({r['종목코드']}) · {r['상장일']} 상장 ({r['등락률(%)']:+.2f}%) | {r.get('업종', '-')}" for _, r in new_disp.iterrows()]
-
-        col_nctl1, col_nctl2 = st.columns([3.3, 1.7])
-        with col_nctl1:
-            sel_new_str = st.selectbox(
-                "⚡ 분석할 신규 상장주 검색 또는 선택 (선택 즉시 모달 팝업이 부드럽게 열립니다):",
-                options=new_options,
-                index=0,
-                key="new_quick_select",
-            )
-            if sel_new_str != "선택하여 모달 열기...":
-                import re
-                m_code = re.search(r"\((\d{6})\)", sel_new_str)
-                if m_code:
-                    tn_code = m_code.group(1)
-                    matched_new = new_disp[new_disp["종목코드"] == tn_code]
-                    tn_name = str(matched_new.iloc[0]["종목명"]) if not matched_new.empty else tn_code
-                    show_stock_chart_dialog(tn_code, tn_name, is_dark)
-
-        with col_nctl2:
-            new_view_mode = st.segmented_control(
-                "화면 보기",
-                options=["🚀 원클릭 종목 리스트", "📋 전체 신규상장 표"],
-                default="🚀 원클릭 종목 리스트",
-                key="new_view_mode",
-            )
-            if not new_view_mode:
-                new_view_mode = "🚀 원클릭 종목 리스트"
-
-        if new_view_mode == "🚀 원클릭 종목 리스트":
-            st.html(
-                f"""<div style="font-size:0.86rem; color:{'#94A3B8' if is_dark else '#64748B'}; margin-bottom:8px;">
-                    💡 <b>모바일/PC 공통:</b> 아래 신규 상장주를 누르시면 <b>즉시 화려한 모달 팝업</b>으로 캔들 차트와 지표가 열립니다.
-                </div>"""
-            )
-            for _, row in new_disp.iterrows():
-                rn_code = str(row["종목코드"])
-                rn_name = str(row["종목명"])
-                rn_date = str(row.get("상장일", ""))
-                rn_days = row.get("상장 경과일수", 0)
-                rn_price = int(row.get("현재가(원)", 0))
-                rn_chg = float(row.get("등락률(%)", 0.0))
-                rn_val = float(row.get("거래대금(억원)", 0.0))
-                rn_sec = str(row.get("업종", "-"))
-
-                btn_label = f"🚀  {rn_name} ({rn_code})  |  {rn_price:,}원 ({rn_chg:+.2f}%)  |  {rn_date} 상장 ({rn_days}일차)  |  거래대금: {rn_val:,.0f}억  |  {rn_sec}"
-                if st.button(btn_label, key=f"n_btn_{rn_code}", use_container_width=True):
-                    show_stock_chart_dialog(rn_code, rn_name, is_dark)
-        else:
-            st.dataframe(new_disp, use_container_width=True, hide_index=True)
-            st.caption("💡 특정 종목의 캔들 차트와 5일/20일/60일 이평선 정밀 분석은 상단 빠른 선택 드롭다운 또는 [🚀 원클릭 종목 리스트]에서 종목을 클릭하세요.")
+        render_new_listings_tab_fragment(new_disp, is_dark)
     else:
         st.info("신규 상장주 데이터를 불러오는 중입니다.")
 
