@@ -50,6 +50,7 @@ try:
         fetch_top_rising_overseas_stocks,
         get_newly_listed_overseas_stocks,
         get_usd_krw_rate,
+        POPULAR_US_STOCKS,
     )
 except ImportError:
     from krx_collector import (
@@ -81,6 +82,7 @@ except ImportError:
         fetch_top_rising_overseas_stocks,
         get_newly_listed_overseas_stocks,
         get_usd_krw_rate,
+        POPULAR_US_STOCKS,
     )
 
 
