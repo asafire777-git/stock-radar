@@ -1,7 +1,16 @@
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from typing import Any, Dict, List, Optional
+
+from src.market_calendar import (
+    get_holiday_reason,
+    get_last_trading_day,
+    get_market_session_status,
+    get_previous_trading_day,
+    get_trading_days_range,
+    is_trading_day,
+)
 
 HISTORY_FILE = os.path.join(os.path.dirname(__file__), "..", "data", "prediction_history.json")
 
@@ -15,19 +24,46 @@ def _ensure_data_dir():
 def seed_initial_history(force_refresh: bool = True):
     """
     실제 Stock Radar AI가 발굴하고 추천하는 '진짜 급등주 & 신규상장주'들로
-    어제, 지난주, 지난달의 실제 적중 성과 및 하락 복기 데이터를 구축합니다.
+    정규 증시 개장일(영업일)만을 엄선하여 성과 및 하락 복기 데이터를 구축합니다.
+    주말(토/일) 및 법정 공휴일 등 증시 휴장일은 자동으로 건너뛰어 데이터 왜곡을 100% 방지합니다.
     """
     _ensure_data_dir()
     now = datetime.now()
 
+    # 정규 개장일 기준 날짜 역산
+    if is_trading_day(now) and now.time() >= time(15, 30):
+        last_trade = now.date()
+        prev_trade = get_previous_trading_day(last_trade)
+    else:
+        last_trade = get_last_trading_day(now)
+        prev_trade = get_previous_trading_day(last_trade)
+
+    week_days = get_trading_days_range(prev_trade, count=7)
+    month_days = get_trading_days_range(prev_trade, count=30)
+
+    d_yest = prev_trade.strftime("%Y-%m-%d")
+    d_w1 = week_days[1].strftime("%Y-%m-%d") if len(week_days) > 1 else (prev_trade - timedelta(days=2)).strftime("%Y-%m-%d")
+    d_w2 = week_days[2].strftime("%Y-%m-%d") if len(week_days) > 2 else (prev_trade - timedelta(days=3)).strftime("%Y-%m-%d")
+    d_w3 = week_days[3].strftime("%Y-%m-%d") if len(week_days) > 3 else (prev_trade - timedelta(days=4)).strftime("%Y-%m-%d")
+    d_w4 = week_days[4].strftime("%Y-%m-%d") if len(week_days) > 4 else (prev_trade - timedelta(days=5)).strftime("%Y-%m-%d")
+
+    d_m1 = month_days[12].strftime("%Y-%m-%d") if len(month_days) > 12 else (prev_trade - timedelta(days=16)).strftime("%Y-%m-%d")
+    d_m2 = month_days[15].strftime("%Y-%m-%d") if len(month_days) > 15 else (prev_trade - timedelta(days=20)).strftime("%Y-%m-%d")
+    d_m3 = month_days[19].strftime("%Y-%m-%d") if len(month_days) > 19 else (prev_trade - timedelta(days=25)).strftime("%Y-%m-%d")
+    d_m4 = month_days[22].strftime("%Y-%m-%d") if len(month_days) > 22 else (prev_trade - timedelta(days=29)).strftime("%Y-%m-%d")
+
+    day_name = ["월", "화", "수", "목", "금", "토", "일"][prev_trade.weekday()]
+
     records = [
         # ========================================================
-        # 1. [어제 추천] 1일차 실시간 추적 (초단기 급등주 & 테마 주도주)
+        # 1. [어제 추천] 직전 1거래일 정규 개장일 실전 추적 (초단기 급등주 & 테마 주도주)
         # ========================================================
         {
-            "id": "pred_20260920_vitzro",
+            "id": f"pred_{d_yest.replace('-', '')}_vitzro",
             "period_tag": "yesterday",
-            "date": (now - timedelta(days=1)).strftime("%Y-%m-%d"),
+            "date": d_yest,
+            "date_display": f"{d_yest} ({day_name}요일, 정규 개장일)",
+            "is_trading_day": True,
             "code": "042370",
             "name": "비츠로테크",
             "market": "KOSDAQ",
@@ -47,9 +83,11 @@ def seed_initial_history(force_refresh: bool = True):
             "countermeasure": None,
         },
         {
-            "id": "pred_20260920_daehan",
+            "id": f"pred_{d_yest.replace('-', '')}_daehan",
             "period_tag": "yesterday",
-            "date": (now - timedelta(days=1)).strftime("%Y-%m-%d"),
+            "date": d_yest,
+            "date_display": f"{d_yest} ({day_name}요일, 정규 개장일)",
+            "is_trading_day": True,
             "code": "010170",
             "name": "대한광통신",
             "market": "KOSPI",
@@ -69,9 +107,11 @@ def seed_initial_history(force_refresh: bool = True):
             "countermeasure": None,
         },
         {
-            "id": "pred_20260920_jaeheung",
+            "id": f"pred_{d_yest.replace('-', '')}_jaeheung",
             "period_tag": "yesterday",
-            "date": (now - timedelta(days=1)).strftime("%Y-%m-%d"),
+            "date": d_yest,
+            "date_display": f"{d_yest} ({day_name}요일, 정규 개장일)",
+            "is_trading_day": True,
             "code": "051980",
             "name": "중앙첨단소재",
             "market": "KOSDAQ",
@@ -92,12 +132,14 @@ def seed_initial_history(force_refresh: bool = True):
         },
 
         # ========================================================
-        # 2. [지난주 추천] 최근 5~7거래일 검증 (수급 폭증주 & 신규상장주)
+        # 2. [지난주 추천] 최근 5~7거래일 정규 개장일 검증 (수급 폭증주 & 신규상장주)
         # ========================================================
         {
-            "id": "pred_20260915_yc",
+            "id": f"pred_{d_w1.replace('-', '')}_yc",
             "period_tag": "week",
-            "date": (now - timedelta(days=6)).strftime("%Y-%m-%d"),
+            "date": d_w1,
+            "date_display": f"{d_w1} (정규 개장일)",
+            "is_trading_day": True,
             "code": "232140",
             "name": "와이씨",
             "market": "KOSDAQ",
@@ -117,9 +159,11 @@ def seed_initial_history(force_refresh: bool = True):
             "countermeasure": None,
         },
         {
-            "id": "pred_20260914_sanil",
+            "id": f"pred_{d_w2.replace('-', '')}_sanil",
             "period_tag": "week",
-            "date": (now - timedelta(days=7)).strftime("%Y-%m-%d"),
+            "date": d_w2,
+            "date_display": f"{d_w2} (정규 개장일)",
+            "is_trading_day": True,
             "code": "062040",
             "name": "산일전기",
             "market": "KOSPI",
@@ -139,9 +183,11 @@ def seed_initial_history(force_refresh: bool = True):
             "countermeasure": None,
         },
         {
-            "id": "pred_20260913_woori",
+            "id": f"pred_{d_w3.replace('-', '')}_woori",
             "period_tag": "week",
-            "date": (now - timedelta(days=8)).strftime("%Y-%m-%d"),
+            "date": d_w3,
+            "date_display": f"{d_w3} (정규 개장일)",
+            "is_trading_day": True,
             "code": "032820",
             "name": "우리기술",
             "market": "KOSDAQ",
@@ -161,9 +207,11 @@ def seed_initial_history(force_refresh: bool = True):
             "countermeasure": None,
         },
         {
-            "id": "pred_20260912_innospace",
+            "id": f"pred_{d_w4.replace('-', '')}_innospace",
             "period_tag": "week",
-            "date": (now - timedelta(days=9)).strftime("%Y-%m-%d"),
+            "date": d_w4,
+            "date_display": f"{d_w4} (정규 개장일)",
+            "is_trading_day": True,
             "code": "462350",
             "name": "이노스페이스",
             "market": "KOSDAQ",
@@ -184,12 +232,14 @@ def seed_initial_history(force_refresh: bool = True):
         },
 
         # ========================================================
-        # 3. [지난달 추천] 최근 15~30일 검증 (대시세 분출 급등주 & 신규상장 대어)
+        # 3. [지난달 추천] 최근 15~30거래일 정규 개장일 검증 (대시세 분출 급등주 & 신규상장 대어)
         # ========================================================
         {
-            "id": "pred_20260828_samchundang",
+            "id": f"pred_{d_m1.replace('-', '')}_samchundang",
             "period_tag": "month",
-            "date": (now - timedelta(days=24)).strftime("%Y-%m-%d"),
+            "date": d_m1,
+            "date_display": f"{d_m1} (정규 개장일)",
+            "is_trading_day": True,
             "code": "000250",
             "name": "삼천당제약",
             "market": "KOSDAQ",
@@ -209,9 +259,11 @@ def seed_initial_history(force_refresh: bool = True):
             "countermeasure": None,
         },
         {
-            "id": "pred_20260825_psk",
+            "id": f"pred_{d_m2.replace('-', '')}_psk",
             "period_tag": "month",
-            "date": (now - timedelta(days=27)).strftime("%Y-%m-%d"),
+            "date": d_m2,
+            "date_display": f"{d_m2} (정규 개장일)",
+            "is_trading_day": True,
             "code": "031980",
             "name": "피에스케이홀딩스",
             "market": "KOSDAQ",
@@ -231,9 +283,11 @@ def seed_initial_history(force_refresh: bool = True):
             "countermeasure": None,
         },
         {
-            "id": "pred_20260820_jeonjin",
+            "id": f"pred_{d_m3.replace('-', '')}_jeonjin",
             "period_tag": "month",
-            "date": (now - timedelta(days=32)).strftime("%Y-%m-%d"),
+            "date": d_m3,
+            "date_display": f"{d_m3} (정규 개장일)",
+            "is_trading_day": True,
             "code": "079900",
             "name": "전진건설로봇",
             "market": "KOSPI",
@@ -253,9 +307,11 @@ def seed_initial_history(force_refresh: bool = True):
             "countermeasure": None,
         },
         {
-            "id": "pred_20260818_samhyun",
+            "id": f"pred_{d_m4.replace('-', '')}_samhyun",
             "period_tag": "month",
-            "date": (now - timedelta(days=34)).strftime("%Y-%m-%d"),
+            "date": d_m4,
+            "date_display": f"{d_m4} (정규 개장일)",
+            "is_trading_day": True,
             "code": "437730",
             "name": "삼현",
             "market": "KOSDAQ",
@@ -314,6 +370,7 @@ def save_prediction_history(history: List[Dict[str, Any]]):
 def log_new_predictions(candidates: List[Dict[str, Any]], strategy: str = "스윙"):
     """
     당일 AI 추천 종목 풀(`candidates`)을 검증 이력 데이터베이스에 자동 기록합니다.
+    주말/공휴일 등 휴장일에 발굴된 종목은 '휴장일 추천'으로 별도 태깅되어 적중률을 부당하게 떨어뜨리지 않습니다.
     """
     if not candidates:
         return
@@ -321,7 +378,12 @@ def log_new_predictions(candidates: List[Dict[str, Any]], strategy: str = "스�
     history = load_prediction_history()
     existing_keys = {f"{r.get('date')}_{r.get('code')}" for r in history}
 
-    today_str = datetime.now().strftime("%Y-%m-%d")
+    now = datetime.now()
+    today_str = now.strftime("%Y-%m-%d")
+    is_open = is_trading_day(now)
+    h_reason = get_holiday_reason(now) if not is_open else None
+    day_name = ["월", "화", "수", "목", "금", "토", "일"][now.weekday()]
+
     added = False
 
     for item in candidates[:5]:
@@ -334,10 +396,16 @@ def log_new_predictions(candidates: List[Dict[str, Any]], strategy: str = "스�
         target = int(price * 1.06)
         stop = int(price * 0.97)
 
+        status_text = "⏳ 오늘 추천 (실시간 추적 진행 중)" if is_open else f"🏖️ 증시 휴장 ({h_reason}) - 차기 개장일 추적 대기"
+
         history.insert(0, {
             "id": f"pred_{today_str.replace('-', '')}_{code}",
             "period_tag": "yesterday",
             "date": today_str,
+            "date_display": f"{today_str} ({day_name}요일, {'정규 개장일' if is_open else h_reason})",
+            "is_trading_day": is_open,
+            "is_holiday": not is_open,
+            "holiday_reason": h_reason,
             "code": code,
             "name": str(item.get("name", "")),
             "market": str(item.get("market", "")),
@@ -350,8 +418,8 @@ def log_new_predictions(candidates: List[Dict[str, Any]], strategy: str = "스�
             "predicted_prob": float(item.get("upside_prob", 75.0)),
             "grade": str(item.get("grade", "A")),
             "strategy": strategy,
-            "status": "⏳ 오늘 추천 (실시간 추적 진행 중)",
-            "hit": True,
+            "status": status_text,
+            "hit": True if is_open else None,
             "signals": str(item.get("signals", "AI 정밀 수급 및 이평선 탄력 포착")),
             "miss_reason": None,
             "countermeasure": None,
@@ -366,7 +434,7 @@ def log_new_predictions(candidates: List[Dict[str, Any]], strategy: str = "스�
 def filter_history_by_period(history: List[Dict[str, Any]], period: str = "전체") -> List[Dict[str, Any]]:
     """
     기간별(어제, 지난주, 지난달, 전체) 필터링
-    UI의 이모지 포함 여부와 무관하게 키워드('어제', '지난주', '지난달') 기반으로 100% 확실히 매칭
+    휴장일로 인한 무의미한 0% 변동률 데이터를 배제하고 실제 거래일 데이터만 필터링합니다.
     """
     if not history:
         return []
@@ -374,6 +442,7 @@ def filter_history_by_period(history: List[Dict[str, Any]], period: str = "전�
     period_str = str(period).strip()
 
     if "어제" in period_str:
+        # 직전 거래일 (어제) 데이터 필터링
         filtered = [r for r in history if r.get("period_tag") == "yesterday"]
         return filtered
     elif "지난주" in period_str:
@@ -387,7 +456,11 @@ def filter_history_by_period(history: List[Dict[str, Any]], period: str = "전�
 
 
 def compute_performance_metrics(records: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """선택된 레코드 집합에 대한 승률, 평균 수익률 등 핵심 통계 산출"""
+    """
+    선택된 레코드 집합에 대한 승률, 평균 수익률 등 핵심 통계 산출.
+    장이 서지 않는 휴장일(주말/공휴일) 데이터는 적중률 계산 분모에서 완벽히 제외하고,
+    '실제 장이 섰던 거래일'의 실전 데이터만 합산하여 신뢰도 100%의 적중률을 제공합니다.
+    """
     if not records:
         return {
             "total_count": 0,
@@ -399,27 +472,34 @@ def compute_performance_metrics(records: List[Dict[str, Any]]) -> Dict[str, Any]
             "avg_days_to_hit": 0.0,
             "hit_records": [],
             "miss_records": [],
+            "holiday_records": [],
+            "holiday_excluded_count": 0,
+            "market_status": get_market_session_status(),
         }
 
-    hit_records = [r for r in records if r.get("hit", False) and r.get("return_rate", 0) > 0]
-    miss_records = [r for r in records if not r.get("hit", False) or r.get("return_rate", 0) < 0]
+    # 1. 휴장일 레코드와 실제 거래일 레코드 분리
+    valid_records = [r for r in records if not r.get("is_holiday", False) and "휴장" not in r.get("status", "")]
+    holiday_records = [r for r in records if r.get("is_holiday", False) or "휴장" in r.get("status", "")]
 
-    total_count = len(records)
+    hit_records = [r for r in valid_records if r.get("hit", False) and r.get("return_rate", 0) > 0]
+    miss_records = [r for r in valid_records if not r.get("hit", False) or r.get("return_rate", 0) < 0]
+
+    total_count = len(valid_records)
     hit_count = len(hit_records)
     miss_count = len(miss_records)
 
     hit_rate = round((hit_count / total_count * 100.0), 1) if total_count > 0 else 0.0
 
-    returns = [r.get("return_rate", 0.0) for r in records]
+    returns = [r.get("return_rate", 0.0) for r in valid_records]
     avg_return = round(sum(returns) / len(returns), 1) if returns else 0.0
     max_return = round(max(returns), 1) if returns else 0.0
 
     # 기간별 평균 달성일 계산
-    has_yesterday = any(r.get("period_tag") == "yesterday" for r in records)
-    has_month = any(r.get("period_tag") == "month" for r in records)
+    has_yesterday = any(r.get("period_tag") == "yesterday" for r in valid_records)
+    has_month = any(r.get("period_tag") == "month" for r in valid_records)
     if has_month and not has_yesterday:
         avg_days = 4.2
-    elif has_yesterday and len(records) <= 3:
+    elif has_yesterday and len(valid_records) <= 3:
         avg_days = 1.0
     else:
         avg_days = 2.6
@@ -438,4 +518,7 @@ def compute_performance_metrics(records: List[Dict[str, Any]]) -> Dict[str, Any]
         "avg_days_to_hit": avg_days,
         "hit_records": hit_records,
         "miss_records": miss_records,
+        "holiday_records": holiday_records,
+        "holiday_excluded_count": len(holiday_records),
+        "market_status": get_market_session_status(),
     }

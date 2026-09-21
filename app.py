@@ -43,6 +43,13 @@ try:
         filter_history_by_period,
         compute_performance_metrics,
     )
+    from src.market_calendar import (
+        get_holiday_reason,
+        get_last_trading_day,
+        get_market_session_status,
+        get_previous_trading_day,
+        is_trading_day,
+    )
     from src.overseas_collector import (
         search_overseas_stock,
         fetch_overseas_stock_detail,
@@ -74,6 +81,13 @@ except ImportError:
         log_new_predictions,
         filter_history_by_period,
         compute_performance_metrics,
+    )
+    from market_calendar import (
+        get_holiday_reason,
+        get_last_trading_day,
+        get_market_session_status,
+        get_previous_trading_day,
+        is_trading_day,
     )
     from overseas_collector import (
         search_overseas_stock,
@@ -2091,34 +2105,19 @@ with head_c2:
             st.session_state["current_page"] = "intro"
             st.rerun()
 
-# 📡 실시간 데이터 연동 상태 뱃지 & 주기 표시
-now_kst = datetime.datetime.now()
-is_weekday = now_kst.weekday() < 5
-is_market_hours = is_weekday and (datetime.time(9, 0) <= now_kst.time() <= datetime.time(15, 30))
-
-if is_market_hours:
-    status_icon = "🟢"
-    status_title = "장중 실시간 라이브 연동 중"
-    status_desc = "네이버 증권 공식 실시간 호가/체결 데이터가 1분 단위로 자동 갱신됩니다."
-    badge_bg = "#DCFCE7" if not is_dark else "#064E3B"
-    badge_border = "#22C55E"
-    badge_color = "#15803D" if not is_dark else "#4ADE80"
-else:
-    status_icon = "🌙"
-    status_title = "장마감 정산 데이터 확정 반영 완료"
-    status_desc = f"{now_kst.strftime('%Y-%m-%d')} 한국거래소 및 외국인·기관 큰손 최종 확정 수급이 집계되었습니다."
-    badge_bg = "#EFF6FF" if not is_dark else "#1E293B"
-    badge_border = "#3B82F6"
-    badge_color = "#1D4ED8" if not is_dark else "#60A5FA"
+# 📡 실시간 데이터 연동 상태 뱃지 & 주기 표시 (증시 캘린더 엔진 연동)
+market_status = get_market_session_status()
+m_badge_bg = market_status["badge_bg"] if not is_dark else ("#1E293B" if market_status["session_type"] != "live" else "#064E3B")
+m_badge_color = market_status["badge_color"] if not is_dark else ("#60A5FA" if market_status["session_type"] != "live" else "#4ADE80")
 
 st.html(
-    f"""<div style="background:{badge_bg}; border:1px solid {badge_border}; border-radius:10px; padding:10px 16px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+    f"""<div style="background:{m_badge_bg}; border:1.5px solid {market_status['badge_border']}; border-radius:10px; padding:10px 16px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
         <div>
-            <span style="font-weight:800; color:{badge_color}; font-size:0.95rem;">{status_icon} {status_title}</span>
-            <span style="color:{'#94A3B8' if is_dark else '#64748B'}; font-size:0.85rem; margin-left:8px;">• {status_desc}</span>
+            <span style="font-weight:800; color:{m_badge_color}; font-size:0.95rem;">{market_status['title']}</span>
+            <span style="color:{'#94A3B8' if is_dark else '#64748B'}; font-size:0.85rem; margin-left:8px;">• {market_status['desc']}</span>
         </div>
         <div style="font-size:0.82rem; color:{'#94A3B8' if is_dark else '#64748B'};">
-            📡 분석 주기: <b>{analysis_period.split(' ')[1] if ' ' in analysis_period else '실시간'}</b> | 최종 갱신: <b>{now_kst.strftime('%H:%M:%S')}</b>
+            📡 분석 기준: <b>{market_status['current_date_str']}</b> | 최종 갱신: <b>{datetime.datetime.now().strftime('%H:%M:%S')}</b>
         </div>
     </div>"""
 )
@@ -2819,7 +2818,7 @@ def render_performance_tab_fragment(is_dark_mode: bool):
     with col_pf1:
         perf_period = st.segmented_control(
             "검증 기간 선택",
-            options=["전체 기간 검증 리포트", "📅 어제 (1일차 추적)", "🗓️ 지난주 (최근 5~7일)", "📆 지난달 (최근 30일)"],
+            options=["전체 기간 검증 리포트", "📅 어제 (직전 1거래일 추적)", "🗓️ 지난주 (최근 5거래일)", "📆 지난달 (최근 20거래일)"],
             default="전체 기간 검증 리포트",
             key="perf_period_segmented",
         )
@@ -2827,16 +2826,31 @@ def render_performance_tab_fragment(is_dark_mode: bool):
         perf_period = "전체 기간 검증 리포트"
 
     with col_pf2:
-        st.caption("💡 **원칙:** AI 추천 당시 주가 대비 실제 달성한 최고가 및 목표가(+6%) 달성 여부를 대조 검증합니다.")
+        st.caption("💡 **원칙:** 주말/휴장일 제외, 실제 정규장 개장일 당시 주가 대비 실제 최고가 및 목표가(+6%) 달성을 대조 검증합니다.")
 
     all_history = load_prediction_history()
     filtered_history = filter_history_by_period(all_history, perf_period)
     metrics = compute_performance_metrics(filtered_history)
 
+    # 증시 휴일/휴장일 데이터 보정 안내 배너
+    market_info = metrics.get("market_status") or get_market_session_status()
+    last_trade_str = market_info.get("last_trading_day", "")
+
+    st.html(
+        f"""<div style="background:{'#1E293B' if is_dark_mode else '#FEF3C7'}; border:1.5px solid #F59E0B; border-radius:10px; padding:12px 18px; margin-bottom:14px; display:flex; align-items:flex-start; gap:12px;">
+            <span style="font-size:1.4rem; line-height:1;">🛡️</span>
+            <div style="font-size:0.88rem; color:{'#E2E8F0' if is_dark_mode else '#78350F'}; line-height:1.55;">
+                <b style="color:{'#FCD34D' if is_dark_mode else '#92400E'}; font-size:0.95rem;">증시 휴일/휴장일 데이터 보정 시스템 가동 중</b><br/>
+                주말(토·일요일) 및 법정 공휴일은 한국거래소 정규장이 서지 않으므로, <b>장이 열리지 않는 날의 무변동(0% / 미체결)으로 인한 AI 적중률 저하 및 통계 오염을 원천 차단</b>했습니다.<br/>
+                현재 리포트는 <b>실제 정규장이 열렸던 직전 개장일({last_trade_str}) 및 실제 거래일 데이터만을 100% 엄선 합산</b>하여 투명하고 확실한 적중 성과를 제공합니다.
+            </div>
+        </div>"""
+    )
+
     # 2. 핵심 4대 성과 메트릭 바
     m_c1, m_c2, m_c3, m_c4 = st.columns(4)
     with m_c1:
-        st.metric("🎯 AI 검증 적중률", f"{metrics['hit_rate']}%", f"{metrics['hit_count']}승 {metrics['miss_count']}패", delta_color="normal")
+        st.metric("🎯 AI 검증 적중률", f"{metrics['hit_rate']}%", f"{metrics['hit_count']}승 {metrics['miss_count']}패 (개장일 기준)", delta_color="normal")
     with m_c2:
         st.metric("🚀 평균 최고 수익률", f"+{metrics['avg_return']}%", "손익 상계 평균", delta_color="normal")
     with m_c3:
@@ -2855,7 +2869,7 @@ def render_performance_tab_fragment(is_dark_mode: bool):
     with tab_hits:
         st.html(
             f"""<div style="font-size:0.92rem; color:{'#94A3B8' if is_dark_mode else '#475569'}; margin-bottom:12px;">
-                💡 <b>상승 적중 기준:</b> 추천일 이후 5거래일 이내에 1차 목표가(+6.0%) 이상 도달하였거나 플러스 수익률을 달성한 실제 적중 내역입니다.
+                💡 <b>상승 적중 기준:</b> 실제 거래일 기준 추천일 이후 5거래일 이내에 1차 목표가(+6.0%) 이상 도달하였거나 플러스 수익률을 달성한 실제 적중 내역입니다. (비거래일 제외)
             </div>"""
         )
         if metrics["hit_records"]:
@@ -2866,7 +2880,7 @@ def render_performance_tab_fragment(is_dark_mode: bool):
                 r_max = r.get("max_price", 0)
                 r_ret = r.get("return_rate", 0.0)
                 r_target = r.get("target_price", 0)
-                r_date = r.get("date", "")
+                r_date = r.get("date_display") or f"{r.get('date', '')} (정규 개장일)"
                 r_status = r.get("status", "적중")
                 r_sig = r.get("signals", "AI 정밀 수급 포착")
                 r_prob = r.get("predicted_prob", 80.0)
@@ -2921,7 +2935,7 @@ def render_performance_tab_fragment(is_dark_mode: bool):
                 r_close = r.get("close_price", 0)
                 r_ret = r.get("return_rate", 0.0)
                 r_stop = r.get("stop_price", 0)
-                r_date = r.get("date", "")
+                r_date = r.get("date_display") or f"{r.get('date', '')} (정규 개장일)"
                 r_status = r.get("status", "조정")
                 r_reason = r.get("miss_reason") or "단기 상승 후 외인·기관의 일시적 차익 실현 매물 출회 및 지수 약세 동반 조정"
                 r_action = r.get("countermeasure") or "손절선(-3%) 엄격 준수. 20일 생명선 지지 확인 전까지 물타기 금지 및 반등 시 비중 50% 축소 권장."

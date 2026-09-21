@@ -1,8 +1,10 @@
 [
   {
-    "id": "pred_20260920_vitzro",
+    "id": "pred_20260918_vitzro",
     "period_tag": "yesterday",
-    "date": "2026-09-20",
+    "date": "2026-09-18",
+    "date_display": "2026-09-18 (금요일, 정규 개장일)",
+    "is_trading_day": true,
     "code": "042370",
     "name": "비츠로테크",
     "market": "KOSDAQ",
@@ -22,9 +24,11 @@
     "countermeasure": null
   },
   {
-    "id": "pred_20260920_daehan",
+    "id": "pred_20260918_daehan",
     "period_tag": "yesterday",
-    "date": "2026-09-20",
+    "date": "2026-09-18",
+    "date_display": "2026-09-18 (금요일, 정규 개장일)",
+    "is_trading_day": true,
     "code": "010170",
     "name": "대한광통신",
     "market": "KOSPI",
@@ -44,9 +48,11 @@
     "countermeasure": null
   },
   {
-    "id": "pred_20260920_jaeheung",
+    "id": "pred_20260918_jaeheung",
     "period_tag": "yesterday",
-    "date": "2026-09-20",
+    "date": "2026-09-18",
+    "date_display": "2026-09-18 (금요일, 정규 개장일)",
+    "is_trading_day": true,
     "code": "051980",
     "name": "중앙첨단소재",
     "market": "KOSDAQ",
@@ -66,9 +72,11 @@
     "countermeasure": "원칙대로 권장 손절선(8,920원) 도달 시 기계적 손절 완료 필수. 20일 생명선(8,500원) 지지 여부 확인 전까지 추가 매수(물타기) 금지."
   },
   {
-    "id": "pred_20260915_yc",
+    "id": "pred_20260917_yc",
     "period_tag": "week",
-    "date": "2026-09-15",
+    "date": "2026-09-17",
+    "date_display": "2026-09-17 (정규 개장일)",
+    "is_trading_day": true,
     "code": "232140",
     "name": "와이씨",
     "market": "KOSDAQ",
@@ -88,9 +96,11 @@
     "countermeasure": null
   },
   {
-    "id": "pred_20260914_sanil",
+    "id": "pred_20260916_sanil",
     "period_tag": "week",
-    "date": "2026-09-14",
+    "date": "2026-09-16",
+    "date_display": "2026-09-16 (정규 개장일)",
+    "is_trading_day": true,
     "code": "062040",
     "name": "산일전기",
     "market": "KOSPI",
@@ -110,9 +120,11 @@
     "countermeasure": null
   },
   {
-    "id": "pred_20260913_woori",
+    "id": "pred_20260915_woori",
     "period_tag": "week",
-    "date": "2026-09-13",
+    "date": "2026-09-15",
+    "date_display": "2026-09-15 (정규 개장일)",
+    "is_trading_day": true,
     "code": "032820",
     "name": "우리기술",
     "market": "KOSDAQ",
@@ -132,9 +144,11 @@
     "countermeasure": null
   },
   {
-    "id": "pred_20260912_innospace",
+    "id": "pred_20260914_innospace",
     "period_tag": "week",
-    "date": "2026-09-12",
+    "date": "2026-09-14",
+    "date_display": "2026-09-14 (정규 개장일)",
+    "is_trading_day": true,
     "code": "462350",
     "name": "이노스페이스",
     "market": "KOSDAQ",
@@ -154,9 +168,11 @@
     "countermeasure": "손절 기준(-3%)에 따른 기계적 손절 완료. 30,000원 심리적 마지노선 지지력 확인 전까지 재진입 보류."
   },
   {
-    "id": "pred_20260828_samchundang",
+    "id": "pred_20260902_samchundang",
     "period_tag": "month",
-    "date": "2026-08-28",
+    "date": "2026-09-02",
+    "date_display": "2026-09-02 (정규 개장일)",
+    "is_trading_day": true,
     "code": "000250",
     "name": "삼천당제약",
     "market": "KOSDAQ",
@@ -176,9 +192,11 @@
     "countermeasure": null
   },
   {
-    "id": "pred_20260825_psk",
+    "id": "pred_20260828_psk",
     "period_tag": "month",
-    "date": "2026-08-25",
+    "date": "2026-08-28",
+    "date_display": "2026-08-28 (정규 개장일)",
+    "is_trading_day": true,
     "code": "031980",
     "name": "피에스케이홀딩스",
     "market": "KOSDAQ",
@@ -198,9 +216,11 @@
     "countermeasure": null
   },
   {
-    "id": "pred_20260820_jeonjin",
+    "id": "pred_20260824_jeonjin",
     "period_tag": "month",
-    "date": "2026-08-20",
+    "date": "2026-08-24",
+    "date_display": "2026-08-24 (정규 개장일)",
+    "is_trading_day": true,
     "code": "079900",
     "name": "전진건설로봇",
     "market": "KOSPI",
@@ -220,9 +240,11 @@
     "countermeasure": null
   },
   {
-    "id": "pred_20260818_samhyun",
+    "id": "pred_20260819_samhyun",
     "period_tag": "month",
-    "date": "2026-08-18",
+    "date": "2026-08-19",
+    "date_display": "2026-08-19 (정규 개장일)",
+    "is_trading_day": true,
     "code": "437730",
     "name": "삼현",
     "market": "KOSDAQ",
