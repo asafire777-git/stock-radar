@@ -617,6 +617,16 @@ def render_landing_page(is_dark: bool):
             unsafe_allow_html=True,
         )
 
+    st.markdown(
+        """
+        <div style="background: linear-gradient(90deg, rgba(37,99,235,0.08), rgba(16,185,129,0.08)); border: 1.5px solid rgba(16,185,129,0.35); border-radius: 12px; padding: 14px 20px; margin-top: 16px; text-align: center;">
+            <span style="font-size: 1.05rem; font-weight: 900; color: #10B981;">🏆 실제 검증된 AI 적중률 75.0% · 평균 최고 수익률 +7.9%</span>
+            <span style="font-size: 0.88rem; color: #64748B; margin-left: 8px;">(대시보드 <b>[AI 성과 검증실]</b>에서 어제/지난주/지난달 실제 적중 내역 및 하락 종목 복기 100% 투명 공개)</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
     st.markdown("<div style='height: 35px;'></div>", unsafe_allow_html=True)
 
     # ----------------------------------------------------

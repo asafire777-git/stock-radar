@@ -37,6 +37,12 @@ try:
     from src.prediction_model import predictor
     from src.quant_scorer import calculate_quant_score
     from src.technical_analysis import analyze_stock_signals, compute_technical_indicators
+    from src.performance_tracker import (
+        load_prediction_history,
+        log_new_predictions,
+        filter_history_by_period,
+        compute_performance_metrics,
+    )
 except ImportError:
     from krx_collector import (
         get_investor_net_purchases,
@@ -54,6 +60,12 @@ except ImportError:
     from prediction_model import predictor
     from quant_scorer import calculate_quant_score
     from technical_analysis import analyze_stock_signals, compute_technical_indicators
+    from performance_tracker import (
+        load_prediction_history,
+        log_new_predictions,
+        filter_history_by_period,
+        compute_performance_metrics,
+    )
 
 
 # ----------------------------------------------------
@@ -1669,6 +1681,13 @@ if not pool.empty:
     else:
         candidates = evaluate_candidates(pool_records, strategy_key)
 
+    # 당일 AI 추천 종목 성과 추적 데이터베이스 자동 로깅 (중복 방지)
+    if candidates:
+        try:
+            log_new_predictions(candidates, strategy=strategy_key)
+        except Exception:
+            pass
+
 # 매트릭스 디지털 레인 애니메이션 최소 2.2초 연출 보장 후 짠~ 하고 해제
 if show_matrix:
     elapsed = time.time() - matrix_start_time
@@ -1856,11 +1875,12 @@ st.markdown("---")
 # ----------------------------------------------------
 # 6. 메인 탭 구성
 # ----------------------------------------------------
-tab_ai, tab_rising, tab_new, tab_chart = st.tabs([
+tab_ai, tab_rising, tab_new, tab_perf, tab_chart = st.tabs([
     "⭐ AI 오늘 추천주 (초보자 강추)",
     "🔥 실시간 급등 순위 (TOP 100)",
     "🚀 신규 상장주 모니터링",
-    "📊 1초 종목 진단실",
+    "🏆 AI 성과 검증실 & 실전 복기",
+    "📊 1초 종목 정밀 진단실",
 ])
 
 
@@ -2195,7 +2215,170 @@ with tab_new:
 
 
 # ====================================================
-# TAB 4: 종목 정밀 진단실 (전면 AI 검색 연동)
+# TAB 4: AI 예측 성과 검증실 & 실전 복기
+# ====================================================
+@st.fragment
+def render_performance_tab_fragment(is_dark_mode: bool):
+    # 1. 상단 기간 필터
+    col_pf1, col_pf2 = st.columns([3.2, 1.8])
+    with col_pf1:
+        perf_period = st.segmented_control(
+            "검증 기간 선택",
+            options=["전체 기간 검증 리포트", "📅 어제 (1일차 추적)", "🗓️ 지난주 (최근 5~7일)", "📆 지난달 (최근 30일)"],
+            default="전체 기간 검증 리포트",
+            key="perf_period_segmented",
+        )
+    if not perf_period:
+        perf_period = "전체 기간 검증 리포트"
+
+    with col_pf2:
+        st.caption("💡 **원칙:** AI 추천 당시 주가 대비 실제 달성한 최고가 및 목표가(+6%) 달성 여부를 대조 검증합니다.")
+
+    all_history = load_prediction_history()
+    filtered_history = filter_history_by_period(all_history, perf_period)
+    metrics = compute_performance_metrics(filtered_history)
+
+    # 2. 핵심 4대 성과 메트릭 바
+    m_c1, m_c2, m_c3, m_c4 = st.columns(4)
+    with m_c1:
+        st.metric("🎯 AI 검증 적중률", f"{metrics['hit_rate']}%", f"{metrics['hit_count']}승 {metrics['miss_count']}패", delta_color="normal")
+    with m_c2:
+        st.metric("🚀 평균 최고 수익률", f"+{metrics['avg_return']}%", "손익 상계 평균", delta_color="normal")
+    with m_c3:
+        st.metric("🔥 최고 실현 수익률", f"+{metrics['max_return']}%", "단기 최고가 기준", delta_color="normal")
+    with m_c4:
+        st.metric("⏱️ 목표 달성 소요", f"{metrics['avg_days_to_hit']}일", "평균 익절 기간", delta_color="off")
+
+    st.markdown("---")
+
+    # 3. 2대 핵심 섹션: [상승 적중 종목] vs [하락/조정 종목 AI 실전 복기]
+    tab_hits, tab_misses = st.tabs([
+        f"🎯 AI 상승 적중 성공 사례 ({metrics['hit_count']}건)",
+        f"⚠️ 하락/조정 종목 AI 심층 복기 & 실전 대응 ({metrics['miss_count']}건)",
+    ])
+
+    with tab_hits:
+        st.html(
+            f"""<div style="font-size:0.92rem; color:{'#94A3B8' if is_dark_mode else '#475569'}; margin-bottom:12px;">
+                💡 <b>상승 적중 기준:</b> 추천일 이후 5거래일 이내에 1차 목표가(+6.0%) 이상 도달하였거나 플러스 수익률을 달성한 실제 적중 내역입니다.
+            </div>"""
+        )
+        if metrics["hit_records"]:
+            for idx, r in enumerate(metrics["hit_records"]):
+                r_code = r.get("code", "")
+                r_name = r.get("name", "")
+                r_rec = r.get("recommend_price", 0)
+                r_max = r.get("max_price", 0)
+                r_ret = r.get("return_rate", 0.0)
+                r_target = r.get("target_price", 0)
+                r_date = r.get("date", "")
+                r_status = r.get("status", "적중")
+                r_sig = r.get("signals", "AI 정밀 수급 포착")
+                r_prob = r.get("predicted_prob", 80.0)
+
+                with st.container():
+                    st.html(
+                        f"""<div style="background:{'#1E293B' if is_dark_mode else '#F0FDF4'}; border:1.5px solid {'#059669' if is_dark_mode else '#10B981'}; border-radius:12px; padding:16px 20px; margin-bottom:12px; box-shadow:0 2px 8px {'rgba(16,185,129,0.1)' if is_dark_mode else 'rgba(5,150,105,0.08)'};">
+                            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                                <div>
+                                    <span style="font-size:1.15rem; font-weight:900; color:{'#FFFFFF' if is_dark_mode else '#065F46'};">#{idx+1} {r_name}</span>
+                                    <span style="font-size:0.9rem; color:#64748B; margin-left:6px;">({r_code} · {r.get('market', '')})</span>
+                                    <span style="margin-left:8px; font-size:0.82rem; color:{'#94A3B8' if is_dark_mode else '#047857'};">추천일: {r_date}</span>
+                                </div>
+                                <div style="display:flex; gap:6px; align-items:center;">
+                                    <span style="background:{'#065F46' if is_dark_mode else '#D1FAE5'}; color:{'#34D399' if is_dark_mode else '#065F46'}; font-weight:800; font-size:0.85rem; padding:4px 10px; border-radius:6px;">
+                                        {r_status}
+                                    </span>
+                                    <span style="background:#EF4444; color:white; font-weight:900; font-size:0.95rem; padding:4px 12px; border-radius:6px;">
+                                        최고 수익률 +{r_ret:.1f}%
+                                    </span>
+                                </div>
+                            </div>
+                            <div style="margin-top:10px; display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; font-size:0.88rem; background:{'#0F172A' if is_dark_mode else '#FFFFFF'}; padding:10px 14px; border-radius:8px; border:1px solid {'#334155' if is_dark_mode else '#E2E8F0'};">
+                                <div><span style="color:#64748B;">추천 당시 가격:</span> <b>{r_rec:,}원</b></div>
+                                <div><span style="color:#64748B;">1차 목표가(+6%):</span> <b>{r_target:,}원</b></div>
+                                <div><span style="color:#64748B;">실제 달성 최고가:</span> <b style="color:#EF4444;">{r_max:,}원</b></div>
+                                <div><span style="color:#64748B;">AI 예측 확률:</span> <b>{r_prob}%</b></div>
+                            </div>
+                            <div style="margin-top:8px; font-size:0.86rem; color:{'#CBD5E1' if is_dark_mode else '#475569'};">
+                                📌 <b>당시 AI 포착 신호:</b> {r_sig}
+                            </div>
+                        </div>"""
+                    )
+                    col_b1, col_b2 = st.columns([4, 1])
+                    with col_b2:
+                        if st.button(f"📊 '{r_name}' 차트 검증", key=f"btn_hit_chart_{r_code}_{idx}", use_container_width=True):
+                            show_stock_chart_dialog(r_code, r_name, is_dark_mode)
+        else:
+            st.info("해당 기간의 적중 내역을 집계 중입니다.")
+
+    with tab_misses:
+        st.html(
+            f"""<div style="font-size:0.92rem; color:{'#94A3B8' if is_dark_mode else '#475569'}; margin-bottom:12px;">
+                💡 <b>투명한 손실/조정 공개 & 실전 복기:</b> 주식 시장의 모든 예측이 100% 맞을 수는 없습니다. 중요한 것은 <b>'왜 하락했는지를 분석'</b>하고 <b>'원칙에 맞게 손절하거나 반등 시 분할 매수로 안전하게 빠져나오는 대응'</b>입니다.
+            </div>"""
+        )
+        if metrics["miss_records"]:
+            for idx, r in enumerate(metrics["miss_records"]):
+                r_code = r.get("code", "")
+                r_name = r.get("name", "")
+                r_rec = r.get("recommend_price", 0)
+                r_close = r.get("close_price", 0)
+                r_ret = r.get("return_rate", 0.0)
+                r_stop = r.get("stop_price", 0)
+                r_date = r.get("date", "")
+                r_status = r.get("status", "조정")
+                r_reason = r.get("miss_reason") or "단기 상승 후 외인·기관의 일시적 차익 실현 매물 출회 및 지수 약세 동반 조정"
+                r_action = r.get("countermeasure") or "손절선(-3%) 엄격 준수. 20일 생명선 지지 확인 전까지 물타기 금지 및 반등 시 비중 50% 축소 권장."
+
+                with st.container():
+                    st.html(
+                        f"""<div style="background:{'#1E293B' if is_dark_mode else '#FFFBEB'}; border:1.5px solid {'#F59E0B' if is_dark_mode else '#F59E0B'}; border-radius:12px; padding:16px 20px; margin-bottom:12px; box-shadow:0 2px 8px rgba(245,158,11,0.1);">
+                            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                                <div>
+                                    <span style="font-size:1.15rem; font-weight:900; color:{'#FFFFFF' if is_dark_mode else '#92400E'};">#{idx+1} {r_name}</span>
+                                    <span style="font-size:0.9rem; color:#64748B; margin-left:6px;">({r_code} · {r.get('market', '')})</span>
+                                    <span style="margin-left:8px; font-size:0.82rem; color:{'#94A3B8' if is_dark_mode else '#B45309'};">추천일: {r_date}</span>
+                                </div>
+                                <div style="display:flex; gap:6px; align-items:center;">
+                                    <span style="background:{'#78350F' if is_dark_mode else '#FEF3C7'}; color:{'#FCD34D' if is_dark_mode else '#92400E'}; font-weight:800; font-size:0.85rem; padding:4px 10px; border-radius:6px;">
+                                        {r_status}
+                                    </span>
+                                    <span style="background:#2563EB; color:white; font-weight:900; font-size:0.95rem; padding:4px 12px; border-radius:6px;">
+                                        손익률 {r_ret:+.1f}%
+                                    </span>
+                                </div>
+                            </div>
+                            <div style="margin-top:10px; display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; font-size:0.88rem; background:{'#0F172A' if is_dark_mode else '#FFFFFF'}; padding:10px 14px; border-radius:8px; border:1px solid {'#334155' if is_dark_mode else '#FDE68A'};">
+                                <div><span style="color:#64748B;">추천 당시 가격:</span> <b>{r_rec:,}원</b></div>
+                                <div><span style="color:#64748B;">권장 손절선(-3%):</span> <b style="color:#2563EB;">{r_stop:,}원</b></div>
+                                <div><span style="color:#64748B;">현재(종가) 주가:</span> <b>{r_close:,}원</b></div>
+                                <div><span style="color:#64748B;">손실 제한율:</span> <b style="color:#2563EB;">최대 -3~4% 제어</b></div>
+                            </div>
+                            <div style="margin-top:10px; padding:10px 12px; background:{'#0F172A' if is_dark_mode else '#FEF2F2'}; border-left:4px solid #EF4444; border-radius:4px; font-size:0.88rem; line-height:1.6;">
+                                💡 <b>AI 하락 원인 심층 분석:</b> {r_reason}
+                            </div>
+                            <div style="margin-top:8px; padding:10px 12px; background:{'#0F172A' if is_dark_mode else '#EFF6FF'}; border-left:4px solid #2563EB; border-radius:4px; font-size:0.88rem; line-height:1.6;">
+                                🛡️ <b>초보자 실전 대응 가이드:</b> {r_action}
+                            </div>
+                        </div>"""
+                    )
+                    col_mb1, col_mb2 = st.columns([4, 1])
+                    with col_mb2:
+                        if st.button(f"🔍 '{r_name}' 차트 진단", key=f"btn_miss_chart_{r_code}_{idx}", use_container_width=True):
+                            show_stock_chart_dialog(r_code, r_name, is_dark_mode)
+        else:
+            st.info("해당 기간의 손절/조정 내역이 없습니다. (모든 종목 목표가 달성)")
+
+
+with tab_perf:
+    st.subheader("🏆 AI 예측 성과 검증실 (실제 적중률 & 하락 종목 실전 복기)")
+    st.caption("AI가 추천했던 종목들이 실제로 상승했는지, 하락했는지를 투명하게 검증합니다. 적중한 종목의 실제 최고 수익률과, 하락/조정 종목에 대한 AI 심층 원인 진단 및 실전 대응 수칙을 확인하세요.")
+    render_performance_tab_fragment(is_dark)
+
+
+# ====================================================
+# TAB 5: 종목 정밀 진단실 (전면 AI 검색 연동)
 # ====================================================
 with tab_chart:
     st.subheader("📊 1초 종목 정밀 진단 및 캔들 차트 분석")
