@@ -1604,9 +1604,22 @@ def render_stock_detailed_section(code: str, name: str, is_dark: bool, in_modal:
         time.sleep(0.18)
         loader_ph.empty()
 
+    is_ipo_day1 = False
     if ohlcv is None or ohlcv.empty or len(ohlcv) < 2:
-        st.warning(f"'{name}'({code})의 차트 데이터를 불러올 수 없습니다.")
-        return
+        # 신규 상장 1일차(당일 상장) 등 일봉 캔들이 2개 미만인 경우
+        # 장중 실시간 24시간 분봉(또는 5분봉)으로 스마트 자동 전환
+        fallback_df = load_overseas_stock_chart(code, timeframe="24시간") if is_ovs else load_stock_timeframe_chart(code, timeframe="24시간")
+        if fallback_df is None or fallback_df.empty or len(fallback_df) < 2:
+            fallback_df = load_overseas_stock_chart(code, timeframe="5분") if is_ovs else load_stock_timeframe_chart(code, timeframe="5분")
+
+        if fallback_df is not None and not fallback_df.empty and len(fallback_df) >= 2:
+            ohlcv = fallback_df
+            is_ipo_day1 = True
+        elif ohlcv is not None and not ohlcv.empty:
+            is_ipo_day1 = True
+        else:
+            st.warning(f"'{name}'({code})의 차트 데이터를 불러올 수 없습니다.")
+            return
 
     ohlcv_ind = compute_technical_indicators(ohlcv)
     signals = analyze_stock_signals(ohlcv_ind)
@@ -1717,18 +1730,22 @@ def render_stock_detailed_section(code: str, name: str, is_dark: bool, in_modal:
     with tf_c1:
         st.html("<div style='font-size:0.92rem; font-weight:800; padding-top:6px; color:#2563EB;'>⏱️ 캔들 차트 주기 선택:</div>")
     with tf_c2:
+        def_tf = "24시간" if is_ipo_day1 else "1달"
         selected_tf = st.segmented_control(
             "차트 주기 선택",
             options=["1분", "5분", "1시간", "24시간", "1주일", "1달", "1년"],
-            default="1달",
+            default=def_tf,
             key=f"tf_ctrl_{key_prefix}_{code}",
             label_visibility="collapsed",
         )
     if not selected_tf:
-        selected_tf = "1달"
+        selected_tf = def_tf
+
+    if is_ipo_day1:
+        st.info(f"🆕 **신규 상장 당일(1일차) 실시간 분석:** '{name}'({code}) 종목은 금일 첫 상장되어 과거 일봉 데이터(1달/1주일) 대신 **오늘 장중 실시간 캔들 차트({selected_tf})**로 분석이 제공됩니다.")
 
     # 주기별 캔들 데이터 로드 및 보조지표 산출
-    if selected_tf != "1달":
+    if selected_tf != "1달" or is_ipo_day1:
         if is_ovs:
             chart_data = load_overseas_stock_chart(code, timeframe=selected_tf)
         else:
@@ -1902,6 +1919,10 @@ def show_stock_chart_dialog(code: str, name: str, is_dark: bool):
         inv_df = pd.DataFrame()
     else:
         ohlcv = load_stock_chart(code, days=100)
+        if ohlcv is None or ohlcv.empty or len(ohlcv) < 2:
+            ohlcv_fb = load_stock_timeframe_chart(code, timeframe="24시간")
+            if ohlcv_fb is not None and not ohlcv_fb.empty and len(ohlcv_fb) >= 2:
+                ohlcv = ohlcv_fb
         detail = load_stock_realtime_detail(code)
         inv_df = load_stock_investors(code)
 
@@ -2179,6 +2200,10 @@ def render_search_section_fragment(all_stocks_df, code_map, is_dark):
             s_inv = pd.DataFrame()
         else:
             s_ohlcv = load_stock_chart(search_code, days=100)
+            if s_ohlcv is None or s_ohlcv.empty or len(s_ohlcv) < 2:
+                s_ohlcv_fb = load_stock_timeframe_chart(search_code, timeframe="24시간")
+                if s_ohlcv_fb is not None and not s_ohlcv_fb.empty and len(s_ohlcv_fb) >= 2:
+                    s_ohlcv = s_ohlcv_fb
             s_detail = load_stock_realtime_detail(search_code)
             s_inv = load_stock_investors(search_code)
 
