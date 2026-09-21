@@ -235,30 +235,52 @@ div[data-testid="stMain"] {
 </script>
 """)
 
-# 세션 상태 초기화 (첫 방문 시 소개/가이드 페이지를 디폴트로)
-if "current_page" not in st.session_state:
-    st.session_state["current_page"] = "intro"
+# ----------------------------------------------------
+# 1-1. 세션 상태 초기화 및 URL 파라미터 기반 새로고침(F5) 복원 엔진
+# ----------------------------------------------------
+if "theme_mode" not in st.session_state:
+    st.session_state["theme_mode"] = "light"
 if "is_authenticated" not in st.session_state:
     st.session_state["is_authenticated"] = False
 if "user_info" not in st.session_state:
     st.session_state["user_info"] = None
-if "theme_mode" not in st.session_state:
-    st.session_state["theme_mode"] = "light"
 
 # URL 쿼리 파라미터 확인 (?nav=dashboard 또는 ?page=dashboard)
+target_page = None
 if hasattr(st, "query_params"):
-    target_nav = st.query_params.get("nav") or st.query_params.get("page")
-    if target_nav in ["dashboard", "radar", "app"]:
-        st.session_state["is_authenticated"] = True
-        if not st.session_state.get("user_info"):
-            st.session_state["user_info"] = {
-                "name": "체험 투자자",
-                "email": "guest@stockradar.ai",
-                "provider": "Guest",
-                "badge": "🟢 체험 회원",
-            }
-        st.session_state["matrix_intro_transition"] = True
-        st.session_state["current_page"] = "dashboard"
+    target_page = st.query_params.get("page") or st.query_params.get("nav")
+
+if target_page in ["dashboard", "radar", "app"]:
+    # 새로고침(F5) 시 분석 대시보드 화면 100% 유지 (매트릭스 인트로 애니메이션은 생략하고 즉시 화면 로드)
+    if "current_page" not in st.session_state or st.session_state.get("current_page") != "dashboard":
+        st.session_state["matrix_intro_transition"] = False
+    st.session_state["current_page"] = "dashboard"
+    st.session_state["is_authenticated"] = True
+    if not st.session_state.get("user_info"):
+        st.session_state["user_info"] = {
+            "name": "체험 투자자",
+            "email": "guest@stockradar.ai",
+            "provider": "Guest",
+            "badge": "🟢 체험 회원",
+        }
+    # 브라우저 주소창에 ?page=dashboard 유지 (새로고침 시 튕김 방지)
+    if hasattr(st, "query_params") and st.query_params.get("page") != "dashboard":
+        st.query_params["page"] = "dashboard"
+elif target_page in ["intro", "home"]:
+    st.session_state["current_page"] = "intro"
+    if hasattr(st, "query_params") and st.query_params.get("page") != "intro":
+        st.query_params["page"] = "intro"
+else:
+    # URL 파라미터가 없는 경우 세션 상태 확인, 최초 방문이면 'intro'
+    if "current_page" not in st.session_state:
+        st.session_state["current_page"] = "intro"
+
+# 현재 페이지 상태를 URL 쿼리 파라미터와 엄격히 동기화
+if st.session_state.get("current_page") == "dashboard":
+    if hasattr(st, "query_params") and st.query_params.get("page") != "dashboard":
+        st.query_params["page"] = "dashboard"
+elif st.session_state.get("current_page") == "intro":
+    if hasattr(st, "query_params") and st.query_params.get("page") == "dashboard":
         st.query_params.clear()
 
 is_dark = (st.session_state.get("theme_mode", "light") == "dark")
@@ -285,12 +307,16 @@ if st.session_state["current_page"] == "dashboard":
             with col_sb1:
                 if st.button("🏠 홈으로", key="sb_btn_home", use_container_width=True):
                     st.session_state["current_page"] = "intro"
+                    if hasattr(st, "query_params"):
+                        st.query_params["page"] = "intro"
                     st.rerun()
             with col_sb2:
                 if st.button("🚪 로그아웃", key="sb_btn_logout", use_container_width=True):
                     st.session_state["is_authenticated"] = False
                     st.session_state["user_info"] = None
                     st.session_state["current_page"] = "intro"
+                    if hasattr(st, "query_params"):
+                        st.query_params.clear()
                     st.rerun()
             st.markdown("---")
 
@@ -2097,12 +2123,16 @@ with head_c2:
     with h_btn1:
         if st.button("🏠 서비스 소개", use_container_width=True, key="btn_dash_to_intro"):
             st.session_state["current_page"] = "intro"
+            if hasattr(st, "query_params"):
+                st.query_params["page"] = "intro"
             st.rerun()
     with h_btn2:
         if st.button("🚪 로그아웃", use_container_width=True, key="btn_dash_logout"):
             st.session_state["is_authenticated"] = False
             st.session_state["user_info"] = None
             st.session_state["current_page"] = "intro"
+            if hasattr(st, "query_params"):
+                st.query_params.clear()
             st.rerun()
 
 # 📡 실시간 데이터 연동 상태 뱃지 & 주기 표시 (증시 캘린더 엔진 연동)

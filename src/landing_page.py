@@ -135,6 +135,8 @@ def open_login_modal():
         }
         st.session_state["matrix_intro_transition"] = True
         st.session_state["current_page"] = "dashboard"
+        if hasattr(st, "query_params"):
+            st.query_params["page"] = "dashboard"
         st.rerun()
 
     st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
@@ -150,6 +152,8 @@ def open_login_modal():
         }
         st.session_state["matrix_intro_transition"] = True
         st.session_state["current_page"] = "dashboard"
+        if hasattr(st, "query_params"):
+            st.query_params["page"] = "dashboard"
         st.rerun()
 
     st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
@@ -165,6 +169,8 @@ def open_login_modal():
         }
         st.session_state["matrix_intro_transition"] = True
         st.session_state["current_page"] = "dashboard"
+        if hasattr(st, "query_params"):
+            st.query_params["page"] = "dashboard"
         st.rerun()
 
     st.markdown("---")
@@ -499,6 +505,8 @@ def render_landing_page(is_dark: bool):
                 if st.button(f"🚀 {u_name}님 입장", type="primary", key="top_enter_btn", use_container_width=True):
                     st.session_state["matrix_intro_transition"] = True
                     st.session_state["current_page"] = "dashboard"
+                    if hasattr(st, "query_params"):
+                        st.query_params["page"] = "dashboard"
                     st.rerun()
             else:
                 if st.button("🔑 간편 로그인", type="primary", key="top_login_btn", use_container_width=True):
@@ -567,6 +575,8 @@ def render_landing_page(is_dark: bool):
                     }
                 st.session_state["matrix_intro_transition"] = True
                 st.session_state["current_page"] = "dashboard"
+                if hasattr(st, "query_params"):
+                    st.query_params["page"] = "dashboard"
                 st.rerun()
 
     # 핵심 신뢰 지표 4선
@@ -1147,6 +1157,8 @@ def render_landing_page(is_dark: bool):
                     }
                 st.session_state["matrix_intro_transition"] = True
                 st.session_state["current_page"] = "dashboard"
+                if hasattr(st, "query_params"):
+                    st.query_params["page"] = "dashboard"
                 st.rerun()
 
     st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True)
