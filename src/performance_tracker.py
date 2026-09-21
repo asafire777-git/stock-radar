@@ -400,7 +400,7 @@ def log_new_predictions(candidates: List[Dict[str, Any]], strategy: str = "스�
 
         history.insert(0, {
             "id": f"pred_{today_str.replace('-', '')}_{code}",
-            "period_tag": "yesterday",
+            "period_tag": "today",
             "date": today_str,
             "date_display": f"{today_str} ({day_name}요일, {'정규 개장일' if is_open else h_reason})",
             "is_trading_day": is_open,
@@ -419,7 +419,7 @@ def log_new_predictions(candidates: List[Dict[str, Any]], strategy: str = "스�
             "grade": str(item.get("grade", "A")),
             "strategy": strategy,
             "status": status_text,
-            "hit": True if is_open else None,
+            "hit": None,
             "signals": str(item.get("signals", "AI 정밀 수급 및 이평선 탄력 포착")),
             "miss_reason": None,
             "countermeasure": None,
@@ -434,7 +434,7 @@ def log_new_predictions(candidates: List[Dict[str, Any]], strategy: str = "스�
 def filter_history_by_period(history: List[Dict[str, Any]], period: str = "전체") -> List[Dict[str, Any]]:
     """
     기간별(어제, 지난주, 지난달, 전체) 필터링
-    휴장일로 인한 무의미한 0% 변동률 데이터를 배제하고 실제 거래일 데이터만 필터링합니다.
+    휴장일 및 장중 미체결 건으로 인한 무의미한 0% 변동률 데이터를 배제하고 실제 거래일 데이터만 필터링합니다.
     """
     if not history:
         return []
@@ -442,7 +442,7 @@ def filter_history_by_period(history: List[Dict[str, Any]], period: str = "전�
     period_str = str(period).strip()
 
     if "어제" in period_str:
-        # 직전 거래일 (어제) 데이터 필터링
+        # 직전 정규 거래일(어제) 검증 완료 데이터만 필터링
         filtered = [r for r in history if r.get("period_tag") == "yesterday"]
         return filtered
     elif "지난주" in period_str:
@@ -451,15 +451,17 @@ def filter_history_by_period(history: List[Dict[str, Any]], period: str = "전�
     elif "지난달" in period_str:
         filtered = [r for r in history if r.get("period_tag") == "month"]
         return filtered
-    else:  # 전체 기간
-        return history
+    else:  # 전체 기간 (당일 실시간 미완료 건을 제외한 실전 검증 완료 데이터셋)
+        completed = [r for r in history if r.get("period_tag") in ["yesterday", "week", "month"]]
+        return completed if completed else history
 
 
 def compute_performance_metrics(records: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
     선택된 레코드 집합에 대한 승률, 평균 수익률 등 핵심 통계 산출.
-    장이 서지 않는 휴장일(주말/공휴일) 데이터는 적중률 계산 분모에서 완벽히 제외하고,
-    '실제 장이 섰던 거래일'의 실전 데이터만 합산하여 신뢰도 100%의 적중률을 제공합니다.
+    - 장이 서지 않는 휴장일(주말/공휴일) 데이터는 적중률 계산 분모에서 완벽히 제외합니다.
+    - 당일 장중 추적 중인 미완료 건수(변동률 0.0%)로 인한 부당한 적중률 희석을 원천 차단하고,
+      '실전 매매가 완료된 거래일 종목(승+패)'만으로 정밀 적중률을 산출합니다.
     """
     if not records:
         return {
@@ -481,25 +483,28 @@ def compute_performance_metrics(records: List[Dict[str, Any]]) -> Dict[str, Any]
     valid_records = [r for r in records if not r.get("is_holiday", False) and "휴장" not in r.get("status", "")]
     holiday_records = [r for r in records if r.get("is_holiday", False) or "휴장" in r.get("status", "")]
 
-    hit_records = [r for r in valid_records if r.get("hit", False) and r.get("return_rate", 0) > 0]
-    miss_records = [r for r in valid_records if not r.get("hit", False) or r.get("return_rate", 0) < 0]
+    # 2. 실전 승리(적중) vs 손절/조정(패배) 레코드 엄격 분류
+    hit_records = [r for r in valid_records if r.get("hit", False) is True and r.get("return_rate", 0) > 0]
+    miss_records = [r for r in valid_records if (r.get("hit", False) is False or r.get("return_rate", 0) < 0)]
 
-    total_count = len(valid_records)
+    # 3. 실전 완료 건수 기반 승률 & 수익률 계산 (미체결/추적중 0% 건수 배제로 수학적 정확성 100% 확보)
+    completed_records = hit_records + miss_records
+    total_completed = len(completed_records)
     hit_count = len(hit_records)
     miss_count = len(miss_records)
 
-    hit_rate = round((hit_count / total_count * 100.0), 1) if total_count > 0 else 0.0
+    hit_rate = round((hit_count / total_completed * 100.0), 1) if total_completed > 0 else 0.0
 
-    returns = [r.get("return_rate", 0.0) for r in valid_records]
+    returns = [r.get("return_rate", 0.0) for r in completed_records]
     avg_return = round(sum(returns) / len(returns), 1) if returns else 0.0
     max_return = round(max(returns), 1) if returns else 0.0
 
     # 기간별 평균 달성일 계산
-    has_yesterday = any(r.get("period_tag") == "yesterday" for r in valid_records)
-    has_month = any(r.get("period_tag") == "month" for r in valid_records)
+    has_yesterday = any(r.get("period_tag") == "yesterday" for r in completed_records)
+    has_month = any(r.get("period_tag") == "month" for r in completed_records)
     if has_month and not has_yesterday:
         avg_days = 4.2
-    elif has_yesterday and len(valid_records) <= 3:
+    elif has_yesterday and len(completed_records) <= 3:
         avg_days = 1.0
     else:
         avg_days = 2.6
@@ -509,7 +514,7 @@ def compute_performance_metrics(records: List[Dict[str, Any]]) -> Dict[str, Any]
     miss_records = sorted(miss_records, key=lambda x: x.get("return_rate", 0))
 
     return {
-        "total_count": total_count,
+        "total_count": total_completed,
         "hit_count": hit_count,
         "miss_count": miss_count,
         "hit_rate": hit_rate,

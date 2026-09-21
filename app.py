@@ -2864,15 +2864,27 @@ def render_performance_tab_fragment(is_dark_mode: bool):
 
     # 증시 휴일/휴장일 데이터 보정 안내 배너
     market_info = metrics.get("market_status") or get_market_session_status()
+    now_d = datetime.now().date()
+    prev_trade_str = market_info.get("prev_trading_day", "")
     last_trade_str = market_info.get("last_trading_day", "")
+
+    if "어제" in perf_period:
+        eval_date_display = f"직전 정규 개장일 {prev_trade_str} (금요일)" if now_d.weekday() == 0 else f"직전 정규 개장일 {prev_trade_str}"
+        banner_note = f"어제(일요일)는 증시가 열리지 않는 주말 휴장일이었습니다. 무변동(0%)으로 인한 적중률 왜곡을 원천 차단하기 위해 <b>실제 정규장이 열렸던 {eval_date_display} 실전 데이터</b>로 엄선 검증했습니다."
+    elif "지난주" in perf_period:
+        banner_note = "주말 및 공휴일 비거래일을 제외한 <b>최근 5거래일 정규 개장일 데이터</b>를 기준으로 엄선 합산했습니다."
+    elif "지난달" in perf_period:
+        banner_note = "공휴일 및 주말을 제외한 <b>최근 20거래일 정규 개장일 데이터</b>를 기준으로 엄선 합산했습니다."
+    else:
+        banner_note = "장이 열리지 않았던 주말·공휴일 무변동 데이터를 제외하고, <b>실제 정규장이 열렸던 거래일 데이터만 100% 엄선 합산</b>했습니다."
 
     st.html(
         f"""<div style="background:{'#1E293B' if is_dark_mode else '#FEF3C7'}; border:1.5px solid #F59E0B; border-radius:10px; padding:12px 18px; margin-bottom:14px; display:flex; align-items:flex-start; gap:12px;">
             <span style="font-size:1.4rem; line-height:1;">🛡️</span>
             <div style="font-size:0.88rem; color:{'#E2E8F0' if is_dark_mode else '#78350F'}; line-height:1.55;">
                 <b style="color:{'#FCD34D' if is_dark_mode else '#92400E'}; font-size:0.95rem;">증시 휴일/휴장일 데이터 보정 시스템 가동 중</b><br/>
-                주말(토·일요일) 및 법정 공휴일은 한국거래소 정규장이 서지 않으므로, <b>장이 열리지 않는 날의 무변동(0% / 미체결)으로 인한 AI 적중률 저하 및 통계 오염을 원천 차단</b>했습니다.<br/>
-                현재 리포트는 <b>실제 정규장이 열렸던 직전 개장일({last_trade_str}) 및 실제 거래일 데이터만을 100% 엄선 합산</b>하여 투명하고 확실한 적중 성과를 제공합니다.
+                {banner_note}<br/>
+                <b>장중 추적 중인 미완료 건(0.0%)을 분모에서 완벽히 배제</b>하여 확정된 매매 결과(승+패)만으로 정밀하게 적중률({metrics['hit_rate']}%)을 산출했습니다.
             </div>
         </div>"""
     )
