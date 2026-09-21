@@ -1667,6 +1667,21 @@ def render_stock_detailed_section(code: str, name: str, is_dark: bool, in_modal:
     )
 
     # 4. 하단 상세: 초보자 실전 매매 가이드 + 외인/기관 일별 수급 현황 (해외주식은 미국 수급 가이드)
+    raw_reasons = quant_res.get("key_reasons", [])
+    if isinstance(raw_reasons, list):
+        clean_reasons = ", ".join(raw_reasons) if raw_reasons else "모멘텀 및 수급 균형 유지"
+    else:
+        clean_reasons = str(raw_reasons) if raw_reasons else "모멘텀 및 수급 균형 유지"
+
+    rsi_str = "-"
+    if "rsi14" in ohlcv_ind.columns and len(ohlcv_ind) > 0:
+        last_rsi = ohlcv_ind["rsi14"].iloc[-1]
+        if pd.notna(last_rsi):
+            try:
+                rsi_str = f"{float(last_rsi):.1f}"
+            except Exception:
+                rsi_str = "-"
+
     col_g1, col_g2 = st.columns([1.15, 1.85])
     with col_g1:
         if is_ovs:
@@ -1682,7 +1697,7 @@ def render_stock_detailed_section(code: str, name: str, is_dark: bool, in_modal:
                     <div style="margin-bottom:6px;">• <b>실시간 환율:</b> 1달러 = <span style="color:#059669; font-weight:bold;">{usd_rate:,.1f}원</span> 적용</div>
                     <div style="margin-bottom:8px;">• <b>포착 신호:</b> {', '.join(signals['signals'][:3]) if signals['signals'] else '미국 기술주 상승 모멘텀 유지'}</div>
                     <div style="margin-top:10px; padding-top:10px; border-top:1px dashed {'#475569' if is_dark else '#CBD5E1'}; color:{'#CBD5E1' if is_dark else '#475569'}; font-size:0.88rem;">
-                        💡 <b>AI 진단 총평:</b> {quant_res['key_reasons']}
+                        💡 <b>AI 진단 총평:</b> {clean_reasons}
                     </div>
                 </div>"""
             )
@@ -1700,7 +1715,7 @@ def render_stock_detailed_section(code: str, name: str, is_dark: bool, in_modal:
                     <div style="margin-bottom:6px;">• <b>최근 5일 큰손 수급:</b> 외인 <span style="color:{'#EF4444' if f_sum>0 else '#3B82F6'}; font-weight:bold;">{f_sum:+.1f}억</span> / 기관 <span style="color:{'#EF4444' if org_sum>0 else '#3B82F6'}; font-weight:bold;">{org_sum:+.1f}억</span></div>
                     <div style="margin-bottom:8px;">• <b>포착 신호:</b> {', '.join(signals['signals'][:3]) if signals['signals'] else '기본 추세 유지'}</div>
                     <div style="margin-top:10px; padding-top:10px; border-top:1px dashed {'#475569' if is_dark else '#CBD5E1'}; color:{'#CBD5E1' if is_dark else '#475569'}; font-size:0.88rem;">
-                        💡 <b>AI 진단 총평:</b> {quant_res['key_reasons']}
+                        💡 <b>AI 진단 총평:</b> {clean_reasons}
                     </div>
                 </div>"""
             )
@@ -1713,7 +1728,7 @@ def render_stock_detailed_section(code: str, name: str, is_dark: bool, in_modal:
                     <div style="margin-bottom:6px;">• <b>상장 시장:</b> <span style="font-weight:bold;">{mkt_name} (미국 정규거래소)</span></div>
                     <div style="margin-bottom:6px;">• <b>글로벌 기관 수급:</b> 월가 헤지펀드 및 글로벌 테크 패시브 ETF 자금 유입 지속</div>
                     <div style="margin-bottom:6px;">• <b>거래 시간(KST):</b> 정규장 22:30 ~ 05:00 (서머타임) / 프리마켓 18:00 ~ 22:30</div>
-                    <div style="margin-bottom:8px;">• <b>추세 핵심 지표:</b> 5일선 이격도 {d5:+.1f}% / 20일 생명선 이격도 {d20:+.1f}% / RSI {ohlcv_ind['rsi14'].iloc[-1]:.1f if 'rsi14' in ohlcv_ind.columns else '-'}</div>
+                    <div style="margin-bottom:8px;">• <b>추세 핵심 지표:</b> 5일선 이격도 {d5:+.1f}% / 20일 생명선 이격도 {d20:+.1f}% / RSI {rsi_str}</div>
                     <div style="margin-top:10px; padding-top:10px; border-top:1px dashed {'#475569' if is_dark else '#CBD5E1'}; color:{'#CBD5E1' if is_dark else '#475569'}; font-size:0.88rem;">
                         🛡️ <b>실전 매매 팁:</b> 달러 환율과 미국 금리 정책 변동에 따른 장중 급변동을 감안하여, 1차 목표가(+6%) 도달 시 50% 분할 매도 후 본절가 스탑로스를 걸어두는 전략이 가장 안전합니다.
                     </div>
