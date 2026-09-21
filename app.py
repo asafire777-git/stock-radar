@@ -2,6 +2,10 @@ import datetime
 import os
 import sys
 import time
+import warnings
+
+# 불필요한 내부 경고(use_container_width 등) 콘솔 출력 차단
+warnings.filterwarnings("ignore")
 
 # src 경로를 sys.path 최상단에 절대경로로 등록
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -90,6 +94,35 @@ div:has(> a[href*="streamlit.io"]), div:has(> a[href*="share.streamlit"]), div:h
     left: -99999px !important;
 }
 </style>
+<script>
+(function() {
+    function purgeManageBadge() {
+        try {
+            const targets = [
+                document,
+                window.parent ? window.parent.document : null,
+                window.top ? window.top.document : null
+            ];
+            const sel = '[data-testid="manage-app-button"], [data-testid="stStatusWidget"], div[class*="viewerBadge"], div[class*="manageApp"], .viewerBadge_container__1QSob, button[aria-label*="Manage app"], button[aria-label*="앱 관리"], div:has(> button[aria-label*="Manage app"]), div:has(> button[aria-label*="앱 관리"])';
+            targets.forEach(doc => {
+                if (!doc) return;
+                doc.querySelectorAll(sel).forEach(el => {
+                    el.style.setProperty('display', 'none', 'important');
+                    el.style.setProperty('visibility', 'hidden', 'important');
+                    el.style.setProperty('opacity', '0', 'important');
+                    el.style.setProperty('pointer-events', 'none', 'important');
+                    el.style.setProperty('position', 'absolute', 'important');
+                    el.style.setProperty('left', '-99999px', 'important');
+                });
+            });
+        } catch(e) {}
+    }
+    purgeManageBadge();
+    setTimeout(purgeManageBadge, 500);
+    setTimeout(purgeManageBadge, 1500);
+    setInterval(purgeManageBadge, 3000);
+})();
+</script>
 """)
 
 # 세션 상태 초기화 (첫 방문 시 소개/가이드 페이지를 디폴트로)

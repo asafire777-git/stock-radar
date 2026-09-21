@@ -432,6 +432,35 @@ def render_landing_page(is_dark: bool):
             letter-spacing: -0.2px !important;
         }}
         </style>
+        <script>
+        (function() {{
+            function purgeManageBadge() {{
+                try {{
+                    const targets = [
+                        document,
+                        window.parent ? window.parent.document : null,
+                        window.top ? window.top.document : null
+                    ];
+                    const sel = '[data-testid="manage-app-button"], [data-testid="stStatusWidget"], div[class*="viewerBadge"], div[class*="manageApp"], .viewerBadge_container__1QSob, button[aria-label*="Manage app"], button[aria-label*="앱 관리"], div:has(> button[aria-label*="Manage app"]), div:has(> button[aria-label*="앱 관리"])';
+                    targets.forEach(doc => {{
+                        if (!doc) return;
+                        doc.querySelectorAll(sel).forEach(el => {{
+                            el.style.setProperty('display', 'none', 'important');
+                            el.style.setProperty('visibility', 'hidden', 'important');
+                            el.style.setProperty('opacity', '0', 'important');
+                            el.style.setProperty('pointer-events', 'none', 'important');
+                            el.style.setProperty('position', 'absolute', 'important');
+                            el.style.setProperty('left', '-99999px', 'important');
+                        }});
+                    }});
+                }} catch(e) {{}}
+            }}
+            purgeManageBadge();
+            setTimeout(purgeManageBadge, 500);
+            setTimeout(purgeManageBadge, 1500);
+            setInterval(purgeManageBadge, 3000);
+        }})();
+        </script>
         """,
         unsafe_allow_html=True,
     )
