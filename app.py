@@ -2864,7 +2864,7 @@ def render_performance_tab_fragment(is_dark_mode: bool):
 
     # 증시 휴일/휴장일 데이터 보정 안내 배너
     market_info = metrics.get("market_status") or get_market_session_status()
-    now_d = datetime.now().date()
+    now_d = datetime.datetime.now().date()
     prev_trade_str = market_info.get("prev_trading_day", "")
     last_trade_str = market_info.get("last_trading_day", "")
 
@@ -3035,9 +3035,52 @@ with tab_chart:
     @st.fragment
     def render_quick_diagnosis_tab(all_stocks_df, code_map, is_dark):
         st.subheader("📊 1초 종목 정밀 진단 및 캔들 차트 분석 (국내 & 해외 통합)")
-        st.caption("AI 검색 시스템과 100% 연동되어 국내 상장 2,800개 전 종목 및 나스닥/미국 대표주의 캔들 차트, 5일/20일/60일 이동평균선 이격도, 볼린저밴드, RSI, 수급을 분석합니다.")
+        st.caption("궁금한 국내 상장 2,800개 전 종목 및 나스닥/미국 대표주의 종목명을 입력하고 Enter를 누르면 1초 만에 캔들 차트, 5·20·60일선 이격도, 볼린저밴드, RSI, 외인·기관 수급을 정밀 진단합니다.")
 
-        # 1. 퀵 필터 칩
+        # 기본 진단 종목 결정
+        default_stock = st.session_state.get("diagnosed_stock")
+        if not default_stock:
+            if not df_rising.empty:
+                default_stock = {"code": str(df_rising.iloc[0]["code"]), "name": str(df_rising.iloc[0]["name"])}
+            else:
+                default_stock = {"code": "005930", "name": "삼성전자"}
+
+        # 1. 전용 프리미엄 검색 입력창 (Enter 즉시 실행)
+        with st.form("t4_stock_search_form", clear_on_submit=False):
+            col_in1, col_in2, col_in3 = st.columns([4.2, 1.1, 0.9])
+            with col_in1:
+                t4_query = st.text_input(
+                    "진단할 종목명 또는 티커를 입력하세요",
+                    value=st.session_state.get("t4_search_buffer", default_stock.get("name", "")),
+                    placeholder="🔍 종목명이나 티커 입력 후 Enter (예: 비츠로테크, 삼성전자, 테슬라, 엔비디아, TSLA, NVDA, 042370...)",
+                    label_visibility="collapsed",
+                    key="t4_stock_search_input",
+                )
+            with col_in2:
+                btn_t4_search = st.form_submit_button("🔍 1초 진단", use_container_width=True, type="primary")
+            with col_in3:
+                btn_t4_clear = st.form_submit_button("🔄 초기화", use_container_width=True)
+
+        if btn_t4_clear:
+            if not df_rising.empty:
+                st.session_state["diagnosed_stock"] = {"code": str(df_rising.iloc[0]["code"]), "name": str(df_rising.iloc[0]["name"])}
+            else:
+                st.session_state["diagnosed_stock"] = {"code": "005930", "name": "삼성전자"}
+            st.session_state["t4_search_buffer"] = ""
+            st.session_state["t4_related_matches"] = []
+            st.rerun(scope="fragment")
+
+        if btn_t4_search and t4_query:
+            matches = resolve_stock_search(t4_query, all_stocks_df, code_map)
+            if matches:
+                st.session_state["diagnosed_stock"] = matches[0]
+                st.session_state["t4_related_matches"] = matches[1:7]
+                st.session_state["t4_search_buffer"] = matches[0]["name"]
+                st.rerun(scope="fragment")
+            else:
+                st.warning(f"'{t4_query}'에 해당하는 상장 종목을 찾지 못했습니다. 국내 종목명, 6자리 코드 또는 미국 주식 티커/한글명을 확인해 주세요.")
+
+        # 2. 퀵 필터 칩 (원클릭 진단)
         t4_chip_cols = st.columns(7)
         t4_chips = ["비츠로테크", "삼성전자", "테슬라", "엔비디아", "팔란티어", "아이온큐", "레딧"]
         for i, t4_chip in enumerate(t4_chips):
@@ -3046,51 +3089,104 @@ with tab_chart:
                     m = resolve_stock_search(t4_chip, all_stocks_df, code_map)
                     if m:
                         st.session_state["diagnosed_stock"] = m[0]
-                        st.session_state["search_query_buffer"] = t4_chip
+                        st.session_state["t4_search_buffer"] = m[0]["name"]
+                        st.session_state["t4_related_matches"] = m[1:7]
                         st.rerun(scope="fragment")
 
-        # 2. 검색 및 조회 기간 선택
-        col_t4_search, col_t4_days, col_t4_modal = st.columns([3.0, 1.0, 1.2])
-
-        # 기본 종목 결정
-        default_stock = st.session_state.get("diagnosed_stock")
-        if not default_stock:
-            if not df_rising.empty:
-                default_stock = {"code": str(df_rising.iloc[0]["code"]), "name": str(df_rising.iloc[0]["name"])}
-            else:
-                default_stock = {"code": "005930", "name": "삼성전자"}
-
-        # 국내 + 해외 통합 옵션 리스트 구성
-        us_options_list = [f"{s['name']} ({s['symbol']}) · {s['market']}" for s in POPULAR_US_STOCKS]
-        combined_diag_options = us_options_list + (all_options if all_options else [])
-
-        with col_t4_search:
-            default_opt_idx = 0
-            target_token = f"({default_stock['code']})"
-            for idx, opt in enumerate(combined_diag_options):
-                if target_token in opt:
-                    default_opt_idx = idx
-                    break
-
-            selected_t4_str = st.selectbox(
-                "진단할 종목 선택 또는 검색 (국내 2,800+ 및 나스닥/미국 대표주)",
-                options=combined_diag_options if combined_diag_options else [f"{default_stock['name']} ({default_stock['code']})"],
-                index=default_opt_idx if combined_diag_options else 0,
-                key="t4_stock_selectbox",
+        # 연관 검색어 칩 (복수 검색 매칭 시)
+        t4_related = st.session_state.get("t4_related_matches", [])
+        if t4_related:
+            st.markdown(
+                f"<div style='font-size:0.85rem; color:#64748B; margin-top:4px;'>📌 <b>연관 종목 바로가기:</b></div>",
+                unsafe_allow_html=True,
             )
-        with col_t4_days:
-            chart_days = st.selectbox("조회 기간", [60, 100, 150, 200], index=1, key="t4_chart_days")
+            rel_cols = st.columns(min(len(t4_related), 6))
+            for r_idx, rel_stock in enumerate(t4_related[:6]):
+                with rel_cols[r_idx]:
+                    if st.button(f"👉 {rel_stock['name']} ({rel_stock['code']})", key=f"t4_rel_chip_{rel_stock['code']}_{r_idx}", use_container_width=True):
+                        st.session_state["diagnosed_stock"] = rel_stock
+                        st.session_state["t4_search_buffer"] = rel_stock["name"]
+                        st.rerun(scope="fragment")
 
-        import re
-        m_code = re.search(r"\(([A-Za-z0-9.]+)\)", selected_t4_str)
-        t4_target_code = m_code.group(1) if m_code else default_stock["code"]
-        t4_target_name = selected_t4_str.split("(")[0].strip()
+        # 전체 목록 직접 선택 드롭다운 (선택적 확장)
+        with st.expander("📋 국내 2,800+ 및 해외 상장 전 종목 드롭다운 목록에서 직접 고르기"):
+            us_options_list = [f"{s['name']} ({s['symbol']}) · {s['market']}" for s in POPULAR_US_STOCKS]
+            combined_diag_options = us_options_list + (all_options if all_options else [])
+            cur_stock = st.session_state.get("diagnosed_stock", default_stock)
+            def_idx = 0
+            cur_token = f"({cur_stock['code']})"
+            for idx, opt in enumerate(combined_diag_options):
+                if cur_token in opt:
+                    def_idx = idx
+                    break
+            chosen_opt = st.selectbox(
+                "종목 목록",
+                options=combined_diag_options,
+                index=def_idx,
+                key="t4_dropdown_select",
+                label_visibility="collapsed",
+            )
+            import re
+            m_code = re.search(r"\(([A-Za-z0-9.]+)\)", chosen_opt)
+            if m_code and m_code.group(1) != cur_stock["code"]:
+                m_match = resolve_stock_search(m_code.group(1), all_stocks_df, code_map)
+                if m_match:
+                    st.session_state["diagnosed_stock"] = m_match[0]
+                    st.session_state["t4_search_buffer"] = m_match[0]["name"]
+                    st.rerun(scope="fragment")
 
-        with col_t4_modal:
+        st.markdown("---")
+
+        # 3. 조회 기간 선택 & 명확한 가이드 카드
+        active_stock = st.session_state.get("diagnosed_stock", default_stock)
+        target_code = active_stock["code"]
+        target_name = active_stock["name"]
+
+        col_period_ctrl, col_fullscreen = st.columns([3.8, 1.2])
+        with col_period_ctrl:
+            period_options = {
+                "⚡ 60일 (초단기/급등주)": 60,
+                "🌟 100일 (스윙·중기 권장)": 100,
+                "📈 150일 (중기 실적·테마)": 150,
+                "🏛️ 200일 (대세 생명선/기관)": 200,
+            }
+            selected_period_label = st.segmented_control(
+                "차트 및 수급 분석 조회 기간 선택",
+                options=list(period_options.keys()),
+                default="🌟 100일 (스윙·중기 권장)",
+                key="t4_chart_period_segmented",
+            )
+            chart_days = period_options.get(selected_period_label, 100)
+
+        with col_fullscreen:
             st.write("")
-            if st.button(f"🔍 '{t4_target_name}' 검색", key=f"btn_t4_modal_{t4_target_code}", use_container_width=True, type="primary"):
-                show_stock_chart_dialog(t4_target_code, t4_target_name, is_dark)
+            if st.button(f"🖥️ '{target_name}' 전체화면 팝업", key=f"btn_t4_full_{target_code}", use_container_width=True):
+                show_stock_chart_dialog(target_code, target_name, is_dark)
 
-        render_stock_detailed_section(t4_target_code, t4_target_name, is_dark, in_modal=False, days=chart_days, key_prefix="tab4_diag")
+        # 조회 기간이 필요한 이유 및 선택 기준 명확 가이드 배너
+        st.html(
+            f"""<div style="background:{'#1E293B' if is_dark else '#F0F9FF'}; border:1.5px solid {'#38BDF8' if is_dark else '#0284C7'}; border-radius:12px; padding:14px 18px; margin:8px 0 16px 0; box-shadow:0 2px 8px {'rgba(56,189,248,0.08)' if is_dark else 'rgba(2,132,199,0.08)'};">
+                <div style="display:flex; align-items:center; gap:8px; font-weight:900; font-size:0.95rem; color:{'#38BDF8' if is_dark else '#0369A1'}; margin-bottom:8px;">
+                    <span>💡</span>
+                    <span>차트 조회 기간이 필요한 이유 & 투자자별 선택 기준 가이드</span>
+                </div>
+                <div style="font-size:0.87rem; color:{'#CBD5E1' if is_dark else '#334155'}; line-height:1.65;">
+                    <div style="margin-bottom:6px;">
+                        <b>1. 왜 조회 기간이 꼭 필요한가요?</b><br/>
+                        • 주식 차트의 <b>5일·20일선(단기선), 60일선(수급선), 120일·200일선(대세 생명선)</b> 및 보조지표(RSI, 볼린저밴드)를 정확히 계산하고 골든크로스를 판정하려면, 최소 해당 일수 이상의 과거 거래 데이터가 물리적으로 존재해야 합니다.
+                    </div>
+                    <div>
+                        <b>2. 어떤 기간을 선택해야 하나요? (투자 스타일별 가이드)</b><br/>
+                        • <b style="color:{'#FCD34D' if is_dark else '#D97706'};">⚡ 60일 (약 3개월)</b>: 최근 3개월간의 박스권 돌파, 거래량 급증, 단기 전고점 지지 여부를 돋보기처럼 확대 분석할 때 최적 (단타/급등주 매매)<br/>
+                        • <b style="color:{'#34D399' if is_dark else '#059669'};">🌟 100일 (약 5개월, AI 기본 추천 ⭐)</b>: 5·20·60일선 완전 정배열 안착 여부와 외인·기관의 5개월 누적 매집 추세를 가장 신뢰도 높게 균형 분석 (스윙/추세 매매)<br/>
+                        • <b style="color:{'#60A5FA' if is_dark else '#2563EB'};">📈 150일 (약 7.5개월)</b>: 2개 분기 실적 발표 사이클과 테마 순환매 저점을 점검할 때 적합 (중기 추세 매매)<br/>
+                        • <b style="color:{'#A78BFA' if is_dark else '#7C3AED'};">🏛️ 200일 (약 10개월)</b>: 기관 투자자와 외인이 생명선으로 여기는 200일 이동평균선 돌파(골든크로스) 및 1년 대세 상승 국면을 검증할 때 필수 (대세 판단)
+                    </div>
+                </div>
+            </div>"""
+        )
+
+        # 4. 차트 및 상세 분석 렌더링
+        render_stock_detailed_section(target_code, target_name, is_dark, in_modal=False, days=chart_days, key_prefix="tab4_diag")
 
     render_quick_diagnosis_tab(all_stocks_df, code_map, is_dark)
