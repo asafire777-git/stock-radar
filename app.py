@@ -21,23 +21,6 @@ from plotly.subplots import make_subplots
 import streamlit as st
 
 try:
-    from krx_collector import (
-        get_investor_net_purchases,
-        get_newly_listed_stocks,
-        get_stock_ohlcv,
-        get_stock_timeframe_ohlcv,
-    )
-    from naver_collector import (
-        fetch_stock_realtime_detail,
-        fetch_top_rising_stocks,
-        fetch_top_volume_stocks,
-    )
-    from landing_page import render_landing_page
-    from matrix_loader import render_matrix_loader
-    from prediction_model import predictor
-    from quant_scorer import calculate_quant_score
-    from technical_analysis import analyze_stock_signals, compute_technical_indicators
-except ImportError:
     from src.krx_collector import (
         get_investor_net_purchases,
         get_newly_listed_stocks,
@@ -54,6 +37,23 @@ except ImportError:
     from src.prediction_model import predictor
     from src.quant_scorer import calculate_quant_score
     from src.technical_analysis import analyze_stock_signals, compute_technical_indicators
+except ImportError:
+    from krx_collector import (
+        get_investor_net_purchases,
+        get_newly_listed_stocks,
+        get_stock_ohlcv,
+        get_stock_timeframe_ohlcv,
+    )
+    from naver_collector import (
+        fetch_stock_realtime_detail,
+        fetch_top_rising_stocks,
+        fetch_top_volume_stocks,
+    )
+    from landing_page import render_landing_page
+    from matrix_loader import render_matrix_loader
+    from prediction_model import predictor
+    from quant_scorer import calculate_quant_score
+    from technical_analysis import analyze_stock_signals, compute_technical_indicators
 
 
 # ----------------------------------------------------
