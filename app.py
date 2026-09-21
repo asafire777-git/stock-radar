@@ -123,9 +123,24 @@ div:has(> a[href*="streamlit.io"]), div:has(> a[href*="share.streamlit"]), div:h
     position: absolute !important;
     left: -99999px !important;
 }
-/* 검색 및 실행 시 전체 화면 흐려짐(Dimming) 완전 방지 */
-.stApp[data-test-script-state="running"] .main .block-container,
+/* 검색 및 실행 시 전체 화면 흐려짐(Dimming) 완전 방지 - 전방위 차단 */
+.stApp[data-test-script-state="running"],
+.stApp[data-test-script-state="running"] *,
+.stApp[data-test-script-state="running"] > div,
+.stApp[data-test-script-state="running"] .main,
+.stApp[data-test-script-state="running"] .main *,
 .stApp[data-test-script-state="running"] [data-testid="stMain"],
+.stApp[data-test-script-state="running"] [data-testid="stMain"] *,
+.stApp[data-test-script-state="running"] [data-testid="stMainBlockContainer"],
+.stApp[data-test-script-state="running"] [data-testid="stMainBlockContainer"] *,
+.stApp[data-test-script-state="running"] [data-testid="stAppViewContainer"],
+.stApp[data-test-script-state="running"] [data-testid="stAppViewContainer"] *,
+.stApp[data-test-script-state="running"] [data-testid="stVerticalBlock"],
+.stApp[data-test-script-state="running"] [data-testid="stVerticalBlock"] *,
+div[data-test-script-state="running"],
+div[data-test-script-state="running"] *,
+div[class*="stFragment"][data-test-script-state="running"],
+div[class*="stFragment"][data-test-script-state="running"] *,
 div[data-testid="stAppViewContainer"],
 div[data-testid="stAppViewBlockContainer"],
 div[data-testid="stMain"] {
@@ -157,10 +172,32 @@ div[data-testid="stMain"] {
             });
         } catch(e) {}
     }
+
+    function preventDimming() {
+        try {
+            document.querySelectorAll('[data-test-script-state="running"]').forEach(el => {
+                el.style.setProperty('opacity', '1', 'important');
+                el.style.setProperty('filter', 'none', 'important');
+            });
+            document.querySelectorAll('button[role="tab"], button[data-baseweb="tab"]').forEach(btn => {
+                if (btn.innerText && btn.innerText.includes('AI 성과 검증실')) {
+                    btn.classList.add('highlight-perf-tab');
+                }
+            });
+        } catch(e) {}
+    }
+
     purgeManageBadge();
-    setTimeout(purgeManageBadge, 500);
-    setTimeout(purgeManageBadge, 1500);
-    setInterval(purgeManageBadge, 3000);
+    preventDimming();
+    setTimeout(() => { purgeManageBadge(); preventDimming(); }, 500);
+    setTimeout(() => { purgeManageBadge(); preventDimming(); }, 1500);
+    setInterval(() => { purgeManageBadge(); preventDimming(); }, 2000);
+
+    const observer = new MutationObserver(() => {
+        preventDimming();
+        purgeManageBadge();
+    });
+    observer.observe(document.body, { attributes: true, subtree: true, attributeFilter: ['data-test-script-state'] });
 })();
 </script>
 """)
@@ -469,6 +506,88 @@ div.st-key-modal_google_btn button, div.st-key-hero_google_btn button {
 div.st-key-modal_google_btn button:hover, div.st-key-hero_google_btn button:hover {
     background-color: #F3F4F6 !important;
     color: #111827 !important;
+}
+
+/* 검색 및 런타임 실행 중 전체 배경 흐려짐(Dimming) 완전 차단 */
+.stApp[data-test-script-state="running"],
+.stApp[data-test-script-state="running"] *,
+.stApp[data-test-script-state="running"] > div,
+.stApp[data-test-script-state="running"] .main,
+.stApp[data-test-script-state="running"] .main *,
+.stApp[data-test-script-state="running"] [data-testid="stMain"],
+.stApp[data-test-script-state="running"] [data-testid="stMain"] *,
+.stApp[data-test-script-state="running"] [data-testid="stMainBlockContainer"],
+.stApp[data-test-script-state="running"] [data-testid="stMainBlockContainer"] *,
+.stApp[data-test-script-state="running"] [data-testid="stAppViewContainer"],
+.stApp[data-test-script-state="running"] [data-testid="stAppViewContainer"] *,
+.stApp[data-test-script-state="running"] [data-testid="stVerticalBlock"],
+.stApp[data-test-script-state="running"] [data-testid="stVerticalBlock"] *,
+div[data-test-script-state="running"],
+div[data-test-script-state="running"] *,
+div[class*="stFragment"][data-test-script-state="running"],
+div[class*="stFragment"][data-test-script-state="running"] * {
+    opacity: 1 !important;
+    filter: none !important;
+    transition: none !important;
+}
+
+/* 🎯 🏆 AI 성과 검증실 탭메뉴 초강력 시각 강조 (볼드 레드 폰트, 네온 글로우, 레드 블라인드 뱃지) */
+div[data-baseweb="tab-list"] button:nth-of-type(4),
+button[data-baseweb="tab"]:nth-of-type(4),
+button[role="tab"]:nth-of-type(4),
+.highlight-perf-tab {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.14) 0%, rgba(220, 38, 38, 0.24) 100%) !important;
+    border: 2px solid #EF4444 !important;
+    border-radius: 8px 8px 0 0 !important;
+    padding: 8px 18px !important;
+    margin-right: 4px !important;
+    position: relative !important;
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.4) !important;
+    animation: perfTabGlow 2.2s infinite alternate ease-in-out !important;
+}
+
+div[data-baseweb="tab-list"] button:nth-of-type(4) p,
+div[data-baseweb="tab-list"] button:nth-of-type(4) div,
+div[data-baseweb="tab-list"] button:nth-of-type(4) span,
+button[data-baseweb="tab"]:nth-of-type(4) p,
+button[role="tab"]:nth-of-type(4) p,
+.highlight-perf-tab p {
+    color: #DC2626 !important;
+    font-weight: 900 !important;
+    font-size: 1.05rem !important;
+    letter-spacing: -0.2px !important;
+    text-shadow: 0 1px 3px rgba(239, 68, 68, 0.25) !important;
+}
+
+div[data-baseweb="tab-list"] button:nth-of-type(4)[aria-selected="true"],
+button[data-baseweb="tab"]:nth-of-type(4)[aria-selected="true"],
+button[role="tab"]:nth-of-type(4)[aria-selected="true"],
+.highlight-perf-tab[aria-selected="true"] {
+    background: linear-gradient(135deg, #EF4444 0%, #B91C1C 100%) !important;
+    border: 2px solid #FCA5A5 !important;
+    box-shadow: 0 4px 18px rgba(220, 38, 38, 0.65) !important;
+}
+
+div[data-baseweb="tab-list"] button:nth-of-type(4)[aria-selected="true"] p,
+div[data-baseweb="tab-list"] button:nth-of-type(4)[aria-selected="true"] div,
+div[data-baseweb="tab-list"] button:nth-of-type(4)[aria-selected="true"] span,
+button[data-baseweb="tab"]:nth-of-type(4)[aria-selected="true"] p,
+button[role="tab"]:nth-of-type(4)[aria-selected="true"] p,
+.highlight-perf-tab[aria-selected="true"] p {
+    color: #FFFFFF !important;
+    font-weight: 900 !important;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.45) !important;
+}
+
+@keyframes perfTabGlow {
+    0% {
+        box-shadow: 0 0 6px rgba(239, 68, 68, 0.25);
+        border-color: #EF4444;
+    }
+    100% {
+        box-shadow: 0 0 18px rgba(239, 68, 68, 0.65);
+        border-color: #F87171;
+    }
 }
 """
 
@@ -1438,6 +1557,30 @@ def display_investor_table(investor_df: pd.DataFrame, rows: int = 5):
     )
 
 
+def render_quantum_radar_loader(name: str, code: str, is_ovs: bool, is_dark: bool) -> str:
+    market_text = "글로벌 기관 수급" if is_ovs else "큰손 수급"
+    bg = "#0F172A" if is_dark else "#F0FDF4"
+    border = "#10B981" if is_dark else "#059669"
+    title_color = "#34D399" if is_dark else "#065F46"
+    sub_color = "#94A3B8" if is_dark else "#047857"
+    bar_bg = "#1E293B" if is_dark else "#D1FAE5"
+    shadow = "rgba(16,185,129,0.18)" if is_dark else "rgba(2,132,199,0.12)"
+    return f"""<div style="background:{bg}; border:1.5px solid {border}; border-radius:12px; padding:18px 24px; text-align:center; margin-top:10px; margin-bottom:14px; box-shadow:0 4px 16px {shadow};">
+        <div style="display:flex; justify-content:center; align-items:center; gap:10px; margin-bottom:6px;">
+            <span style="font-size:1.35rem;">📡</span>
+            <span style="font-size:1.08rem; font-weight:800; color:{title_color};">
+                AI 퀀트 레이더 정밀 분석 가동 중...
+            </span>
+        </div>
+        <div style="font-size:0.88rem; color:{sub_color}; font-weight:600;">
+            [{name} ({code})] 실시간 시세, 이동평균선(5·20·60일) 및 {market_text} 패킷을 초고속 수신·디코딩하고 있습니다
+        </div>
+        <div style="max-width:280px; margin:12px auto 0 auto; height:4px; background:{bar_bg}; border-radius:10px; overflow:hidden;">
+            <div style="width:100%; height:100%; background:linear-gradient(90deg, #10B981, #38BDF8); animation:pulse 1s infinite;"></div>
+        </div>
+    </div>"""
+
+
 def render_stock_detailed_section(code: str, name: str, is_dark: bool, in_modal: bool = False, days: int = 100, key_prefix: str = "sec", preloaded_data: tuple = None):
     """
     종목의 5일/20일/60일 이동평균선 비교 지표 카드, 3단 인터랙티브 캔들 차트,
@@ -1448,15 +1591,18 @@ def render_stock_detailed_section(code: str, name: str, is_dark: bool, in_modal:
     if preloaded_data:
         ohlcv, detail, inv_df = preloaded_data
     else:
-        with st.spinner(f"'{name}'({code}) 실시간 기술 지표 및 캔들 차트 분석 중..."):
-            if is_ovs:
-                ohlcv = load_overseas_stock_chart(code, timeframe="1달")
-                detail = load_overseas_detail(code)
-                inv_df = pd.DataFrame()
-            else:
-                ohlcv = load_stock_chart(code, days=days)
-                detail = load_stock_realtime_detail(code)
-                inv_df = load_stock_investors(code)
+        loader_ph = st.empty()
+        loader_ph.html(render_quantum_radar_loader(name, code, is_ovs, is_dark))
+        if is_ovs:
+            ohlcv = load_overseas_stock_chart(code, timeframe="1달")
+            detail = load_overseas_detail(code)
+            inv_df = pd.DataFrame()
+        else:
+            ohlcv = load_stock_chart(code, days=days)
+            detail = load_stock_realtime_detail(code)
+            inv_df = load_stock_investors(code)
+        time.sleep(0.18)
+        loader_ph.empty()
 
     if ohlcv is None or ohlcv.empty or len(ohlcv) < 2:
         st.warning(f"'{name}'({code})의 차트 데이터를 불러올 수 없습니다.")
@@ -1748,22 +1894,7 @@ def render_stock_detailed_section(code: str, name: str, is_dark: bool, in_modal:
 def show_stock_chart_dialog(code: str, name: str, is_dark: bool):
     is_ovs = (len(code) <= 5 and code.isalpha()) or any(s["symbol"] == code for s in POPULAR_US_STOCKS)
     loader_ph = st.empty()
-    loader_ph.html(
-        f"""<div style="background:{'#0F172A' if is_dark else '#F0FDF4'}; border:1.5px solid {'#10B981' if is_dark else '#059669'}; border-radius:12px; padding:20px 24px; text-align:center; margin-bottom:14px; box-shadow:0 4px 16px {'rgba(16,185,129,0.15)' if is_dark else 'rgba(2,132,199,0.12)'};">
-            <div style="display:flex; justify-content:center; align-items:center; gap:10px; margin-bottom:6px;">
-                <span style="font-size:1.35rem;">📡</span>
-                <span style="font-size:1.08rem; font-weight:800; color:{'#34D399' if is_dark else '#065F46'};">
-                    AI 퀀트 레이더 정밀 분석 가동 중...
-                </span>
-            </div>
-            <div style="font-size:0.88rem; color:{'#94A3B8' if is_dark else '#047857'}; font-weight:600;">
-                [{name} ({code})] 실시간 시세, 이동평균선(5·20·60일) 및 {'글로벌 기관 수급' if is_ovs else '큰손 수급'} 패킷을 초고속 수신·디코딩하고 있습니다
-            </div>
-            <div style="max-width:280px; margin:12px auto 0 auto; height:4px; background:{'#1E293B' if is_dark else '#D1FAE5'}; border-radius:10px; overflow:hidden;">
-                <div style="width:100%; height:100%; background:linear-gradient(90deg, #10B981, #38BDF8); animation:pulse 1s infinite;"></div>
-            </div>
-        </div>"""
-    )
+    loader_ph.html(render_quantum_radar_loader(name, code, is_ovs, is_dark))
     # 데이터 사전 로드 (로더가 떠 있는 동안 고속 실행)
     if is_ovs:
         ohlcv = load_overseas_stock_chart(code, timeframe="1달")
@@ -1774,6 +1905,7 @@ def show_stock_chart_dialog(code: str, name: str, is_dark: bool):
         detail = load_stock_realtime_detail(code)
         inv_df = load_stock_investors(code)
 
+    time.sleep(0.18)
     loader_ph.empty()
     render_stock_detailed_section(code, name, is_dark, in_modal=True, key_prefix="modal_dialog", preloaded_data=(ohlcv, detail, inv_df))
 
@@ -2039,22 +2171,7 @@ def render_search_section_fragment(all_stocks_df, code_map, is_dark):
         is_ovs = active_diag.get("is_overseas", False) or (len(search_code) <= 5 and search_code.isalpha())
 
         loader_ph = st.empty()
-        loader_ph.html(
-            f"""<div style="background:{'#0F172A' if is_dark else '#F0FDF4'}; border:1.5px solid {'#10B981' if is_dark else '#059669'}; border-radius:12px; padding:18px 24px; text-align:center; margin-top:12px; margin-bottom:14px; box-shadow:0 4px 16px {'rgba(16,185,129,0.18)' if is_dark else 'rgba(2,132,199,0.12)'};">
-                <div style="display:flex; justify-content:center; align-items:center; gap:10px; margin-bottom:6px;">
-                    <span style="font-size:1.35rem;">📡</span>
-                    <span style="font-size:1.08rem; font-weight:800; color:{'#34D399' if is_dark else '#065F46'};">
-                        AI 퀀트 레이더 정밀 분석 가동 중...
-                    </span>
-                </div>
-                <div style="font-size:0.88rem; color:{'#94A3B8' if is_dark else '#047857'}; font-weight:600;">
-                    [{search_name} ({search_code})] 실시간 시세, 이동평균선(5·20·60일) 및 {'글로벌 기관 수급' if is_ovs else '큰손 수급'} 패킷을 초고속 수신·디코딩하고 있습니다
-                </div>
-                <div style="max-width:280px; margin:12px auto 0 auto; height:4px; background:{'#1E293B' if is_dark else '#D1FAE5'}; border-radius:10px; overflow:hidden;">
-                    <div style="width:100%; height:100%; background:linear-gradient(90deg, #10B981, #38BDF8); animation:pulse 1s infinite;"></div>
-                </div>
-            </div>"""
-        )
+        loader_ph.html(render_quantum_radar_loader(search_name, search_code, is_ovs, is_dark))
 
         if is_ovs:
             s_ohlcv = load_overseas_stock_chart(search_code, timeframe="1달")
@@ -2065,6 +2182,7 @@ def render_search_section_fragment(all_stocks_df, code_map, is_dark):
             s_detail = load_stock_realtime_detail(search_code)
             s_inv = load_stock_investors(search_code)
 
+        time.sleep(0.18)
         loader_ph.empty()
         render_stock_detailed_section(search_code, search_name, is_dark, in_modal=False, key_prefix="search_main", preloaded_data=(s_ohlcv, s_detail, s_inv))
 
@@ -2082,7 +2200,7 @@ tab_ai, tab_rising, tab_new, tab_perf, tab_chart = st.tabs([
     "⭐ AI 오늘 추천주 (초보자 강추)",
     "🔥 실시간 급등 순위 (TOP 100)",
     "🚀 신규 상장주 모니터링",
-    "🏆 AI 성과 검증실 & 실전 복기",
+    "🔥 🏆 AI 성과 검증실 & 실전 복기",
     "📊 1초 종목 정밀 진단실",
 ])
 
@@ -2283,19 +2401,19 @@ def render_rising_tab_fragment(disp_df: pd.DataFrame, is_dark_mode: bool):
             df_us_table = df_us_disp[["rank", "name", "code", "market", "category", "price_usd", "price_krw", "change_rate", "grade", "total_score", "upside_prob", "signals"]].copy()
             df_us_table.columns = ["순위", "종목명", "티커", "시장", "핵심테마", "현재가($)", "환산가격(약 원)", "등락률(%)", "AI등급", "종합점수", "5일 상승확률", "핵심 포착신호"]
 
-            us_options = ["선택하여 모달 열기..."] + [f"#{r['순위']} {r['종목명']} ({r['티커']}) | ${r['현재가($)']:.2f} ({r['등락률(%)']:+.2f}%)" for _, r in df_us_table.iterrows()]
+            us_options = ["선택하여 검색/상세보기..."] + [f"#{r['순위']} {r['종목명']} ({r['티커']}) | ${r['현재가($)']:.2f} ({r['등락률(%)']:+.2f}%)" for _, r in df_us_table.iterrows()]
             col_ctl1, col_ctl2 = st.columns([3.3, 1.7])
             with col_ctl1:
                 sel_us_str = st.selectbox(
-                    "⚡ 분석할 미국 급등주 검색 또는 선택 (선택 즉시 모달 팝업이 열립니다):",
+                    "⚡ 분석할 미국 급등주 검색 또는 선택 (선택 즉시 정밀 검색 분석이 실행됩니다):",
                     options=us_options,
                     index=0,
                     key="rising_us_quick_select",
                 )
             with col_ctl2:
-                st.caption("💡 **Tip:** 표에서 원하는 행을 직접 클릭·터치하셔도 즉시 모달 팝업이 열립니다.")
+                st.caption("💡 **Tip:** 표에서 원하는 행을 직접 클릭·터치하셔도 즉시 정밀 캔들 차트와 기술 지표가 검색됩니다.")
 
-            if sel_us_str != "선택하여 모달 열기...":
+            if sel_us_str != "선택하여 검색/상세보기...":
                 import re
                 m_code = re.search(r"\(([A-Za-z0-9.]+)\)", sel_us_str)
                 if m_code:
@@ -2330,20 +2448,20 @@ def render_rising_tab_fragment(disp_df: pd.DataFrame, is_dark_mode: bool):
         return
 
     # 국내 급등주 뷰
-    rising_options = ["선택하여 모달 열기..."] + [f"#{r['순위']} {r['종목명']} ({r['종목코드']}) | {r['현재가(원)']:,}원 ({r['등락률(%)']:+.2f}%)" for _, r in disp_df.iterrows()]
+    rising_options = ["선택하여 검색/상세보기..."] + [f"#{r['순위']} {r['종목명']} ({r['종목코드']}) | {r['현재가(원)']:,}원 ({r['등락률(%)']:+.2f}%)" for _, r in disp_df.iterrows()]
 
     col_ctl1, col_ctl2 = st.columns([3.3, 1.7])
     with col_ctl1:
         sel_rising_str = st.selectbox(
-            "⚡ 분석할 급등주 검색 또는 선택 (선택 즉시 모달 팝업이 열립니다):",
+            "⚡ 분석할 급등주 검색 또는 선택 (선택 즉시 정밀 검색 분석이 실행됩니다):",
             options=rising_options,
             index=0,
             key="rising_quick_select",
         )
     with col_ctl2:
-        st.caption("💡 **Tip:** 표에서 원하는 행을 직접 클릭·터치하셔도 즉시 모달 팝업이 열립니다.")
+        st.caption("💡 **Tip:** 표에서 원하는 행을 직접 클릭·터치하셔도 즉시 정밀 캔들 차트와 기술 지표가 검색됩니다.")
 
-    if sel_rising_str != "선택하여 모달 열기...":
+    if sel_rising_str != "선택하여 검색/상세보기...":
         import re
         m_code = re.search(r"\((\d{6})\)", sel_rising_str)
         if m_code:
@@ -2380,7 +2498,7 @@ def render_rising_tab_fragment(disp_df: pd.DataFrame, is_dark_mode: bool):
 
 with tab_rising:
     st.subheader("🔥 실시간 급등주 순위 (국내 & 나스닥/미국)")
-    st.caption("오늘 시장에서 가장 강력하게 상승 중인 주도주들입니다. 상단 스위처로 국내와 미국 나스닥을 넘나들며 종목을 클릭하시면 즉시 정밀 캔들 차트 모달이 열립니다.")
+    st.caption("오늘 시장에서 가장 강력하게 상승 중인 주도주들입니다. 상단 스위처로 국내와 미국 나스닥을 넘나들며 종목을 클릭하시면 즉시 정밀 캔들 차트와 기술 지표가 검색됩니다.")
 
     if not df_rising_filtered.empty:
         candidate_cols = ["rank", "code", "name", "market", "price", "change_rate", "trade_value_억", "marcap_억", "volume"]
@@ -2425,19 +2543,19 @@ def render_new_listings_tab_fragment(new_disp: pd.DataFrame, is_dark_mode: bool)
             df_us_new_table = df_us_new[["name", "code", "market", "category", "listing_date", "days_since_listing", "ipo_price_usd", "price_usd", "price_krw", "return_from_ipo", "change_rate", "grade", "story"]].copy()
             df_us_new_table.columns = ["종목명", "티커", "시장", "핵심테마", "상장일", "경과일(일)", "공모가($)", "현재가($)", "환산가격(약 원)", "공모가대비(%)", "등락률(%)", "AI등급", "핵심 투자스토리"]
 
-            us_n_options = ["선택하여 모달 열기..."] + [f"{r['종목명']} ({r['티커']}) · {r['상장일']} 상장 ({r['등락률(%)']:+.2f}%) | {r['핵심테마']}" for _, r in df_us_new_table.iterrows()]
+            us_n_options = ["선택하여 검색/상세보기..."] + [f"{r['종목명']} ({r['티커']}) · {r['상장일']} 상장 ({r['등락률(%)']:+.2f}%) | {r['핵심테마']}" for _, r in df_us_new_table.iterrows()]
             col_nctl1, col_nctl2 = st.columns([3.3, 1.7])
             with col_nctl1:
                 sel_us_n_str = st.selectbox(
-                    "⚡ 분석할 미국 신규 상장주 검색 또는 선택 (선택 즉시 모달 팝업이 열립니다):",
+                    "⚡ 분석할 미국 신규 상장주 검색 또는 선택 (선택 즉시 정밀 검색 분석이 실행됩니다):",
                     options=us_n_options,
                     index=0,
                     key="new_us_quick_select",
                 )
             with col_nctl2:
-                st.caption("💡 **Tip:** 표에서 원하는 행을 직접 클릭·터치하셔도 즉시 모달 팝업이 열립니다.")
+                st.caption("💡 **Tip:** 표에서 원하는 행을 직접 클릭·터치하셔도 즉시 정밀 캔들 차트와 기술 지표가 검색됩니다.")
 
-            if sel_us_n_str != "선택하여 모달 열기...":
+            if sel_us_n_str != "선택하여 검색/상세보기...":
                 import re
                 m_code = re.search(r"\(([A-Za-z0-9.]+)\)", sel_us_n_str)
                 if m_code:
@@ -2472,20 +2590,20 @@ def render_new_listings_tab_fragment(new_disp: pd.DataFrame, is_dark_mode: bool)
         return
 
     # 국내 신규상장주 뷰
-    new_options = ["선택하여 모달 열기..."] + [f"{r['종목명']} ({r['종목코드']}) · {r['상장일']} 상장 ({r['등락률(%)']:+.2f}%) | {r.get('업종', '-')}" for _, r in new_disp.iterrows()]
+    new_options = ["선택하여 검색/상세보기..."] + [f"{r['종목명']} ({r['종목코드']}) · {r['상장일']} 상장 ({r['등락률(%)']:+.2f}%) | {r.get('업종', '-')}" for _, r in new_disp.iterrows()]
 
     col_nctl1, col_nctl2 = st.columns([3.3, 1.7])
     with col_nctl1:
         sel_new_str = st.selectbox(
-            "⚡ 분석할 신규 상장주 검색 또는 선택 (선택 즉시 모달 팝업이 열립니다):",
+            "⚡ 분석할 신규 상장주 검색 또는 선택 (선택 즉시 정밀 검색 분석이 실행됩니다):",
             options=new_options,
             index=0,
             key="new_quick_select",
         )
     with col_nctl2:
-        st.caption("💡 **Tip:** 표에서 원하는 행을 직접 클릭·터치하셔도 즉시 모달 팝업이 열립니다.")
+        st.caption("💡 **Tip:** 표에서 원하는 행을 직접 클릭·터치하셔도 즉시 정밀 캔들 차트와 기술 지표가 검색됩니다.")
 
-    if sel_new_str != "선택하여 모달 열기...":
+    if sel_new_str != "선택하여 검색/상세보기...":
         import re
         m_code = re.search(r"\((\d{6})\)", sel_new_str)
         if m_code:
@@ -2712,61 +2830,65 @@ with tab_perf:
 # TAB 5: 종목 정밀 진단실 (전면 AI 검색 연동)
 # ====================================================
 with tab_chart:
-    st.subheader("📊 1초 종목 정밀 진단 및 캔들 차트 분석 (국내 & 해외 통합)")
-    st.caption("AI 검색 시스템과 100% 연동되어 국내 상장 2,800개 전 종목 및 나스닥/미국 대표주의 캔들 차트, 5일/20일/60일 이동평균선 이격도, 볼린저밴드, RSI, 수급을 분석합니다.")
+    @st.fragment
+    def render_quick_diagnosis_tab(all_stocks_df, code_map, is_dark):
+        st.subheader("📊 1초 종목 정밀 진단 및 캔들 차트 분석 (국내 & 해외 통합)")
+        st.caption("AI 검색 시스템과 100% 연동되어 국내 상장 2,800개 전 종목 및 나스닥/미국 대표주의 캔들 차트, 5일/20일/60일 이동평균선 이격도, 볼린저밴드, RSI, 수급을 분석합니다.")
 
-    # 1. 퀵 필터 칩
-    t4_chip_cols = st.columns(7)
-    t4_chips = ["비츠로테크", "삼성전자", "테슬라", "엔비디아", "팔란티어", "아이온큐", "레딧"]
-    for i, t4_chip in enumerate(t4_chips):
-        with t4_chip_cols[i]:
-            if st.button(f"#{t4_chip}", key=f"t4_chip_{t4_chip}", use_container_width=True):
-                m = resolve_stock_search(t4_chip, all_stocks_df, code_map)
-                if m:
-                    st.session_state["diagnosed_stock"] = m[0]
-                    st.session_state["search_query_buffer"] = t4_chip
-                    st.rerun()
+        # 1. 퀵 필터 칩
+        t4_chip_cols = st.columns(7)
+        t4_chips = ["비츠로테크", "삼성전자", "테슬라", "엔비디아", "팔란티어", "아이온큐", "레딧"]
+        for i, t4_chip in enumerate(t4_chips):
+            with t4_chip_cols[i]:
+                if st.button(f"#{t4_chip}", key=f"t4_chip_{t4_chip}", use_container_width=True):
+                    m = resolve_stock_search(t4_chip, all_stocks_df, code_map)
+                    if m:
+                        st.session_state["diagnosed_stock"] = m[0]
+                        st.session_state["search_query_buffer"] = t4_chip
+                        st.rerun(scope="fragment")
 
-    # 2. 검색 및 조회 기간 선택
-    col_t4_search, col_t4_days, col_t4_modal = st.columns([3.0, 1.0, 1.2])
+        # 2. 검색 및 조회 기간 선택
+        col_t4_search, col_t4_days, col_t4_modal = st.columns([3.0, 1.0, 1.2])
 
-    # 기본 종목 결정
-    default_stock = st.session_state.get("diagnosed_stock")
-    if not default_stock:
-        if not df_rising.empty:
-            default_stock = {"code": str(df_rising.iloc[0]["code"]), "name": str(df_rising.iloc[0]["name"])}
-        else:
-            default_stock = {"code": "005930", "name": "삼성전자"}
+        # 기본 종목 결정
+        default_stock = st.session_state.get("diagnosed_stock")
+        if not default_stock:
+            if not df_rising.empty:
+                default_stock = {"code": str(df_rising.iloc[0]["code"]), "name": str(df_rising.iloc[0]["name"])}
+            else:
+                default_stock = {"code": "005930", "name": "삼성전자"}
 
-    # 국내 + 해외 통합 옵션 리스트 구성
-    us_options_list = [f"{s['name']} ({s['symbol']}) · {s['market']}" for s in POPULAR_US_STOCKS]
-    combined_diag_options = us_options_list + (all_options if all_options else [])
+        # 국내 + 해외 통합 옵션 리스트 구성
+        us_options_list = [f"{s['name']} ({s['symbol']}) · {s['market']}" for s in POPULAR_US_STOCKS]
+        combined_diag_options = us_options_list + (all_options if all_options else [])
 
-    with col_t4_search:
-        default_opt_idx = 0
-        target_token = f"({default_stock['code']})"
-        for idx, opt in enumerate(combined_diag_options):
-            if target_token in opt:
-                default_opt_idx = idx
-                break
+        with col_t4_search:
+            default_opt_idx = 0
+            target_token = f"({default_stock['code']})"
+            for idx, opt in enumerate(combined_diag_options):
+                if target_token in opt:
+                    default_opt_idx = idx
+                    break
 
-        selected_t4_str = st.selectbox(
-            "진단할 종목 선택 또는 검색 (국내 2,800+ 및 나스닥/미국 대표주)",
-            options=combined_diag_options if combined_diag_options else [f"{default_stock['name']} ({default_stock['code']})"],
-            index=default_opt_idx if combined_diag_options else 0,
-            key="t4_stock_selectbox",
-        )
-    with col_t4_days:
-        chart_days = st.selectbox("조회 기간", [60, 100, 150, 200], index=1, key="t4_chart_days")
+            selected_t4_str = st.selectbox(
+                "진단할 종목 선택 또는 검색 (국내 2,800+ 및 나스닥/미국 대표주)",
+                options=combined_diag_options if combined_diag_options else [f"{default_stock['name']} ({default_stock['code']})"],
+                index=default_opt_idx if combined_diag_options else 0,
+                key="t4_stock_selectbox",
+            )
+        with col_t4_days:
+            chart_days = st.selectbox("조회 기간", [60, 100, 150, 200], index=1, key="t4_chart_days")
 
-    import re
-    m_code = re.search(r"\(([A-Za-z0-9.]+)\)", selected_t4_str)
-    t4_target_code = m_code.group(1) if m_code else default_stock["code"]
-    t4_target_name = selected_t4_str.split("(")[0].strip()
+        import re
+        m_code = re.search(r"\(([A-Za-z0-9.]+)\)", selected_t4_str)
+        t4_target_code = m_code.group(1) if m_code else default_stock["code"]
+        t4_target_name = selected_t4_str.split("(")[0].strip()
 
-    with col_t4_modal:
-        st.write("")
-        if st.button(f"🔍 '{t4_target_name}' 모달 팝업", key=f"btn_t4_modal_{t4_target_code}", use_container_width=True, type="primary"):
-            show_stock_chart_dialog(t4_target_code, t4_target_name, is_dark)
+        with col_t4_modal:
+            st.write("")
+            if st.button(f"🔍 '{t4_target_name}' 검색", key=f"btn_t4_modal_{t4_target_code}", use_container_width=True, type="primary"):
+                show_stock_chart_dialog(t4_target_code, t4_target_name, is_dark)
 
-    render_stock_detailed_section(t4_target_code, t4_target_name, is_dark, in_modal=False, days=chart_days, key_prefix="tab4_diag")
+        render_stock_detailed_section(t4_target_code, t4_target_name, is_dark, in_modal=False, days=chart_days, key_prefix="tab4_diag")
+
+    render_quick_diagnosis_tab(all_stocks_df, code_map, is_dark)
