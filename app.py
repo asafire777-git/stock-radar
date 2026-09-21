@@ -2307,7 +2307,7 @@ def render_performance_tab_fragment(is_dark_mode: bool):
                     )
                     col_b1, col_b2 = st.columns([4, 1])
                     with col_b2:
-                        if st.button(f"📊 '{r_name}' 차트 검증", key=f"btn_hit_chart_{r_code}_{idx}", use_container_width=True):
+                        if st.button(f"📊 '{r_name}' 차트 검증", key=f"btn_hit_chart_{r_code}_{idx}_{perf_period}", use_container_width=True):
                             show_stock_chart_dialog(r_code, r_name, is_dark_mode)
         else:
             st.info("해당 기간의 적중 내역을 집계 중입니다.")
@@ -2365,7 +2365,7 @@ def render_performance_tab_fragment(is_dark_mode: bool):
                     )
                     col_mb1, col_mb2 = st.columns([4, 1])
                     with col_mb2:
-                        if st.button(f"🔍 '{r_name}' 차트 진단", key=f"btn_miss_chart_{r_code}_{idx}", use_container_width=True):
+                        if st.button(f"🔍 '{r_name}' 차트 진단", key=f"btn_miss_chart_{r_code}_{idx}_{perf_period}", use_container_width=True):
                             show_stock_chart_dialog(r_code, r_name, is_dark_mode)
         else:
             st.info("해당 기간의 손절/조정 내역이 없습니다. (모든 종목 목표가 달성)")
