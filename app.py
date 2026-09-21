@@ -179,9 +179,25 @@ div[data-testid="stMain"] {
                 el.style.setProperty('opacity', '1', 'important');
                 el.style.setProperty('filter', 'none', 'important');
             });
-            document.querySelectorAll('button[role="tab"], button[data-baseweb="tab"]').forEach(btn => {
-                if (btn.innerText && btn.innerText.includes('AI 성과 검증실')) {
+        } catch(e) {}
+    }
+
+    function highlightTabs() {
+        try {
+            const tabs = document.querySelectorAll('[data-testid="stTab"], [role="tab"], .react-aria-Tab, button[data-baseweb="tab"]');
+            tabs.forEach(btn => {
+                if (btn.textContent && (btn.textContent.includes('성과 검증실') || btn.textContent.includes('AI 성과'))) {
                     btn.classList.add('highlight-perf-tab');
+                    const isSelected = btn.getAttribute('aria-selected') === 'true' || btn.getAttribute('data-selected') === 'true';
+                    btn.style.setProperty('background', isSelected ? 'linear-gradient(135deg, #DC2626 0%, #991B1B 100%)' : 'linear-gradient(135deg, rgba(239, 68, 68, 0.18) 0%, rgba(220, 38, 38, 0.28) 100%)', 'important');
+                    btn.style.setProperty('border', isSelected ? '2px solid #FCA5A5' : '2px solid #EF4444', 'important');
+                    btn.style.setProperty('border-radius', '8px 8px 0 0', 'important');
+                    btn.style.setProperty('box-shadow', '0 0 14px rgba(239, 68, 68, 0.55)', 'important');
+                    btn.style.setProperty('padding', '6px 16px', 'important');
+                    btn.querySelectorAll('*').forEach(c => {
+                        c.style.setProperty('color', isSelected ? '#FFFFFF' : '#DC2626', 'important');
+                        c.style.setProperty('font-weight', '900', 'important');
+                    });
                 }
             });
         } catch(e) {}
@@ -189,15 +205,18 @@ div[data-testid="stMain"] {
 
     purgeManageBadge();
     preventDimming();
-    setTimeout(() => { purgeManageBadge(); preventDimming(); }, 500);
-    setTimeout(() => { purgeManageBadge(); preventDimming(); }, 1500);
-    setInterval(() => { purgeManageBadge(); preventDimming(); }, 2000);
+    highlightTabs();
+    setTimeout(() => { purgeManageBadge(); preventDimming(); highlightTabs(); }, 300);
+    setTimeout(() => { purgeManageBadge(); preventDimming(); highlightTabs(); }, 800);
+    setTimeout(() => { purgeManageBadge(); preventDimming(); highlightTabs(); }, 1500);
+    setInterval(() => { purgeManageBadge(); preventDimming(); highlightTabs(); }, 1000);
 
     const observer = new MutationObserver(() => {
         preventDimming();
         purgeManageBadge();
+        highlightTabs();
     });
-    observer.observe(document.body, { attributes: true, subtree: true, attributeFilter: ['data-test-script-state'] });
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true });
 })();
 </script>
 """)
@@ -532,26 +551,40 @@ div[class*="stFragment"][data-test-script-state="running"] * {
 }
 
 /* 🎯 🏆 AI 성과 검증실 탭메뉴 초강력 시각 강조 (볼드 레드 폰트, 네온 글로우, 레드 블라인드 뱃지) */
+[data-testid="stTabs"] [data-testid="stTab"]:nth-of-type(4),
+[data-testid="stTabs"] [data-testid="stTab"]:nth-child(4),
+[data-testid="stTabs"] [role="tab"]:nth-child(4),
+[data-testid="stTabs"] [role="tab"]:nth-of-type(4),
+[data-testid="stTabs"] .react-aria-Tab:nth-child(4),
+[data-testid="stTabs"] .react-aria-Tab:nth-of-type(4),
+[data-testid="stTab"][id="3"],
+[role="tab"][id="3"],
 div[data-baseweb="tab-list"] button:nth-of-type(4),
 button[data-baseweb="tab"]:nth-of-type(4),
 button[role="tab"]:nth-of-type(4),
 .highlight-perf-tab {
-    background: linear-gradient(135deg, rgba(239, 68, 68, 0.14) 0%, rgba(220, 38, 38, 0.24) 100%) !important;
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.16) 0%, rgba(220, 38, 38, 0.28) 100%) !important;
     border: 2px solid #EF4444 !important;
     border-radius: 8px 8px 0 0 !important;
-    padding: 8px 18px !important;
+    padding: 6px 16px !important;
     margin-right: 4px !important;
     position: relative !important;
-    box-shadow: 0 0 12px rgba(239, 68, 68, 0.4) !important;
+    box-shadow: 0 0 14px rgba(239, 68, 68, 0.45) !important;
     animation: perfTabGlow 2.2s infinite alternate ease-in-out !important;
 }
 
-div[data-baseweb="tab-list"] button:nth-of-type(4) p,
-div[data-baseweb="tab-list"] button:nth-of-type(4) div,
-div[data-baseweb="tab-list"] button:nth-of-type(4) span,
-button[data-baseweb="tab"]:nth-of-type(4) p,
-button[role="tab"]:nth-of-type(4) p,
-.highlight-perf-tab p {
+[data-testid="stTabs"] [data-testid="stTab"]:nth-of-type(4) *,
+[data-testid="stTabs"] [data-testid="stTab"]:nth-child(4) *,
+[data-testid="stTabs"] [role="tab"]:nth-child(4) *,
+[data-testid="stTabs"] [role="tab"]:nth-of-type(4) *,
+[data-testid="stTabs"] .react-aria-Tab:nth-child(4) *,
+[data-testid="stTabs"] .react-aria-Tab:nth-of-type(4) *,
+[data-testid="stTab"][id="3"] *,
+[role="tab"][id="3"] *,
+div[data-baseweb="tab-list"] button:nth-of-type(4) *,
+button[data-baseweb="tab"]:nth-of-type(4) *,
+button[role="tab"]:nth-of-type(4) *,
+.highlight-perf-tab * {
     color: #DC2626 !important;
     font-weight: 900 !important;
     font-size: 1.05rem !important;
@@ -559,6 +592,14 @@ button[role="tab"]:nth-of-type(4) p,
     text-shadow: 0 1px 3px rgba(239, 68, 68, 0.25) !important;
 }
 
+[data-testid="stTabs"] [data-testid="stTab"]:nth-of-type(4)[aria-selected="true"],
+[data-testid="stTabs"] [data-testid="stTab"]:nth-of-type(4)[data-selected="true"],
+[data-testid="stTabs"] [data-testid="stTab"]:nth-child(4)[aria-selected="true"],
+[data-testid="stTabs"] [data-testid="stTab"]:nth-child(4)[data-selected="true"],
+[data-testid="stTabs"] [role="tab"]:nth-child(4)[aria-selected="true"],
+[data-testid="stTabs"] [role="tab"]:nth-of-type(4)[aria-selected="true"],
+[data-testid="stTab"][id="3"][aria-selected="true"],
+[role="tab"][id="3"][aria-selected="true"],
 div[data-baseweb="tab-list"] button:nth-of-type(4)[aria-selected="true"],
 button[data-baseweb="tab"]:nth-of-type(4)[aria-selected="true"],
 button[role="tab"]:nth-of-type(4)[aria-selected="true"],
@@ -568,12 +609,18 @@ button[role="tab"]:nth-of-type(4)[aria-selected="true"],
     box-shadow: 0 4px 18px rgba(220, 38, 38, 0.65) !important;
 }
 
-div[data-baseweb="tab-list"] button:nth-of-type(4)[aria-selected="true"] p,
-div[data-baseweb="tab-list"] button:nth-of-type(4)[aria-selected="true"] div,
-div[data-baseweb="tab-list"] button:nth-of-type(4)[aria-selected="true"] span,
-button[data-baseweb="tab"]:nth-of-type(4)[aria-selected="true"] p,
-button[role="tab"]:nth-of-type(4)[aria-selected="true"] p,
-.highlight-perf-tab[aria-selected="true"] p {
+[data-testid="stTabs"] [data-testid="stTab"]:nth-of-type(4)[aria-selected="true"] *,
+[data-testid="stTabs"] [data-testid="stTab"]:nth-of-type(4)[data-selected="true"] *,
+[data-testid="stTabs"] [data-testid="stTab"]:nth-child(4)[aria-selected="true"] *,
+[data-testid="stTabs"] [data-testid="stTab"]:nth-child(4)[data-selected="true"] *,
+[data-testid="stTabs"] [role="tab"]:nth-child(4)[aria-selected="true"] *,
+[data-testid="stTabs"] [role="tab"]:nth-of-type(4)[aria-selected="true"] *,
+[data-testid="stTab"][id="3"][aria-selected="true"] *,
+[role="tab"][id="3"][aria-selected="true"] *,
+div[data-baseweb="tab-list"] button:nth-of-type(4)[aria-selected="true"] *,
+button[data-baseweb="tab"]:nth-of-type(4)[aria-selected="true"] *,
+button[role="tab"]:nth-of-type(4)[aria-selected="true"] *,
+.highlight-perf-tab[aria-selected="true"] * {
     color: #FFFFFF !important;
     font-weight: 900 !important;
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.45) !important;
@@ -2221,6 +2268,80 @@ st.markdown("---")
 # ----------------------------------------------------
 # 6. 메인 탭 구성
 # ----------------------------------------------------
+st.html("""
+<style>
+[data-testid="stTabs"] [data-testid="stTab"]:nth-of-type(4),
+[data-testid="stTabs"] [data-testid="stTab"]:nth-child(4),
+[data-testid="stTabs"] [role="tab"]:nth-child(4),
+[data-testid="stTabs"] [role="tab"]:nth-of-type(4),
+[data-testid="stTabs"] .react-aria-Tab:nth-child(4),
+[data-testid="stTab"][id="3"],
+[role="tab"][id="3"] {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.16) 0%, rgba(220, 38, 38, 0.28) 100%) !important;
+    border: 2px solid #EF4444 !important;
+    border-radius: 8px 8px 0 0 !important;
+    padding: 6px 16px !important;
+    margin-right: 4px !important;
+    box-shadow: 0 0 14px rgba(239, 68, 68, 0.45) !important;
+}
+[data-testid="stTabs"] [data-testid="stTab"]:nth-of-type(4) *,
+[data-testid="stTabs"] [data-testid="stTab"]:nth-child(4) *,
+[data-testid="stTabs"] [role="tab"]:nth-child(4) *,
+[data-testid="stTabs"] [role="tab"]:nth-of-type(4) *,
+[data-testid="stTabs"] .react-aria-Tab:nth-child(4) *,
+[data-testid="stTab"][id="3"] *,
+[role="tab"][id="3"] * {
+    color: #DC2626 !important;
+    font-weight: 900 !important;
+    font-size: 1.05rem !important;
+    letter-spacing: -0.2px !important;
+}
+[data-testid="stTabs"] [data-testid="stTab"]:nth-of-type(4)[aria-selected="true"],
+[data-testid="stTabs"] [data-testid="stTab"]:nth-child(4)[aria-selected="true"],
+[data-testid="stTab"][id="3"][aria-selected="true"],
+[role="tab"][id="3"][aria-selected="true"] {
+    background: linear-gradient(135deg, #EF4444 0%, #B91C1C 100%) !important;
+    border: 2px solid #FCA5A5 !important;
+    box-shadow: 0 4px 18px rgba(220, 38, 38, 0.65) !important;
+}
+[data-testid="stTabs"] [data-testid="stTab"]:nth-of-type(4)[aria-selected="true"] *,
+[data-testid="stTabs"] [data-testid="stTab"]:nth-child(4)[aria-selected="true"] *,
+[data-testid="stTab"][id="3"][aria-selected="true"] *,
+[role="tab"][id="3"][aria-selected="true"] * {
+    color: #FFFFFF !important;
+    font-weight: 900 !important;
+}
+</style>
+<img src="data:image/svg+xml;utf8,<svg></svg>" style="display:none;" onerror="
+(function(){
+    function runHighlight(){
+        const tabs = document.querySelectorAll('[data-testid=\\'stTab\\'], [role=\\'tab\\'], .react-aria-Tab, button[data-baseweb=\\'tab\\']');
+        tabs.forEach(t => {
+            if(t.textContent && (t.textContent.includes('성과 검증실') || t.textContent.includes('AI 성과'))){
+                t.classList.add('highlight-perf-tab');
+                const isSel = t.getAttribute('aria-selected') === 'true' || t.getAttribute('data-selected') === 'true';
+                t.style.setProperty('background', isSel ? 'linear-gradient(135deg, #DC2626 0%, #991B1B 100%)' : 'linear-gradient(135deg, rgba(239, 68, 68, 0.18) 0%, rgba(220, 38, 38, 0.28) 100%)', 'important');
+                t.style.setProperty('border', isSel ? '2px solid #FCA5A5' : '2px solid #EF4444', 'important');
+                t.style.setProperty('border-radius', '8px 8px 0 0', 'important');
+                t.style.setProperty('box-shadow', '0 0 14px rgba(239, 68, 68, 0.55)', 'important');
+                t.style.setProperty('padding', '6px 16px', 'important');
+                t.querySelectorAll('*').forEach(c => {
+                    c.style.setProperty('color', isSel ? '#FFFFFF' : '#DC2626', 'important');
+                    c.style.setProperty('font-weight', '900', 'important');
+                    c.style.setProperty('font-size', '1.02rem', 'important');
+                });
+            }
+        });
+    }
+    runHighlight();
+    setTimeout(runHighlight, 100);
+    setTimeout(runHighlight, 500);
+    setTimeout(runHighlight, 1200);
+    setInterval(runHighlight, 800);
+})();
+"/>
+""")
+
 tab_ai, tab_rising, tab_new, tab_perf, tab_chart = st.tabs([
     "⭐ AI 오늘 추천주 (초보자 강추)",
     "🔥 실시간 급등 순위 (TOP 100)",
