@@ -45,10 +45,16 @@ try:
     )
     from src.market_calendar import (
         get_holiday_reason,
+        get_integrated_market_status,
         get_last_trading_day,
         get_market_session_status,
+        get_now_kst,
+        get_now_us,
         get_previous_trading_day,
+        get_us_market_session_status,
         is_trading_day,
+        is_us_dst_active,
+        is_us_trading_day,
     )
     from src.overseas_collector import (
         search_overseas_stock,
@@ -84,10 +90,16 @@ except ImportError:
     )
     from market_calendar import (
         get_holiday_reason,
+        get_integrated_market_status,
         get_last_trading_day,
         get_market_session_status,
+        get_now_kst,
+        get_now_us,
         get_previous_trading_day,
+        get_us_market_session_status,
         is_trading_day,
+        is_us_dst_active,
+        is_us_trading_day,
     )
     from overseas_collector import (
         search_overseas_stock,
@@ -403,7 +415,7 @@ if st.session_state["current_page"] == "dashboard":
             st.rerun()
 
         st.markdown("---")
-        now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        now_str = get_now_kst().strftime("%Y-%m-%d %H:%M:%S KST")
         st.caption(f"기준 시간: {now_str}")
 else:
     # 소개 페이지 기본 파라미터
@@ -2312,19 +2324,42 @@ with head_c2:
                 st.query_params.clear()
             st.rerun()
 
-# 📡 실시간 데이터 연동 상태 뱃지 & 주기 표시 (증시 캘린더 엔진 연동)
-market_status = get_market_session_status()
-m_badge_bg = market_status["badge_bg"] if not is_dark else ("#1E293B" if market_status["session_type"] != "live" else "#064E3B")
-m_badge_color = market_status["badge_color"] if not is_dark else ("#60A5FA" if market_status["session_type"] != "live" else "#4ADE80")
+# 📡 실시간 데이터 연동 상태 뱃지 (한국장 + 미국장 + 서머타임 실시간 통합 연동)
+integrated_market = get_integrated_market_status()
+krx_st = integrated_market["krx"]
+us_st = integrated_market["us"]
+
+krx_badge_bg = "#064E3B" if (is_dark and krx_st["is_open"]) else ("#1E293B" if is_dark else krx_st["badge_bg"])
+krx_badge_color = "#4ADE80" if (is_dark and krx_st["is_open"]) else krx_st["badge_color"]
+
+us_badge_bg = "#064E3B" if (is_dark and us_st["is_open"]) else ("#1E293B" if is_dark else us_st["badge_bg"])
+us_badge_color = "#4ADE80" if (is_dark and us_st["is_open"]) else us_st["badge_color"]
+
+banner_bg = "#0F172A" if is_dark else "#F8FAFC"
+banner_border = "#334155" if is_dark else "#CBD5E1"
 
 st.html(
-    f"""<div style="background:{m_badge_bg}; border:1.5px solid {market_status['badge_border']}; border-radius:10px; padding:10px 16px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-        <div>
-            <span style="font-weight:800; color:{m_badge_color}; font-size:0.95rem;">{market_status['title']}</span>
-            <span style="color:{'#94A3B8' if is_dark else '#64748B'}; font-size:0.85rem; margin-left:8px;">• {market_status['desc']}</span>
+    f"""<div style="background:{banner_bg}; border:1.5px solid {banner_border}; border-radius:12px; padding:12px 18px; margin-bottom:14px; box-shadow:0 3px 12px rgba(0,0,0,0.06);">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <div style="display:flex; align-items:center; flex-wrap:wrap; gap:10px;">
+                <div style="display:inline-flex; align-items:center; gap:6px; background:{krx_badge_bg}; padding:6px 12px; border-radius:8px; border:1.5px solid {krx_st['badge_border']};">
+                    <span style="font-size:1.05rem;">🇰🇷</span>
+                    <span style="font-weight:900; font-size:0.88rem; color:{krx_badge_color};">한국장: {krx_st['title']}</span>
+                </div>
+                <div style="display:inline-flex; align-items:center; gap:6px; background:{us_badge_bg}; padding:6px 12px; border-radius:8px; border:1.5px solid {us_st['badge_border']};">
+                    <span style="font-size:1.05rem;">🇺🇸</span>
+                    <span style="font-weight:900; font-size:0.88rem; color:{us_badge_color};">미국장: {us_st['title']}</span>
+                    <span style="background:{'#059669' if us_st['dst_active'] else '#2563EB'}; color:white; font-size:0.75rem; font-weight:700; padding:2px 7px; border-radius:4px; margin-left:3px;">{us_st['dst_badge']}</span>
+                </div>
+            </div>
+            <div style="font-size:0.82rem; color:{'#CBD5E1' if is_dark else '#475569'}; text-align:right; line-height:1.45;">
+                <div>⏰ <b>KST (한국):</b> <span style="font-weight:bold; color:{'#38BDF8' if is_dark else '#0284C7'};">{integrated_market['kst_full_str']}</span></div>
+                <div style="font-size:0.78rem; color:{'#94A3B8' if is_dark else '#64748B'};">🗽 <b>NY (미국동부):</b> {integrated_market['us_full_str']} (정규장 개장: 한국 {us_st['kst_open_str']})</div>
+            </div>
         </div>
-        <div style="font-size:0.82rem; color:{'#94A3B8' if is_dark else '#64748B'};">
-            📡 분석 기준: <b>{market_status['current_date_str']}</b> | 최종 갱신: <b>{datetime.datetime.now().strftime('%H:%M:%S')}</b>
+        <div style="margin-top:8px; padding-top:8px; border-top:1px dashed {'#334155' if is_dark else '#E2E8F0'}; font-size:0.82rem; color:{'#94A3B8' if is_dark else '#64748B'}; display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px;">
+            <div>• <b>국내 증시:</b> {krx_st['desc']}</div>
+            <div>• <b>해외 증시:</b> {us_st['desc']}</div>
         </div>
     </div>"""
 )
@@ -3035,13 +3070,17 @@ def render_performance_tab_fragment(is_dark_mode: bool):
 
     # 증시 휴일/휴장일 데이터 보정 안내 배너
     market_info = metrics.get("market_status") or get_market_session_status()
-    now_d = datetime.datetime.now().date()
+    now_d = get_now_kst().date()
     prev_trade_str = market_info.get("prev_trading_day", "")
     last_trade_str = market_info.get("last_trading_day", "")
 
     if "어제" in perf_period:
-        eval_date_display = f"직전 정규 개장일 {prev_trade_str} (금요일)" if now_d.weekday() == 0 else f"직전 정규 개장일 {prev_trade_str}"
-        banner_note = f"어제(일요일)는 증시가 열리지 않는 주말 휴장일이었습니다. 무변동(0%)으로 인한 적중률 왜곡을 원천 차단하기 위해 <b>실제 정규장이 열렸던 {eval_date_display} 실전 데이터</b>로 엄선 검증했습니다."
+        yest_d = now_d - datetime.timedelta(days=1)
+        if not is_trading_day(yest_d):
+            yest_reason = get_holiday_reason(yest_d) or "주말/공휴일"
+            banner_note = f"어제는 증시가 열리지 않는 {yest_reason}이었습니다. 무변동(0%)으로 인한 적중률 왜곡을 원천 차단하기 위해 <b>실제 정규장이 열렸던 직전 개장일({prev_trade_str}) 실전 데이터</b>로 엄선 검증했습니다."
+        else:
+            banner_note = f"직전 정규 개장일({prev_trade_str}) 실전 데이터를 기준으로 AI 추천 적중률 및 수익률을 투명하게 검증했습니다."
     elif "지난주" in perf_period:
         banner_note = "주말 및 공휴일 비거래일을 제외한 <b>최근 5거래일 정규 개장일 데이터</b>를 기준으로 엄선 합산했습니다."
     elif "지난달" in perf_period:

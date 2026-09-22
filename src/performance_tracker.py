@@ -7,6 +7,7 @@ from src.market_calendar import (
     get_holiday_reason,
     get_last_trading_day,
     get_market_session_status,
+    get_now_kst,
     get_previous_trading_day,
     get_trading_days_range,
     is_trading_day,
@@ -28,7 +29,7 @@ def seed_initial_history(force_refresh: bool = True):
     주말(토/일) 및 법정 공휴일 등 증시 휴장일은 자동으로 건너뛰어 데이터 왜곡을 100% 방지합니다.
     """
     _ensure_data_dir()
-    now = datetime.now()
+    now = get_now_kst()
 
     # 정규 개장일 기준 날짜 역산
     if is_trading_day(now) and now.time() >= time(15, 30):
@@ -378,7 +379,7 @@ def log_new_predictions(candidates: List[Dict[str, Any]], strategy: str = "스�
     history = load_prediction_history()
     existing_keys = {f"{r.get('date')}_{r.get('code')}" for r in history}
 
-    now = datetime.now()
+    now = get_now_kst()
     today_str = now.strftime("%Y-%m-%d")
     is_open = is_trading_day(now)
     h_reason = get_holiday_reason(now) if not is_open else None
