@@ -200,46 +200,143 @@ def fetch_top_volume_stocks(limit: int = 100, market: str = "ALL") -> pd.DataFra
         return pd.DataFrame()
 
 
+def parse_korean_amount_to_eok(val_str: str) -> float:
+    """'3조 683억', '1,420억', '85억' 등의 한국어 금액 표기를 억원 단위의 float로 변환"""
+    if not val_str:
+        return 0.0
+    s = str(val_str).replace(",", "").strip()
+    total_eok = 0.0
+    if "조" in s:
+        parts = s.split("조")
+        jo_part = parts[0].strip()
+        try:
+            total_eok += float(jo_part) * 10000.0
+        except ValueError:
+            pass
+        if len(parts) > 1 and "억" in parts[1]:
+            eok_part = parts[1].replace("억", "").strip()
+            try:
+                total_eok += float(eok_part)
+            except ValueError:
+                pass
+        return round(total_eok, 1)
+    elif "억" in s:
+        eok_str = s.replace("억", "").strip()
+        try:
+            return round(float(eok_str), 1)
+        except ValueError:
+            return 0.0
+    elif "만" in s:
+        man_str = s.replace("만", "").strip()
+        try:
+            return round(float(man_str) / 10000.0, 2)
+        except ValueError:
+            return 0.0
+    try:
+        return round(float(s) / 100_000_000, 1)
+    except ValueError:
+        return 0.0
+
+
 def fetch_stock_realtime_detail(code: str) -> Optional[Dict]:
-    """종목의 실시간 요약 정보를 반환합니다."""
-    # 1. 네이버 모바일 증권 API 조회
+    """종목의 실시간 상세 요약 정보(실시간 거래대금, 거래량, 시총, 시고저, 52주 최고/최저, 외인소진율, PER/PBR)를 반환합니다."""
+    # 1. 네이버 모바일 증권 통합 API 조회 (거래대금, 거래량, 시고저, 52주고저, 밸류에이션 완비)
+    try:
+        url_int = f"https://m.stock.naver.com/api/stock/{code}/integration"
+        r_int = requests.get(url_int, headers=HEADERS, timeout=3.5)
+        if r_int.status_code == 200:
+            d_int = r_int.json()
+            total_infos = d_int.get("totalInfos", [])
+            info_dict = {item.get("code"): item.get("value", "") for item in total_infos}
+
+            # 기본 가격 정보 조회
+            url_basic = f"https://m.stock.naver.com/api/stock/{code}/basic"
+            r_basic = requests.get(url_basic, headers=HEADERS, timeout=3.0)
+            d_basic = r_basic.json() if r_basic.status_code == 200 else {}
+
+            stock_name = str(d_int.get("stockName") or d_basic.get("stockName", ""))
+            close_p_str = str(d_basic.get("closePrice", "0")).replace(",", "")
+            curr_price = int(float(close_p_str)) if close_p_str and close_p_str != "0" else 0
+            if curr_price == 0 and "lastClosePrice" in info_dict:
+                curr_price = int(float(str(info_dict.get("lastClosePrice", "0")).replace(",", "")))
+
+            change_rate_str = str(d_basic.get("fluctuationsRatio", "0.0")).replace(",", "")
+            change_rate = float(change_rate_str) if change_rate_str else 0.0
+
+            trade_val_str = info_dict.get("accumulatedTradingValue", "")
+            trade_val_eok = parse_korean_amount_to_eok(trade_val_str)
+
+            trade_vol_str = info_dict.get("accumulatedTradingVolume", "")
+            trade_vol_int = int(float(str(trade_vol_str).replace(",", ""))) if trade_vol_str else 0
+
+            marcap_str = info_dict.get("marketValue", "")
+            marcap_eok = parse_korean_amount_to_eok(marcap_str)
+
+            open_p_str = info_dict.get("openPrice", "")
+            high_p_str = info_dict.get("highPrice", "")
+            low_p_str = info_dict.get("lowPrice", "")
+
+            return {
+                "code": code,
+                "name": stock_name,
+                "price": curr_price,
+                "change_rate": change_rate,
+                "trade_value_str": trade_val_str if trade_val_str else f"{trade_val_eok:,.1f}억",
+                "trade_value_억": trade_val_eok,
+                "trade_volume_str": f"{trade_vol_str}주" if trade_vol_str else "0주",
+                "trade_volume": trade_vol_int,
+                "marcap_str": marcap_str if marcap_str else f"{marcap_eok:,.1f}억",
+                "marcap_억": marcap_eok,
+                "open_price": int(float(str(open_p_str).replace(",", ""))) if open_p_str else curr_price,
+                "high_price": int(float(str(high_p_str).replace(",", ""))) if high_p_str else curr_price,
+                "low_price": int(float(str(low_p_str).replace(",", ""))) if low_p_str else curr_price,
+                "last_close": int(float(str(info_dict.get("lastClosePrice", "0")).replace(",", ""))) if info_dict.get("lastClosePrice") else curr_price,
+                "high_52w": info_dict.get("highPriceOf52Weeks", "-"),
+                "low_52w": info_dict.get("lowPriceOf52Weeks", "-"),
+                "foreign_ratio": info_dict.get("foreignRate", "-"),
+                "per": info_dict.get("per", "-"),
+                "pbr": info_dict.get("pbr", "-"),
+                "eps": info_dict.get("eps", "-"),
+                "bps": info_dict.get("bps", "-"),
+                "dividend_yield": info_dict.get("dividendYieldRatio", "-"),
+                "market_status": d_basic.get("marketStatus", "OPEN"),
+            }
+    except Exception:
+        pass
+
+    # 2. 기존 basic 폴백
     try:
         url = f"https://m.stock.naver.com/api/stock/{code}/basic"
         r = requests.get(url, headers=HEADERS, timeout=4)
         if r.status_code == 200:
             d = r.json()
+            curr_p = int(float(str(d.get("closePrice", "0")).replace(",", "")))
             return {
                 "code": code,
                 "name": str(d.get("stockName", "")),
-                "price": int(float(str(d.get("closePrice", "0")).replace(",", ""))),
+                "price": curr_p,
                 "change_rate": float(str(d.get("fluctuationsRatio", "0.0")).replace(",", "")),
-                "marcap_억": round(float(str(d.get("marketValue", "0")).replace(",", "")) / 100_000_000, 1),
-                "trade_value_억": round(float(str(d.get("accumulatedTradingValue", "0")).replace(",", "")) / 100_000_000, 1),
+                "trade_value_str": "조회 중",
+                "trade_value_억": 0.0,
+                "trade_volume_str": "조회 중",
+                "trade_volume": 0,
+                "marcap_str": "조회 중",
+                "marcap_억": 0.0,
+                "open_price": curr_p,
+                "high_price": curr_p,
+                "low_price": curr_p,
+                "last_close": curr_p,
+                "high_52w": "-",
+                "low_52w": "-",
+                "foreign_ratio": "-",
+                "per": "-",
+                "pbr": "-",
+                "eps": "-",
+                "bps": "-",
+                "dividend_yield": "-",
+                "market_status": d.get("marketStatus", "OPEN"),
             }
     except Exception:
         pass
-
-    # 2. 백업: 네이버 종목 차트 API (초고속 0.1초)
-    try:
-        url2 = f"https://api.stock.naver.com/chart/domestic/item/{code}?periodType=day"
-        r2 = requests.get(url2, headers=HEADERS, timeout=2.0)
-        if r2.status_code == 200:
-            d2 = r2.json()
-            p_infos = d2.get("priceInfos", [])
-            last_p = p_infos[-1] if p_infos else {}
-            curr_p = int(last_p.get("currentPrice", 0))
-            open_p = float(d2.get("openPrice", curr_p) or curr_p)
-            last_close = float(d2.get("lastClosePrice", curr_p) or curr_p)
-            chg_rate = round(((curr_p - last_close) / last_close * 100), 2) if last_close > 0 else 0.0
-            return {
-                "code": code,
-                "name": code,
-                "price": curr_p,
-                "change_rate": chg_rate,
-                "marcap_억": 0.0,
-                "trade_value_억": 0.0,
-            }
-    except Exception as e:
-        print(f"[Error] fetch_stock_realtime_detail({code}): {e}")
-        return None
     return None
+

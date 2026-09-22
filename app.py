@@ -74,6 +74,7 @@ try:
         render_doctor_briefing_card_html,
         render_vital_signs_html,
         render_prescriptions_html,
+        render_essential_trading_metrics_html,
     )
 except ImportError:
     from krx_collector import (
@@ -129,7 +130,9 @@ except ImportError:
         render_doctor_briefing_card_html,
         render_vital_signs_html,
         render_prescriptions_html,
+        render_essential_trading_metrics_html,
     )
+
 
 
 
@@ -1929,7 +1932,7 @@ def render_stock_detailed_section(code: str, name: str, is_dark: bool, in_modal:
         mkt_name = detail.get("market", "NASDAQ") if detail else "NASDAQ"
         marcap_usd = float(detail.get("marcap_usd", 0.0)) if detail else 0.0
         marcap_val = float(detail.get("marcap_억", 0.0)) if detail else 0.0
-        trade_val = 0.0
+        trade_val = float(detail.get("trade_value_억", 0.0)) if detail else 0.0
     else:
         curr_price = int(detail.get("price", ohlcv["close"].iloc[-1])) if detail else int(ohlcv["close"].iloc[-1])
         change_rate = float(detail.get("change_rate", 0.0)) if detail else float(signals.get("change_rate", 0.0))
@@ -1969,10 +1972,15 @@ def render_stock_detailed_section(code: str, name: str, is_dark: bool, in_modal:
     # 1. 상단 요약 헤더 & 이평선 상태
     if is_ovs:
         marcap_str = f"시총: ${marcap_usd/1e9:.1f}B (약 {marcap_val:,}억)" if marcap_usd > 0 else "미국 나스닥/NYSE 대표주"
-        trade_meta = f"<span style='margin-left:8px; font-size:0.85rem; color:#64748B;'>{marcap_str} · 환율: {usd_rate:,.1f}원/USD</span>"
+        tv_str = detail.get("trade_value_str", "") if detail else ""
+        tv_badge = f"<span style='background:{'#374151' if is_dark else '#FEE2E2'}; color:{'#FCA5A5' if is_dark else '#DC2626'}; padding:2px 8px; border-radius:6px; font-weight:800; font-size:0.85rem; margin-right:6px;'>💰 실시간 대금: {tv_str}</span>" if tv_str else ""
+        trade_meta = f"<span style='margin-left:8px; font-size:0.85rem; color:#64748B;'>{tv_badge}{marcap_str} · 환율: {usd_rate:,.1f}원/USD</span>"
         price_tag = f"${curr_price_usd:.2f} <span style='font-size:1.05rem; color:{'#CBD5E1' if is_dark else '#64748B'};'>(약 {curr_price_krw:,}원)</span>"
     else:
-        trade_meta = f"<span style='margin-left:8px; font-size:0.85rem; color:#64748B;'>거래대금: {trade_val:,.1f}억 / 시총: {marcap_val:,.1f}억</span>" if trade_val > 0 else ""
+        tv_str = detail.get("trade_value_str") if (detail and detail.get("trade_value_str")) else (f"{trade_val:,.0f}억" if trade_val > 0 else "")
+        tv_badge = f"<span style='background:{'#374151' if is_dark else '#FEE2E2'}; color:{'#FCA5A5' if is_dark else '#DC2626'}; padding:2px 8px; border-radius:6px; font-weight:800; font-size:0.85rem; margin-right:6px;'>💰 실시간 대금: {tv_str}</span>" if tv_str else ""
+        mc_str = f"시총: {marcap_val:,.0f}억" if marcap_val > 0 else ""
+        trade_meta = f"<span style='margin-left:8px; font-size:0.85rem; color:#64748B;'>{tv_badge}{mc_str}</span>"
         price_tag = f"{curr_price:,}원"
 
     st.html(
@@ -2021,6 +2029,10 @@ def render_stock_detailed_section(code: str, name: str, is_dark: bool, in_modal:
             st.metric("20일선 (생명선/추세)", f"{sma20:,.0f}원", f"이격도 {d20:+.1f}%", delta_color="normal" if d20 > 0 else "inverse")
         with m4:
             st.metric("60일선 (중기 수급)", f"{sma60:,.0f}원", f"이격도 {d60:+.1f}%", delta_color="normal" if d60 > 0 else "inverse")
+
+    # 2-1. 투자자 8대 필수 핵심 실시간 지표 보드 (거래대금, 거래량, 시고저 밴드, 시총, 52주 고저, 외인소진율, PER/PBR, EPS/배당)
+    if detail and not key_prefix.startswith("tab4_diag"):
+        st.html(render_essential_trading_metrics_html(detail, is_dark=is_dark, is_ovs=is_ovs, usd_rate=usd_rate))
 
     # 2-2. 캔들 차트 주기 선택 (1분, 5분, 1시간, 24시간, 1주일, 1달, 1년)
     tf_c1, tf_c2 = st.columns([1.5, 4.5])
@@ -3502,6 +3514,7 @@ with tab_chart:
             vitals_data=vitals_data,
             is_ovs=is_ovs,
             usd_rate=usd_rate,
+            detail=detail,
         )
 
         prescriptions = generate_prescriptions(
@@ -3525,6 +3538,7 @@ with tab_chart:
             is_ovs=is_ovs,
             usd_rate=usd_rate,
             is_dark=is_dark,
+            detail=detail,
         ))
 
         # 6-2. AI 전담 주치의 1초 심층 임상 소견서 (자연어 심층 브리핑)
@@ -3537,10 +3551,14 @@ with tab_chart:
             is_dark=is_dark,
         ))
 
-        # 6-3. 5대 핵심 생체 바이탈 사인 정밀 검진표
+        # 6-3. 투자자 8대 필수 핵심 실시간 지표 보드 (실시간 거래대금, 거래량, 시고저 밴드, 시총, 52주 고저, 외인소진율, PER/PBR, EPS/배당)
+        if detail:
+            st.html(render_essential_trading_metrics_html(detail, is_dark=is_dark, is_ovs=is_ovs, usd_rate=usd_rate))
+
+        # 6-4. 5대 핵심 생체 바이탈 사인 정밀 검진표
         st.html(render_vital_signs_html(vitals_data, is_dark=is_dark))
 
-        # 6-4. AI 주치의 실전 맞춤 처방전 (4단 그리드)
+        # 6-5. AI 주치의 실전 맞춤 처방전 (4단 그리드)
         st.html(render_prescriptions_html(prescriptions, is_dark=is_dark))
 
         # 7. 🔬 [정밀 엑스레이 캔들 영상 & 큰손 수급 해부도]

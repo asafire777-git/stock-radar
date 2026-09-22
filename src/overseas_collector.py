@@ -218,11 +218,59 @@ def fetch_overseas_stock_detail(symbol: str, reuters_code: str = "") -> Dict[str
                     mkt_name = data.get("stockExchangeType", {}).get("name", "NASDAQ")
                     name = data.get("stockName", sym)
                     name_eng = data.get("stockNameEng", sym)
-                    marcap_usd = float(str(data.get("totalMarketValue", "0")).replace(",", "")) if data.get("totalMarketValue") else 0.0
+                    marcap_usd = float(data.get("marketValueFullRaw") or data.get("totalMarketValue") or 0.0)
+                    marcap_krw_raw = float(data.get("marketValueKrwRaw") or 0.0)
+                    marcap_krw_억 = round(marcap_krw_raw / 100_000_000, 1) if marcap_krw_raw > 0 else (int((marcap_usd * usd_rate) / 100_000_000) if marcap_usd > 0 else 0)
+                    if marcap_usd >= 1e12:
+                        marcap_str = f"${marcap_usd/1e12:.2f}T (약 {marcap_krw_억/10000:.1f}조)"
+                    elif marcap_usd >= 1e9:
+                        marcap_str = f"${marcap_usd/1e9:.1f}B (약 {int(marcap_krw_억):,}억)"
+                    else:
+                        marcap_str = f"${marcap_usd/1e6:.1f}M"
 
-                    # 원화 환산
-                    krw_price = int(close_p * usd_rate)
-                    marcap_krw_억 = int((marcap_usd * usd_rate) / 100_000_000) if marcap_usd > 0 else 0
+                    # 실시간 거래량 및 거래대금 (Naver raw 우선, Yahoo 보강)
+                    accum_vol = int(data.get("accumulatedTradingVolumeRaw") or 0)
+                    accum_val_usd = float(data.get("accumulatedTradingValueRaw") or 0.0)
+                    accum_val_krw = float(data.get("accumulatedTradingValueKrwRaw") or 0.0)
+                    trade_val_eok = round(accum_val_krw / 100_000_000, 1) if accum_val_krw > 0 else round((accum_val_usd * usd_rate) / 100_000_000, 1)
+
+                    if accum_val_usd >= 1e9:
+                        trade_val_str = f"${accum_val_usd/1e9:.2f}B (약 {int(trade_val_eok):,}억)"
+                    elif accum_val_usd >= 1e6:
+                        trade_val_str = f"${accum_val_usd/1e6:.1f}M (약 {int(trade_val_eok):,}억)"
+                    elif trade_val_eok > 0:
+                        trade_val_str = f"{int(trade_val_eok):,}억"
+                    else:
+                        trade_val_str = "조회 중"
+
+                    trade_vol_str = f"{accum_vol:,}주" if accum_vol > 0 else "조회 중"
+                    high_p = float(data.get("highPriceRaw") or close_p)
+                    low_p = float(data.get("lowPriceRaw") or close_p)
+                    open_p = float(data.get("openPriceRaw") or close_p)
+                    high_52w = "-"
+                    low_52w = "-"
+
+                    try:
+                        y_url = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}?range=1d&interval=1d"
+                        y_resp = requests.get(y_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=2.0)
+                        if y_resp.status_code == 200:
+                            y_meta = y_resp.json()["chart"]["result"][0].get("meta", {})
+                            if accum_vol == 0:
+                                y_vol = int(y_meta.get("regularMarketVolume", 0) or 0)
+                                if y_vol > 0:
+                                    accum_vol = y_vol
+                                    trade_vol_str = f"{accum_vol:,}주"
+                                    y_val_usd = close_p * accum_vol
+                                    trade_val_eok = round((y_val_usd * usd_rate) / 100_000_000, 1)
+                                    trade_val_str = f"${y_val_usd/1e9:.2f}B (약 {int(trade_val_eok):,}억)" if y_val_usd >= 1e9 else f"${y_val_usd/1e6:.1f}M"
+                            h52 = y_meta.get("fiftyTwoWeekHigh")
+                            l52 = y_meta.get("fiftyTwoWeekLow")
+                            if h52:
+                                high_52w = f"${float(h52):.2f}"
+                            if l52:
+                                low_52w = f"${float(l52):.2f}"
+                    except Exception:
+                        pass
 
                     return {
                         "code": sym,
@@ -234,8 +282,25 @@ def fetch_overseas_stock_detail(symbol: str, reuters_code: str = "") -> Dict[str
                         "price_krw": krw_price,
                         "change_price": change_p,
                         "change_rate": ratio,
+                        "trade_value_str": trade_val_str,
+                        "trade_value_억": trade_val_eok,
+                        "trade_volume_str": trade_vol_str,
+                        "trade_volume": trade_vol,
                         "marcap_usd": marcap_usd,
+                        "marcap_str": marcap_str,
                         "marcap_억": marcap_krw_억,
+                        "open_price": close_p,
+                        "high_price": high_p,
+                        "low_price": low_p,
+                        "last_close": close_p,
+                        "high_52w": high_52w,
+                        "low_52w": low_52w,
+                        "foreign_ratio": "100.0%",
+                        "per": "-",
+                        "pbr": "-",
+                        "eps": "-",
+                        "bps": "-",
+                        "dividend_yield": "-",
                         "usd_rate": usd_rate,
                         "is_overseas": True,
                     }
@@ -253,6 +318,15 @@ def fetch_overseas_stock_detail(symbol: str, reuters_code: str = "") -> Dict[str
             prev_p = float(meta.get("chartPreviousClose", curr_p))
             ratio = round(((curr_p - prev_p) / prev_p * 100), 2) if prev_p > 0 else 0.0
 
+            trade_vol = int(meta.get("regularMarketVolume", 0) or 0)
+            trade_vol_str = f"{trade_vol:,}주" if trade_vol > 0 else "0주"
+            val_usd = curr_p * trade_vol
+            trade_val_eok = round((val_usd * usd_rate) / 100_000_000, 1)
+            trade_val_str = f"${val_usd/1e9:.2f}B (약 {int(trade_val_eok):,}억)" if val_usd >= 1e9 else f"${val_usd/1e6:.1f}M"
+
+            h52 = meta.get("fiftyTwoWeekHigh")
+            l52 = meta.get("fiftyTwoWeekLow")
+
             return {
                 "code": sym,
                 "reuters_code": f"{sym}.O",
@@ -263,8 +337,25 @@ def fetch_overseas_stock_detail(symbol: str, reuters_code: str = "") -> Dict[str
                 "price_krw": int(curr_p * usd_rate),
                 "change_price": round(curr_p - prev_p, 2),
                 "change_rate": ratio,
+                "trade_value_str": trade_val_str,
+                "trade_value_억": trade_val_eok,
+                "trade_volume_str": trade_vol_str,
+                "trade_volume": trade_vol,
                 "marcap_usd": 0,
+                "marcap_str": "미국 대표 기업",
                 "marcap_억": 0,
+                "open_price": curr_p,
+                "high_price": float(meta.get("regularMarketDayHigh", curr_p) or curr_p),
+                "low_price": float(meta.get("regularMarketDayLow", curr_p) or curr_p),
+                "last_close": prev_p,
+                "high_52w": f"${float(h52):.2f}" if h52 else "-",
+                "low_52w": f"${float(l52):.2f}" if l52 else "-",
+                "foreign_ratio": "100.0%",
+                "per": "-",
+                "pbr": "-",
+                "eps": "-",
+                "bps": "-",
+                "dividend_yield": "-",
                 "usd_rate": usd_rate,
                 "is_overseas": True,
             }

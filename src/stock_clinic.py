@@ -292,6 +292,7 @@ def generate_doctor_clinical_briefing(
     vitals_data: Dict[str, Any],
     is_ovs: bool = False,
     usd_rate: float = 1350.0,
+    detail: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, str]:
     """
     전문 AI 주치의의 4단 심층 임상 소견서 (자연어 심층 브리핑) 생성
@@ -317,9 +318,17 @@ def generate_doctor_clinical_briefing(
         f"중기 체력(20일선)이 상호 유기적으로 지지 매수세를 형성하고 있습니다."
     )
 
-    # 2. 혈류 및 큰손 수급 순환도
+    # 2. 혈류 및 큰손 수급 순환도 (실시간 거래대금 연동)
+    trade_val_mention = ""
+    if detail:
+        t_val = detail.get("trade_value_str")
+        t_vol = detail.get("trade_volume_str")
+        if t_val and t_val != "조회 중":
+            vol_phrase = f"(당일 누적 거래량 {t_vol})" if t_vol and t_vol != "조회 중" else ""
+            trade_val_mention = f"현재 당일 실시간 거래대금은 <b>약 {t_val}</b>{vol_phrase}이 터지며 시장 참여자들의 중심 수급이 집중되고 있습니다. "
+
     vital_p2 = (
-        f"수급 혈류를 해부해 보면, <b>{vitals['v2_money']['title']}</b>이 명확히 관측됩니다. "
+        f"{trade_val_mention}수급 혈류를 해부해 보면, <b>{vitals['v2_money']['title']}</b>이 명확히 관측됩니다. "
         f"{vitals['v2_money']['desc']} 이는 단순 개미의 추격매수가 아니라, 주포 메이저의 계획된 포트폴리오 비중 관리 및 "
         f"물량 매집 패킷이 확인된 것으로 체력 바닥을 단단하게 다져주는 핵심 근거입니다."
     )
@@ -457,6 +466,7 @@ def render_health_summary_card_html(
     is_ovs: bool = False,
     usd_rate: float = 1350.0,
     is_dark: bool = False,
+    detail: Optional[Dict[str, Any]] = None,
 ) -> str:
     """종목의 종합 건강검진 결과표 카드"""
     bg = "#151A23" if is_dark else "#FFFFFF"
@@ -470,13 +480,24 @@ def render_health_summary_card_html(
     vitals = vitals_data["vitals"]
     v5_desc = vitals["v5_growth"]["title"]
 
+    t_val_str = detail.get("trade_value_str") if detail else None
+    t_vol_str = detail.get("trade_volume_str") if detail else None
+    m_cap_str = detail.get("marcap_str") if detail else None
+
     if is_ovs:
         price_krw = int(price * usd_rate)
         price_display = f"${price:.2f} <span style='font-size:1.05rem; color:#64748B;'>(약 {price_krw:,}원)</span>"
-        trade_meta = f"<span style='font-size:0.85rem; color:#64748B;'>환율: {usd_rate:,.1f}원/USD</span>"
+        val_badge = f"<span style='background:#DC2626; color:white; font-size:0.82rem; font-weight:bold; padding:3px 8px; border-radius:6px; margin-left:8px;'>💰 실시간 대금 {t_val_str}</span>" if t_val_str and t_val_str != "조회 중" else ""
+        vol_text = f" · 📊 거래량 {t_vol_str}" if t_vol_str and t_vol_str != "조회 중" else ""
+        cap_text = f" · 🏛️ 시총 {m_cap_str}" if m_cap_str and m_cap_str != "조회 중" else ""
+        trade_meta = f"<span style='font-size:0.85rem; color:#64748B;'>{val_badge}{vol_text}{cap_text} · 환율: {usd_rate:,.1f}원/USD</span>"
     else:
         price_display = f"{int(price):,}원"
-        trade_meta = f"<span style='font-size:0.85rem; color:#64748B;'>거래대금: {trade_val:,.1f}억 · 시총: {marcap_val:,.1f}억</span>" if trade_val > 0 else ""
+        val_display = t_val_str if t_val_str and t_val_str != "조회 중" else (f"{trade_val:,.1f}억" if trade_val > 0 else "")
+        val_badge = f"<span style='background:#DC2626; color:white; font-size:0.82rem; font-weight:bold; padding:3px 8px; border-radius:6px; margin-left:8px;'>💰 실시간 대금 {val_display}</span>" if val_display else ""
+        vol_text = f" · 📊 거래량 {t_vol_str}" if t_vol_str and t_vol_str != "조회 중" else ""
+        cap_text = f" · 🏛️ 시총 {m_cap_str}" if m_cap_str and m_cap_str != "조회 중" else (f" · 시총 {marcap_val:,.1f}억" if marcap_val > 0 else "")
+        trade_meta = f"<span style='font-size:0.85rem; color:#64748B;'>{val_badge}{vol_text}{cap_text}</span>"
 
     change_color = "#EF4444" if change_rate > 0 else "#3B82F6"
 
@@ -675,4 +696,142 @@ def render_prescriptions_html(prescriptions: List[Dict[str, str]], is_dark: bool
 
     html_parts.append("</div></div>")
     return "".join(html_parts)
+
+
+def render_essential_trading_metrics_html(
+    detail: Dict[str, Any],
+    is_dark: bool = False,
+    is_ovs: bool = False,
+    usd_rate: float = 1350.0,
+) -> str:
+    """주식 투자자들이 가장 많이 보는 핵심 지표 8종 보드 (실시간 거래대금, 거래량, 시고저, 시총, 52주고저, 외인소진율, PER/PBR)"""
+    bg = "#151A23" if is_dark else "#FFFFFF"
+    border = "#334155" if is_dark else "#E2E8F0"
+    card_bg = "#1E293B" if is_dark else "#F8FAFC"
+    card_border = "#334155" if is_dark else "#E2E8F0"
+    text_color = "#F8FAFC" if is_dark else "#0F172A"
+    sub_color = "#94A3B8" if is_dark else "#64748B"
+
+    # 값 추출
+    trade_val_str = detail.get("trade_value_str") or (f"{detail.get('trade_value_억', 0):,.1f}억" if detail.get("trade_value_억") else "조회 중")
+    trade_vol_str = detail.get("trade_volume_str") or (f"{detail.get('trade_volume', 0):,}주" if detail.get("trade_volume") else "조회 중")
+    marcap_str = detail.get("marcap_str") or (f"{detail.get('marcap_억', 0):,.1f}억" if detail.get("marcap_억") else "조회 중")
+
+    curr_p = detail.get("price", 0)
+    high_p = detail.get("high_price", curr_p)
+    low_p = detail.get("low_price", curr_p)
+    open_p = detail.get("open_price", curr_p)
+
+    if is_ovs:
+        high_str = f"${float(high_p):.2f}"
+        low_str = f"${float(low_p):.2f}"
+        open_str = f"${float(open_p):.2f}"
+        val_sub = "미국 거래소 실시간 체결 대금"
+        vol_sub = "나스닥/NYSE 정규 거래량"
+        marcap_sub = "글로벌 테크 대표주"
+        foreign_label = "글로벌 비중"
+        foreign_val = "100.0%"
+    else:
+        high_str = f"{int(high_p):,}원"
+        low_str = f"{int(low_p):,}원"
+        open_str = f"{int(open_p):,}원"
+        val_sub = "당일 정규장 누적 거래대금"
+        vol_sub = "체결 회전율 활성"
+        marcap_sub = detail.get("market", "KRX 정규상장")
+        foreign_label = "외인 소진율"
+        foreign_val = str(detail.get("foreign_ratio", "-"))
+
+    high_52w = str(detail.get("high_52w", "-"))
+    low_52w = str(detail.get("low_52w", "-"))
+    per = str(detail.get("per", "-"))
+    pbr = str(detail.get("pbr", "-"))
+    eps = str(detail.get("eps", "-"))
+    div_yield = str(detail.get("dividend_yield", "-"))
+
+    return f"""<div style="background:{bg}; border:1.5px solid {border}; border-radius:12px; padding:16px 20px; margin-bottom:14px; box-shadow:0 2px 10px rgba(0,0,0,0.04);">
+        <div style="font-size:0.95rem; font-weight:800; color:{'#38BDF8' if is_dark else '#2563EB'}; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
+            <div style="display:flex; align-items:center; gap:6px;">
+                <span>⚡</span>
+                <span>실시간 시장 거래 데이터 & 실전 투자자 필수 지표 보드</span>
+            </div>
+            <span style="font-size:0.8rem; color:{sub_color}; font-weight:600;">
+                실시간 호가·거래대금·체결량 패킷 즉시 반영
+            </span>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:10px;">
+            <!-- 1. 당일 실시간 거래대금 (핵심!) -->
+            <div style="background:{card_bg}; border:1.5px solid {'#EF4444' if is_dark else '#FCA5A5'}; border-radius:8px; padding:10px 14px;">
+                <div style="font-size:0.78rem; color:#EF4444; font-weight:800;">💰 실시간 거래대금 (중심 수급)</div>
+                <div style="font-size:1.18rem; font-weight:900; color:{'#F87171' if is_dark else '#DC2626'}; margin-top:2px;">
+                    {trade_val_str}
+                </div>
+                <div style="font-size:0.75rem; color:{sub_color};">{val_sub}</div>
+            </div>
+
+            <!-- 2. 실시간 거래량 -->
+            <div style="background:{card_bg}; border:1px solid {card_border}; border-radius:8px; padding:10px 14px;">
+                <div style="font-size:0.78rem; color:{sub_color}; font-weight:700;">📊 당일 누적 거래량</div>
+                <div style="font-size:1.15rem; font-weight:900; color:{text_color}; margin-top:2px;">
+                    {trade_vol_str}
+                </div>
+                <div style="font-size:0.75rem; color:{sub_color};">{vol_sub}</div>
+            </div>
+
+            <!-- 3. 당일 시고저 변동 밴드 -->
+            <div style="background:{card_bg}; border:1px solid {card_border}; border-radius:8px; padding:10px 14px;">
+                <div style="font-size:0.78rem; color:{sub_color}; font-weight:700;">🎯 당일 시가 / 고가 / 저가</div>
+                <div style="font-size:0.86rem; font-weight:800; color:{'#CBD5E1' if is_dark else '#334155'}; margin-top:3px; line-height:1.45;">
+                    • 고가: <span style="color:#EF4444;">{high_str}</span><br/>
+                    • 저가: <span style="color:#3B82F6;">{low_str}</span><br/>
+                    • 시가: <span>{open_str}</span>
+                </div>
+            </div>
+
+            <!-- 4. 시가총액 -->
+            <div style="background:{card_bg}; border:1px solid {card_border}; border-radius:8px; padding:10px 14px;">
+                <div style="font-size:0.78rem; color:{sub_color}; font-weight:700;">🏛️ 시가총액 (기업 규모)</div>
+                <div style="font-size:1.15rem; font-weight:900; color:{'#60A5FA' if is_dark else '#2563EB'}; margin-top:2px;">
+                    {marcap_str}
+                </div>
+                <div style="font-size:0.75rem; color:{sub_color};">{marcap_sub}</div>
+            </div>
+
+            <!-- 5. 52주 최고가 / 최저가 -->
+            <div style="background:{card_bg}; border:1px solid {card_border}; border-radius:8px; padding:10px 14px;">
+                <div style="font-size:0.78rem; color:{sub_color}; font-weight:700;">📈 52주 최고 / 최저</div>
+                <div style="font-size:0.86rem; font-weight:800; color:{'#CBD5E1' if is_dark else '#334155'}; margin-top:3px; line-height:1.45;">
+                    • 최고: <span style="color:#EF4444;">{high_52w}</span><br/>
+                    • 최저: <span style="color:#3B82F6;">{low_52w}</span>
+                </div>
+            </div>
+
+            <!-- 6. 외국인 지분율 / 소진율 -->
+            <div style="background:{card_bg}; border:1px solid {card_border}; border-radius:8px; padding:10px 14px;">
+                <div style="font-size:0.78rem; color:{sub_color}; font-weight:700;">🌍 {foreign_label}</div>
+                <div style="font-size:1.15rem; font-weight:900; color:{'#34D399' if is_dark else '#059669'}; margin-top:2px;">
+                    {foreign_val}
+                </div>
+                <div style="font-size:0.75rem; color:{sub_color};">외인 메이저 지분율</div>
+            </div>
+
+            <!-- 7. 주요 밸류에이션 (PER / PBR) -->
+            <div style="background:{card_bg}; border:1px solid {card_border}; border-radius:8px; padding:10px 14px;">
+                <div style="font-size:0.78rem; color:{sub_color}; font-weight:700;">⚖️ 밸류에이션 (PER / PBR)</div>
+                <div style="font-size:0.86rem; font-weight:800; color:{'#CBD5E1' if is_dark else '#334155'}; margin-top:3px; line-height:1.45;">
+                    • PER: <span>{per}</span><br/>
+                    • PBR: <span>{pbr}</span>
+                </div>
+            </div>
+
+            <!-- 8. 수익성 & 배당 (EPS / 배당수익률) -->
+            <div style="background:{card_bg}; border:1px solid {card_border}; border-radius:8px; padding:10px 14px;">
+                <div style="font-size:0.78rem; color:{sub_color}; font-weight:700;">💵 수익성 & 배당</div>
+                <div style="font-size:0.86rem; font-weight:800; color:{'#CBD5E1' if is_dark else '#334155'}; margin-top:3px; line-height:1.45;">
+                    • EPS: <span>{eps}</span><br/>
+                    • 배당수익률: <span>{div_yield}</span>
+                </div>
+            </div>
+        </div>
+    </div>"""
+
 
