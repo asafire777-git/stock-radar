@@ -198,6 +198,11 @@ div[data-testid="stMain"] {
     filter: none !important;
     transition: none !important;
 }
+[data-testid="stStatusWidget"],
+div[data-testid="stStatusWidget"] {
+    display: none !important;
+    visibility: hidden !important;
+}
 </style>
 <script>
 (function() {
@@ -435,6 +440,9 @@ if st.session_state["current_page"] == "dashboard":
 
         if st.button("🔄 실시간 데이터 새로고침", use_container_width=True):
             st.cache_data.clear()
+            for k in list(st.session_state.keys()):
+                if str(k).startswith("cached_cand_"):
+                    del st.session_state[k]
             st.session_state["matrix_intro_transition"] = True
             st.rerun()
 
@@ -1663,17 +1671,33 @@ MAJOR_THEMES_DICT = {
 }
 
 
-def find_theme_by_query(query: str):
+def find_theme_by_query(query: str, code_map: dict = None):
     """업종/테마명 질의(2차전지, 반도체, 원전 등)에 해당하는 테마 정보 반환"""
     if not query:
         return None, None
-    q = query.strip().lower()
+    q = query.strip()
+    q_lower = q.lower()
+
+    # 1. 사용자가 입력한 검색어가 개별 종목명과 '완전 일치'하면 테마가 아닌 종목으로 최우선 처리
+    if code_map and q in code_map:
+        return None, None
+
+    # 2. 테마 키(예: '2차전지', '반도체', '바이오', '원전', '로봇', '방산', '조선', '뷰티', '엔터') 완전 일치
     for theme_key, info in MAJOR_THEMES_DICT.items():
-        if q == theme_key.lower():
+        if q_lower == theme_key.lower():
             return theme_key, info
+
+    # 3. 테마 키워드(예: '비만치료제', 'ADC', 'HBM', '자율주행' 등)와 검색어가 완전 일치할 때
+    for theme_key, info in MAJOR_THEMES_DICT.items():
         for kw in info.get("keywords", []):
-            if kw.lower() in q or q in kw.lower():
+            if q_lower == kw.lower():
                 return theme_key, info
+
+    # 4. 검색어가 테마명이나 대표 테마에 부합할 때 (예: '바이오제약', '미래차')
+    for theme_key, info in MAJOR_THEMES_DICT.items():
+        if theme_key.lower() in q_lower or q_lower in theme_key.lower():
+            return theme_key, info
+
     return None, None
 
 
@@ -1687,42 +1711,25 @@ def find_theme_of_stock(code: str, name: str = ""):
 
 
 def resolve_stock_search(query: str, all_stocks_df: pd.DataFrame, code_map: dict) -> list:
-    """사용자가 입력한 검색어로 국내(코스피/코스닥), 업종·테마, 해외(나스닥/미국) 주식을 지능적으로 통합 매칭"""
+    """사용자가 입력한 검색어로 국내(코스피/코스닥), 해외(나스닥/미국), 업종·테마 주식을 지능적으로 통합 매칭"""
     if not query:
         return []
     q = query.strip()
     q_up = q.upper()
     matches = []
+    seen_codes = set()
 
-    # 0. 업종/테마 키워드 매칭 우선 검사 (예: '2차전지', '반도체', '원전', '로봇' 등)
-    t_key, t_info = find_theme_by_query(q)
-    if t_info:
-        for s in t_info.get("stocks", []):
-            matches.append({
-                "code": s["code"],
-                "name": s["name"],
-                "market": s.get("market", "KRX"),
-                "is_overseas": False,
-                "role": s.get("role", ""),
-                "theme_key": t_key,
-                "theme_title": t_info.get("title", ""),
-            })
-        if matches:
-            return matches
+    def add_match(item):
+        c = item.get("code")
+        if c and c not in seen_codes:
+            seen_codes.add(c)
+            matches.append(item)
 
-    # 1. 해외/미국 주식 검색 우선 시도 (티커 or 한글명 완전 매칭)
-    try:
-        overseas_res = search_overseas_stock(q)
-    except Exception:
-        overseas_res = []
-
-    if overseas_res:
-        # 완전 일치하는 해외 주식이 있으면 최우선 배치
-        for o_item in overseas_res:
-            if o_item["code"] == q_up or o_item["name"] == q:
-                matches.append(o_item)
-
-    # 2. code_map 완전 일치 (국내)
+    # ----------------------------------------------------
+    # [1단계: 개별 종목 완전 일치 최우선 탐색]
+    # 사용자가 '삼천당제약', '삼성전자', 'TSLA' 등 특정 종목을 명확히 입력한 경우
+    # ----------------------------------------------------
+    # 1-1. 국내 종목명 code_map 완전 일치
     if q in code_map:
         c = code_map[q]
         name = q
@@ -1732,43 +1739,96 @@ def resolve_stock_search(query: str, all_stocks_df: pd.DataFrame, code_map: dict
             if not row.empty:
                 name = str(row["Name"].iloc[0])
                 mkt = str(row["Market"].iloc[0]) if "Market" in row.columns else "KRX"
-        matches.append({"code": c, "name": name, "market": mkt, "is_overseas": False})
+        add_match({"code": c, "name": name, "market": mkt, "is_overseas": False})
 
-    # 3. 6자리 국내 코드 일치
+    # 1-2. 6자리 국내 종목 코드 일치 (예: 000250)
     if all_stocks_df is not None and not all_stocks_df.empty:
         m_code = all_stocks_df[all_stocks_df["Code"] == q_up]
         if not m_code.empty:
             r = m_code.iloc[0]
-            matches.append({"code": r["Code"], "name": r["Name"], "market": r.get("Market", "KRX"), "is_overseas": False})
+            add_match({"code": r["Code"], "name": r["Name"], "market": r.get("Market", "KRX"), "is_overseas": False})
 
-        # 4. 국내 종목명 대소문자 무시 완전 일치
+        # 1-3. 국내 종목명 대소문자 무시 완전 일치
         m_name = all_stocks_df[all_stocks_df["Name"].str.upper() == q_up]
         if not m_name.empty:
             r = m_name.iloc[0]
-            matches.append({"code": r["Code"], "name": r["Name"], "market": r.get("Market", "KRX"), "is_overseas": False})
+            add_match({"code": r["Code"], "name": r["Name"], "market": r.get("Market", "KRX"), "is_overseas": False})
 
-    # 해외 주식 나머지 매칭 항목 추가
-    for o_item in overseas_res:
-        if not any(m["code"] == o_item["code"] for m in matches):
-            matches.append(o_item)
+    # 1-4. 해외/미국 주식 검색 (티커 or 한글명 완전 매칭)
+    try:
+        overseas_res = search_overseas_stock(q)
+    except Exception:
+        overseas_res = []
 
-    # 5. 국내 접두사/부분 일치
+    if overseas_res:
+        for o_item in overseas_res:
+            if o_item["code"] == q_up or o_item["name"] == q:
+                add_match(o_item)
+
+    # 만약 개별 종목 완전 일치 결과가 이미 확보되었다면, 그 종목을 #1 최우선 순위로 고정!
+    has_exact_stock = len(matches) > 0
+
+    # 1-5. 개별 종목이 특정 테마(예: 삼천당제약 -> 바이오)에 속해 있다면 같은 테마 대장주들을 연관 검색어로 함께 제공
+    if has_exact_stock:
+        t_key, t_info = find_theme_of_stock(matches[0]["code"], matches[0]["name"])
+        if t_info:
+            for s in t_info.get("stocks", []):
+                add_match({
+                    "code": s["code"],
+                    "name": s["name"],
+                    "market": s.get("market", "KRX"),
+                    "is_overseas": False,
+                    "role": s.get("role", ""),
+                    "theme_key": t_key,
+                    "theme_title": t_info.get("title", ""),
+                })
+
+    # ----------------------------------------------------
+    # [2단계: 접두사 일치 (Prefix match)]
+    # 예: '삼성' -> 삼성전자, 삼성SDI, 삼성물산 등
+    # ----------------------------------------------------
     if all_stocks_df is not None and not all_stocks_df.empty:
         m_pre = all_stocks_df[all_stocks_df["Name"].str.upper().str.startswith(q_up)]
         if not m_pre.empty:
             if "Amount" in m_pre.columns:
                 m_pre = m_pre.sort_values(by="Amount", ascending=False)
             for _, r in m_pre.head(8).iterrows():
-                if not any(m["code"] == r["Code"] for m in matches):
-                    matches.append({"code": r["Code"], "name": r["Name"], "market": r.get("Market", "KRX"), "is_overseas": False})
+                add_match({"code": r["Code"], "name": r["Name"], "market": r.get("Market", "KRX"), "is_overseas": False})
 
+    # ----------------------------------------------------
+    # [3단계: 업종/테마 키워드 매칭 (종목명 완전 일치가 아닐 때)]
+    # 예: '2차전지', '반도체', '원전', '로봇', '비만치료제', '바이오' 등
+    # ----------------------------------------------------
+    if not has_exact_stock:
+        t_key, t_info = find_theme_by_query(q, code_map)
+        if t_info:
+            for s in t_info.get("stocks", []):
+                add_match({
+                    "code": s["code"],
+                    "name": s["name"],
+                    "market": s.get("market", "KRX"),
+                    "is_overseas": False,
+                    "role": s.get("role", ""),
+                    "theme_key": t_key,
+                    "theme_title": t_info.get("title", ""),
+                })
+
+    # ----------------------------------------------------
+    # [4단계: 해외 주식 나머지 매칭 항목 추가]
+    # ----------------------------------------------------
+    for o_item in overseas_res:
+        add_match(o_item)
+
+    # ----------------------------------------------------
+    # [5단계: 국내 부분 포함 일치 (Substring match)]
+    # ----------------------------------------------------
+    if all_stocks_df is not None and not all_stocks_df.empty:
         m_sub = all_stocks_df[all_stocks_df["Name"].str.upper().str.contains(q_up, regex=False)]
         if not m_sub.empty:
             if "Amount" in m_sub.columns:
                 m_sub = m_sub.sort_values(by="Amount", ascending=False)
             for _, r in m_sub.head(8).iterrows():
-                if not any(m["code"] == r["Code"] for m in matches):
-                    matches.append({"code": r["Code"], "name": r["Name"], "market": r.get("Market", "KRX"), "is_overseas": False})
+                add_match({"code": r["Code"], "name": r["Name"], "market": r.get("Market", "KRX"), "is_overseas": False})
 
     return matches
 
@@ -2298,18 +2358,21 @@ else:
     swing_rise = df_rising[(df_rising["change_rate"] >= 2.0) & (df_rising["change_rate"] <= 14.0)].head(25) if not df_rising.empty else pd.DataFrame()
     pool = pd.concat([swing_rise, df_volume.head(20)]).drop_duplicates(subset=["code"]).head(35)
 
-candidates = []
-if not pool.empty:
+cand_cache_key = f"cached_cand_{strategy_key}_{market_filter}_{min_change_rate}_{new_listing_months}_{analysis_period}"
+candidates = st.session_state.get(cand_cache_key, [])
+
+if not candidates and not pool.empty:
     pool_subset = pool.head(20)
     pool_records = pool_subset.to_dict("records")
     if not show_matrix:
-        with st.spinner(f"[{preset_style}] AI 퀀트 및 상승 확률 정밀 분석 중..."):
+        with st.spinner(f"⚡ [{preset_style}] AI 퀀트 및 머신러닝 상승 확률 정밀 분석 중..."):
             candidates = evaluate_candidates(pool_records, strategy_key)
     else:
         candidates = evaluate_candidates(pool_records, strategy_key)
 
     # 당일 AI 추천 종목 성과 추적 데이터베이스 자동 로깅 (중복 방지)
     if candidates:
+        st.session_state[cand_cache_key] = candidates
         try:
             log_new_predictions(candidates, strategy=strategy_key)
         except Exception:
@@ -2328,7 +2391,12 @@ if show_matrix:
 # ----------------------------------------------------
 head_c1, head_c2 = st.columns([5, 3.2])
 with head_c1:
-    st.html('<div class="main-title notranslate" translate="no">📈 Stock Radar : AI 급등주 & 신규상장 분석기</div>')
+    st.html(
+        """<div style="display:flex; align-items:center; gap:10px; margin-bottom:0.2rem;">
+            <span style="font-size:2.2rem; line-height:1; display:inline-block; vertical-align:middle;">📈</span>
+            <span class="main-title notranslate" translate="no" style="margin-bottom:0; display:inline-block;">Stock Radar : AI 급등주 & 신규상장 분석기</span>
+        </div>"""
+    )
     st.html('<div class="sub-title">어려운 차트 공부 없이, 큰손(외인·기관) 수급과 상승 확률 높은 종목만 한눈에 확인하세요!</div>')
 with head_c2:
     user = st.session_state.get("user_info")
@@ -3317,29 +3385,34 @@ with tab_chart:
             st.rerun(scope="fragment")
 
         if btn_t4_search and t4_query:
-            t_key, t_info = find_theme_by_query(t4_query)
-            if t_info:
-                # 업종/테마 검색 적중
+            t4_q = t4_query.strip()
+            # 1. 개별 종목 검색을 최우선 시도 (완전 일치 / 접두사 일치)
+            matches = resolve_stock_search(t4_q, all_stocks_df, code_map)
+
+            # 2. 검색어가 테마명/키워드 자체인지 확인
+            t_key, t_info = find_theme_by_query(t4_q, code_map)
+            is_pure_theme = (t_info is not None) and (t4_q not in code_map) and not (matches and matches[0]["name"] == t4_q)
+
+            if is_pure_theme:
+                # 사용자가 '2차전지', '반도체', '원전' 등 순수 테마를 입력한 경우
                 st.session_state["t4_active_theme"] = t_info
                 theme_stocks = t_info.get("stocks", [])
                 if theme_stocks:
                     st.session_state["t4_diagnosed_stock"] = {"code": theme_stocks[0]["code"], "name": theme_stocks[0]["name"], "market": theme_stocks[0].get("market", "KRX")}
                     st.session_state["t4_related_matches"] = theme_stocks[1:]
-                st.session_state["t4_search_buffer"] = t4_query
+                st.session_state["t4_search_buffer"] = t4_q
+                st.rerun(scope="fragment")
+            elif matches:
+                # 개별 종목 검색 매칭 성공 (예: '삼천당제약' 입력 시 삼천당제약 확정!)
+                st.session_state["t4_diagnosed_stock"] = matches[0]
+                st.session_state["t4_related_matches"] = matches[1:7]
+                st.session_state["t4_search_buffer"] = matches[0]["name"]
+                # 해당 종목이 속한 주도 테마가 있다면 대장주 매트릭스도 함께 연동
+                _, stock_theme = find_theme_of_stock(matches[0]["code"], matches[0]["name"])
+                st.session_state["t4_active_theme"] = stock_theme
                 st.rerun(scope="fragment")
             else:
-                # 개별 종목 검색 시도
-                matches = resolve_stock_search(t4_query, all_stocks_df, code_map)
-                if matches:
-                    st.session_state["t4_diagnosed_stock"] = matches[0]
-                    st.session_state["t4_related_matches"] = matches[1:7]
-                    st.session_state["t4_search_buffer"] = matches[0]["name"]
-                    # 해당 종목의 소속 테마 확인
-                    _, stock_theme = find_theme_of_stock(matches[0]["code"], matches[0]["name"])
-                    st.session_state["t4_active_theme"] = stock_theme
-                    st.rerun(scope="fragment")
-                else:
-                    st.warning(f"'{t4_query}'에 해당하는 상장 종목 또는 업종/테마를 찾지 못했습니다. '2차전지', '반도체', '원전', '로봇', '방산' 등의 업종명 또는 종목명을 확인해 주세요.")
+                st.warning(f"'{t4_q}'에 해당하는 상장 종목 또는 업종/테마를 찾지 못했습니다. '2차전지', '반도체', '원전', '로봇', '방산' 등의 업종명 또는 종목명을 확인해 주세요.")
 
         # 2. 10대 핵심 주도 섹터 퀵 필터 칩 (원클릭 레이더)
         st.markdown(
