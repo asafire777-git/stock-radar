@@ -1472,13 +1472,207 @@ def load_all_stocks():
         return [], {}, pd.DataFrame()
 
 
+# ====================================================
+# 국내 10대 핵심 업종/주도 테마 및 대장주 데이터베이스
+# ====================================================
+MAJOR_THEMES_DICT = {
+    "2차전지": {
+        "title": "⚡ 2차전지 / 배터리 / 소재",
+        "badge": "2차전지/소재",
+        "keywords": ["2차전지", "이차전지", "배터리", "양극재", "음극재", "리튬", "전해액", "폐배터리"],
+        "desc": "전기차 캐즘 극복 및 북미·유럽 설비 가동 모멘텀, 원자재 가격 반등 수혜",
+        "stocks": [
+            {"code": "086520", "name": "에코프로", "market": "KOSDAQ", "role": "양극재 지주사 / 코스닥 대표 대장주"},
+            {"code": "247540", "name": "에코프로비엠", "market": "KOSDAQ", "role": "하이니켈 양극재 글로벌 1위 공급사"},
+            {"code": "373220", "name": "LG에너지솔루션", "market": "KOSPI", "role": "글로벌 배터리 셀 제조 1위"},
+            {"code": "005490", "name": "POSCO홀딩스", "market": "KOSPI", "role": "리튬·니켈 원자재 풀 밸류체인 보유"},
+            {"code": "066970", "name": "엘앤에프", "market": "KOSPI", "role": "NCMA 단결정 양극재 공급사"},
+            {"code": "006400", "name": "삼성SDI", "market": "KOSPI", "role": "프리미엄 각형·원통형 배터리"},
+            {"code": "005070", "name": "코스모신소재", "market": "KOSPI", "role": "이차전지 기능성 신소재"},
+            {"code": "010780", "name": "아이에스동서", "market": "KOSPI", "role": "폐배터리 리사이클링 친환경 선도"},
+        ],
+    },
+    "반도체": {
+        "title": "💾 반도체 / HBM / AI가속기",
+        "badge": "반도체/HBM",
+        "keywords": ["반도체", "HBM", "메모리", "파운드리", "패키징", "팹리스", "웨이퍼", "CXL"],
+        "desc": "글로벌 AI 데이터센터 증설 및 HBM3E/HBM4 쇼티지, 레거시 D램 가격 반등",
+        "stocks": [
+            {"code": "005930", "name": "삼성전자", "market": "KOSPI", "role": "글로벌 메모리 반도체 1위 / 파운드리"},
+            {"code": "000660", "name": "SK하이닉스", "market": "KOSPI", "role": "HBM3E 글로벌 독점적 공급 선도주"},
+            {"code": "042700", "name": "한미반도체", "market": "KOSPI", "role": "HBM 듀얼 TC 본더 글로벌 표준 독점"},
+            {"code": "232140", "name": "와이씨", "market": "KOSDAQ", "role": "고속 HBM 웨이퍼 검사장비 독점"},
+            {"code": "039030", "name": "이오테크닉스", "market": "KOSDAQ", "role": "반도체 레이저 마커 및 그루빙 장비"},
+            {"code": "089030", "name": "테크윙", "market": "KOSDAQ", "role": "HBM 고대역폭 큐브 프로버 핸들러"},
+            {"code": "058470", "name": "리노공업", "market": "KOSDAQ", "role": "반도체 테스트 소켓(리노핀) 독보적 1위"},
+            {"code": "403870", "name": "HPSP", "market": "KOSDAQ", "role": "고압 수소 어닐링 장비 글로벌 독점"},
+        ],
+    },
+    "원전": {
+        "title": "⚛️ 원자력발전 / SMR / 전력인프라",
+        "badge": "원전/전력설비",
+        "keywords": ["원전", "원자력", "SMR", "체코", "전력", "변압기", "전선", "송배전", "그리드"],
+        "desc": "AI 전력난에 따른 원전 르네상스, 체코 수주 잭팟 및 북미 노후 변압기 교체 사이클",
+        "stocks": [
+            {"code": "034020", "name": "두산에너빌리티", "market": "KOSPI", "role": "원전 주기기 제조 및 SMR 글로벌 파트너"},
+            {"code": "042370", "name": "비츠로테크", "market": "KOSDAQ", "role": "원전 진공차단기 및 플라즈마 초고온 기술"},
+            {"code": "267260", "name": "HD현대일렉트릭", "market": "KOSPI", "role": "초고압 변압기 북미 수출 사상 최대 실적"},
+            {"code": "298040", "name": "효성중공업", "market": "KOSPI", "role": "글로벌 송배전 초고압 변압기 선도사"},
+            {"code": "010170", "name": "대한광통신", "market": "KOSPI", "role": "AI 데이터센터 전력망 및 광통신 케이블"},
+            {"code": "010120", "name": "LS ELECTRIC", "market": "KOSPI", "role": "스마트 배전 및 초고압 변압기 턴키 공급"},
+            {"code": "450080", "name": "우진엔텍", "market": "KOSDAQ", "role": "원자력 발전소 계측제어정비(I&C) 전문"},
+        ],
+    },
+    "로봇": {
+        "title": "🤖 로봇 / AI자율제조 / 휴머노이드",
+        "badge": "AI/로봇",
+        "keywords": ["로봇", "인공지능", "AI", "휴머노이드", "협동로봇", "자율주행", "스마트팩토리", "감속기"],
+        "desc": "대기업의 피지컬 AI 및 휴머노이드 투자 본격화, 제조 공장 자동화 수요 급증",
+        "stocks": [
+            {"code": "277810", "name": "레인보우로보틱스", "market": "KOSDAQ", "role": "삼성전자 지분 투자 / 이족보행 휴머노이드"},
+            {"code": "454910", "name": "두산로보틱스", "market": "KOSPI", "role": "협동로봇 시장 국내 1위 / 소프트웨어 강화"},
+            {"code": "304100", "name": "솔트룩스", "market": "KOSDAQ", "role": "생성형 AI 루시아(Luxia) LLM 솔루션"},
+            {"code": "377480", "name": "마음AI", "market": "KOSDAQ", "role": "멀티모달 AI 플랫폼 및 자율주행 모빌리티"},
+            {"code": "056080", "name": "유진로봇", "market": "KOSDAQ", "role": "자율주행 물류 로봇(AMR) 및 라이다 센서"},
+            {"code": "437730", "name": "삼현", "market": "KOSDAQ", "role": "로봇 관절 정밀 스마트 액추에이터"},
+            {"code": "383310", "name": "에스피지", "market": "KOSDAQ", "role": "로봇용 정밀 감속기(SHG/SR) 국산화"},
+        ],
+    },
+    "방산": {
+        "title": "🛡️ K-방산 / 항공우주 / 미사일",
+        "badge": "방산/우주",
+        "keywords": ["방산", "우주항공", "K9", "천궁", "자주포", "탱크", "유도무기", "미사일", "인공위성"],
+        "desc": "지정학적 리스크 지속, 폴란드·루마니아·중동 K-방산 수주 러시 및 우주 발사체",
+        "stocks": [
+            {"code": "012450", "name": "한화에어로스페이스", "market": "KOSPI", "role": "K9 자주포 / 다련장 로켓 / 누리호 총괄"},
+            {"code": "064350", "name": "현대로템", "market": "KOSPI", "role": "K2 흑표 전차 폴란드 대규모 수출 주도"},
+            {"code": "079550", "name": "LIG넥스원", "market": "KOSPI", "role": "천궁-II 및 비궁 유도무기 글로벌 수출"},
+            {"code": "047810", "name": "한국항공우주", "market": "KOSPI", "role": "KF-21 보라매 / FA-50 경공격기 양산"},
+            {"code": "103140", "name": "풍산", "market": "KOSPI", "role": "글로벌 155mm 포탄 쇼티지 최대 수혜"},
+            {"code": "272210", "name": "한화시스템", "market": "KOSPI", "role": "AESA 레이다 및 군위성 통신 체계"},
+            {"code": "462350", "name": "이노스페이스", "market": "KOSDAQ", "role": "민간 소형 위성 발사체(한빛) 선도사"},
+        ],
+    },
+    "바이오": {
+        "title": "💊 바이오 / 제약 / 비만치료제 / ADC",
+        "badge": "바이오/제약",
+        "keywords": ["바이오", "제약", "신약", "비만치료제", "항암제", "ADC", "바이오시밀러", "헬스케어"],
+        "desc": "금리 인하 사이클 도래 및 글로벌 제약사 기술 수출(L/O), 비만·항암 파이프라인 부각",
+        "stocks": [
+            {"code": "207940", "name": "삼성바이오로직스", "market": "KOSPI", "role": "글로벌 1위 바이오의약품 CDMO 생산능력"},
+            {"code": "068270", "name": "셀트리온", "market": "KOSPI", "role": "짐펜트라 미국 직판 개시 및 바이오시밀러"},
+            {"code": "196170", "name": "알테오젠", "market": "KOSDAQ", "role": "SC 제형 변경 키트루다 독점 라이선스"},
+            {"code": "028300", "name": "HLB", "market": "KOSDAQ", "role": "간암 신약 리보세라닙 글로벌 상업화"},
+            {"code": "000100", "name": "유한양행", "market": "KOSPI", "role": "렉라자(폐암) FDA 승인 마일스톤 유입"},
+            {"code": "141080", "name": "리가켐바이오", "market": "KOSDAQ", "role": "차세대 항암 ADC 플랫폼 글로벌 기술수출"},
+            {"code": "298380", "name": "에이비엘바이오", "market": "KOSDAQ", "role": "이중항체 뇌혈관장벽(BBB) 통과 플랫폼"},
+            {"code": "000250", "name": "삼천당제약", "market": "KOSDAQ", "role": "경구용 비만/인슐린 글로벌 공급 계약"},
+        ],
+    },
+    "자동차": {
+        "title": "🚗 미래차 / 현대차 / 자율주행",
+        "badge": "미래차/전장",
+        "keywords": ["자동차", "현대차", "기아", "자율주행", "전기차", "SDV", "수소차", "전장"],
+        "desc": "인도 법인 IPO 및 하이브리드 고수익성 유지, SDV 소프트웨어 중심 자동차 전환",
+        "stocks": [
+            {"code": "005380", "name": "현대차", "market": "KOSPI", "role": "완성차 글로벌 3위 / 하이브리드·전기차 풀라인업"},
+            {"code": "000270", "name": "기아", "market": "KOSPI", "role": "글로벌 완성차 최고 수준의 영업이익률"},
+            {"code": "012330", "name": "현대모비스", "market": "KOSPI", "role": "섀시·전장 미래 모빌리티 핵심 부품"},
+            {"code": "204320", "name": "HL만도", "market": "KOSPI", "role": "자율주행 조향·제동 시스템 글로벌 공급"},
+            {"code": "011210", "name": "현대위아", "market": "KOSPI", "role": "차량 구동축 및 열관리 모듈 선도"},
+            {"code": "062040", "name": "산일전기", "market": "KOSPI", "role": "모빌리티 및 신재생 전력망 특화 변압기"},
+        ],
+    },
+    "조선": {
+        "title": "🚢 조선 / 해운 / 친환경선박",
+        "badge": "조선/해운",
+        "keywords": ["조선", "해운", "LNG", "조선소", "선박", "컨테이너", "벌크선", "해양플랜트"],
+        "desc": "선가 상승과 3년치 이상 수주잔고 확보에 따른 조선 슈퍼사이클 진입",
+        "stocks": [
+            {"code": "009540", "name": "HD한국조선해양", "market": "KOSPI", "role": "조선 중간지주사 / 고부가가치 LNG선 1위"},
+            {"code": "329180", "name": "HD현대중공업", "market": "KOSPI", "role": "친환경 선박 엔진 및 방산 특수선"},
+            {"code": "010140", "name": "삼성중공업", "market": "KOSPI", "role": "해양플랜트(FLNG) 독보적 시장 지배력"},
+            {"code": "042660", "name": "한화오션", "market": "KOSPI", "role": "잠수함/특수선 및 미국 해군 함정 MRO"},
+            {"code": "011200", "name": "HMM", "market": "KOSPI", "role": "국내 1위 국적 원양 컨테이너 선사"},
+            {"code": "028670", "name": "팬오션", "market": "KOSPI", "role": "글로벌 건화물(벌크선) 해상 운송"},
+        ],
+    },
+    "뷰티": {
+        "title": "💄 K-뷰티 / 화장품 / 글로벌소비재",
+        "badge": "K-뷰티/화장품",
+        "keywords": ["화장품", "뷰티", "K뷰티", "피부", "미용", "올리브영", "선크림", "인디브랜드"],
+        "desc": "미국·유럽·일본 등 비중화권 K-인디 브랜드 수출 대폭발 및 ODM 제조사 실적 호조",
+        "stocks": [
+            {"code": "278470", "name": "에이피알", "market": "KOSPI", "role": "메디큐브 뷰티 디바이스 글로벌 메가히트"},
+            {"code": "257720", "name": "실리콘투", "market": "KOSDAQ", "role": "K-뷰티 인디 브랜드 글로벌 유통 인프라 1위"},
+            {"code": "192820", "name": "코스맥스", "market": "KOSPI", "role": "글로벌 1위 화장품 ODM 전문 연구제조"},
+            {"code": "161890", "name": "한국콜마", "market": "KOSPI", "role": "선케어 자외선차단제 독보적 기술력"},
+            {"code": "090430", "name": "아모레퍼시픽", "market": "KOSPI", "role": "라네즈·코스알엑스 서구권 수출 고성장"},
+            {"code": "214150", "name": "클리오", "market": "KOSDAQ", "role": "색조 화장품 및 글로벌 드럭스토어 입점"},
+        ],
+    },
+    "엔터": {
+        "title": "🎵 K-콘텐츠 / 엔터 / 게임 / IP",
+        "badge": "엔터/콘텐츠",
+        "keywords": ["엔터", "게임", "음반", "BTS", "아이돌", "K-POP", "웹툰", "콘텐츠"],
+        "desc": "음원 스트리밍 및 월드투어 확대, 글로벌 IP 팬덤 플랫폼 수익 다각화",
+        "stocks": [
+            {"code": "352820", "name": "하이브", "market": "KOSPI", "role": "글로벌 멀티 레이블 및 위버스 플랫폼"},
+            {"code": "041510", "name": "에스엠", "market": "KOSPI", "role": "SM 3.0 체제 다각화 및 신인 IP 론칭"},
+            {"code": "035900", "name": "JYP Ent.", "market": "KOSDAQ", "role": "체계적 아티스트 육성 시스템 및 해외 투어"},
+            {"code": "259960", "name": "크래프톤", "market": "KOSPI", "role": "PUBG 배틀그라운드 글로벌 IP 지속 확장"},
+            {"code": "251270", "name": "넷마블", "market": "KOSPI", "role": "나 혼자만 레벨업 등 신작 모멘텀"},
+        ],
+    },
+}
+
+
+def find_theme_by_query(query: str):
+    """업종/테마명 질의(2차전지, 반도체, 원전 등)에 해당하는 테마 정보 반환"""
+    if not query:
+        return None, None
+    q = query.strip().lower()
+    for theme_key, info in MAJOR_THEMES_DICT.items():
+        if q == theme_key.lower():
+            return theme_key, info
+        for kw in info.get("keywords", []):
+            if kw.lower() in q or q in kw.lower():
+                return theme_key, info
+    return None, None
+
+
+def find_theme_of_stock(code: str, name: str = ""):
+    """특정 종목(코드 또는 종목명)이 속한 주도 테마 정보 반환"""
+    for theme_key, info in MAJOR_THEMES_DICT.items():
+        for s in info.get("stocks", []):
+            if s.get("code") == code or (name and s.get("name") == name):
+                return theme_key, info
+    return None, None
+
+
 def resolve_stock_search(query: str, all_stocks_df: pd.DataFrame, code_map: dict) -> list:
-    """사용자가 입력한 검색어로 국내(코스피/코스닥) 및 해외(나스닥/미국) 주식을 지능적으로 통합 매칭"""
+    """사용자가 입력한 검색어로 국내(코스피/코스닥), 업종·테마, 해외(나스닥/미국) 주식을 지능적으로 통합 매칭"""
     if not query:
         return []
     q = query.strip()
     q_up = q.upper()
     matches = []
+
+    # 0. 업종/테마 키워드 매칭 우선 검사 (예: '2차전지', '반도체', '원전', '로봇' 등)
+    t_key, t_info = find_theme_by_query(q)
+    if t_info:
+        for s in t_info.get("stocks", []):
+            matches.append({
+                "code": s["code"],
+                "name": s["name"],
+                "market": s.get("market", "KRX"),
+                "is_overseas": False,
+                "role": s.get("role", ""),
+                "theme_key": t_key,
+                "theme_title": t_info.get("title", ""),
+            })
+        if matches:
+            return matches
 
     # 1. 해외/미국 주식 검색 우선 시도 (티커 or 한글명 완전 매칭)
     try:
@@ -3022,8 +3216,22 @@ with tab_perf:
 with tab_chart:
     @st.fragment
     def render_quick_diagnosis_tab(all_stocks_df, code_map, is_dark):
-        st.subheader("📊 1초 종목 정밀 진단 및 캔들 차트 분석 (국내 & 해외 통합)")
-        st.caption("궁금한 국내 상장 2,800개 전 종목 및 나스닥/미국 대표주의 종목명을 입력하고 Enter를 누르면 1초 만에 캔들 차트, 5·20·60일선 이격도, 볼린저밴드, RSI, 외인·기관 수급을 정밀 진단합니다.")
+        st.subheader("📊 AI 업종·테마 & 1초 종목 정밀 엑스레이 진단실 (국내 & 해외 통합)")
+        st.caption("업종명(반도체, 2차전지, 원전, 로봇, 방산, 바이오 등)이나 개별 종목명을 입력하고 Enter를 누르면 1초 만에 섹터 대장주 비교 및 캔들 차트, 5·20·60일선, 볼린저밴드, RSI, 외인·기관 수급을 정밀 진단합니다.")
+
+        # 0. 상단 메인 검색창과의 명확한 차별점 안내 배너
+        st.html(
+            f"""<div style="background:{'#1E293B' if is_dark else '#EFF6FF'}; border:1.5px solid {'#3B82F6' if is_dark else '#2563EB'}; border-radius:12px; padding:14px 18px; margin-bottom:14px; box-shadow:0 2px 8px {'rgba(59,130,246,0.1)' if is_dark else 'rgba(37,99,235,0.08)'};">
+                <div style="display:flex; align-items:center; gap:8px; font-weight:900; font-size:0.98rem; color:{'#60A5FA' if is_dark else '#1D4ED8'}; margin-bottom:4px;">
+                    <span>💡</span>
+                    <span>1초 정밀 엑스레이 진단실만의 특화 기능 (상단 메인 검색창과의 차이점)</span>
+                </div>
+                <div style="font-size:0.87rem; color:{'#CBD5E1' if is_dark else '#334155'}; line-height:1.65;">
+                    • <b>🔍 상단 메인 검색창</b>: 바쁜 실전 매매 중 1개 종목의 실시간 가격, 목표가, 손절선을 빠르게 확인하는 <b>[단일 종목 1초 퀵 검색]</b><br/>
+                    • <b>📊 1초 정밀 엑스레이 진단실 (본 탭)</b>: <b>'업종·테마명(2차전지, 반도체, 원전, 로봇, 방산, 바이오 등)'</b>을 검색하여 <b>해당 섹터의 핵심 대장주 TOP 8 비교</b>와 <b>동종 테마주 동반 수급 흐름</b>까지 입체적으로 꿰뚫어 보는 <b>[AI 업종·테마 엑스레이 심층 분석실]</b>입니다.
+                </div>
+            </div>"""
+        )
 
         # 기본 진단 종목 결정
         default_stock = st.session_state.get("diagnosed_stock")
@@ -3033,14 +3241,14 @@ with tab_chart:
             else:
                 default_stock = {"code": "005930", "name": "삼성전자"}
 
-        # 1. 전용 프리미엄 검색 입력창 (Enter 즉시 실행)
+        # 1. 전용 프리미엄 검색 입력창 (업종명 또는 종목명 입력 후 Enter 즉시 실행)
         with st.form("t4_stock_search_form", clear_on_submit=False):
             col_in1, col_in2, col_in3 = st.columns([4.2, 1.1, 0.9])
             with col_in1:
                 t4_query = st.text_input(
-                    "진단할 종목명 또는 티커를 입력하세요",
+                    "진단할 업종명이나 종목명을 입력하세요",
                     value=st.session_state.get("t4_search_buffer", default_stock.get("name", "")),
-                    placeholder="🔍 종목명이나 티커 입력 후 Enter (예: 비츠로테크, 삼성전자, 테슬라, 엔비디아, TSLA, NVDA, 042370...)",
+                    placeholder="🔍 업종·테마명(2차전지, 반도체, 원전, 로봇, 방산 등) 또는 종목명 입력 후 Enter",
                     label_visibility="collapsed",
                     key="t4_stock_search_input",
                 )
@@ -3056,44 +3264,101 @@ with tab_chart:
                 st.session_state["diagnosed_stock"] = {"code": "005930", "name": "삼성전자"}
             st.session_state["t4_search_buffer"] = ""
             st.session_state["t4_related_matches"] = []
+            st.session_state["t4_active_theme"] = None
             st.rerun(scope="fragment")
 
         if btn_t4_search and t4_query:
-            matches = resolve_stock_search(t4_query, all_stocks_df, code_map)
-            if matches:
-                st.session_state["diagnosed_stock"] = matches[0]
-                st.session_state["t4_related_matches"] = matches[1:7]
-                st.session_state["t4_search_buffer"] = matches[0]["name"]
+            t_key, t_info = find_theme_by_query(t4_query)
+            if t_info:
+                # 업종/테마 검색 적중
+                st.session_state["t4_active_theme"] = t_info
+                theme_stocks = t_info.get("stocks", [])
+                if theme_stocks:
+                    st.session_state["diagnosed_stock"] = {"code": theme_stocks[0]["code"], "name": theme_stocks[0]["name"], "market": theme_stocks[0].get("market", "KRX")}
+                    st.session_state["t4_related_matches"] = theme_stocks[1:]
+                st.session_state["t4_search_buffer"] = t4_query
                 st.rerun(scope="fragment")
             else:
-                st.warning(f"'{t4_query}'에 해당하는 상장 종목을 찾지 못했습니다. 국내 종목명, 6자리 코드 또는 미국 주식 티커/한글명을 확인해 주세요.")
+                # 개별 종목 검색 시도
+                matches = resolve_stock_search(t4_query, all_stocks_df, code_map)
+                if matches:
+                    st.session_state["diagnosed_stock"] = matches[0]
+                    st.session_state["t4_related_matches"] = matches[1:7]
+                    st.session_state["t4_search_buffer"] = matches[0]["name"]
+                    # 해당 종목의 소속 테마 확인
+                    _, stock_theme = find_theme_of_stock(matches[0]["code"], matches[0]["name"])
+                    st.session_state["t4_active_theme"] = stock_theme
+                    st.rerun(scope="fragment")
+                else:
+                    st.warning(f"'{t4_query}'에 해당하는 상장 종목 또는 업종/테마를 찾지 못했습니다. '2차전지', '반도체', '원전', '로봇' 등의 업종명 또는 종목명을 확인해 주세요.")
 
-        # 2. 퀵 필터 칩 (원클릭 진단)
-        t4_chip_cols = st.columns(7)
-        t4_chips = ["비츠로테크", "삼성전자", "테슬라", "엔비디아", "팔란티어", "아이온큐", "레딧"]
-        for i, t4_chip in enumerate(t4_chips):
-            with t4_chip_cols[i]:
-                if st.button(f"#{t4_chip}", key=f"t4_chip_{t4_chip}", use_container_width=True):
-                    m = resolve_stock_search(t4_chip, all_stocks_df, code_map)
-                    if m:
-                        st.session_state["diagnosed_stock"] = m[0]
-                        st.session_state["t4_search_buffer"] = m[0]["name"]
-                        st.session_state["t4_related_matches"] = m[1:7]
+        # 2. 10대 핵심 주도 섹터 퀵 필터 칩 (원클릭 레이더)
+        st.markdown(
+            f"<div style='font-size:0.85rem; color:{'#94A3B8' if is_dark else '#64748B'}; margin:6px 0 4px 0; font-weight:700;'>⚡ <b>10대 핵심 주도 테마 원클릭 레이더 (대장주 엑스레이 스캐너):</b></div>",
+            unsafe_allow_html=True,
+        )
+        theme_keys_list = [
+            ("⚡ 2차전지", "2차전지"),
+            ("💾 반도체", "반도체"),
+            ("⚛️ 원전", "원전"),
+            ("🤖 로봇", "로봇"),
+            ("🛡️ 방산", "방산"),
+            ("💊 바이오", "바이오"),
+            ("🚗 미래차", "자동차"),
+            ("🚢 조선", "조선"),
+            ("💄 뷰티", "뷰티"),
+            ("🎵 엔터", "엔터"),
+        ]
+        th_chip_cols = st.columns(len(theme_keys_list))
+        for i, (label, tkey) in enumerate(theme_keys_list):
+            with th_chip_cols[i]:
+                if st.button(label, key=f"th_radar_btn_{tkey}", use_container_width=True):
+                    th_obj = MAJOR_THEMES_DICT.get(tkey)
+                    if th_obj:
+                        st.session_state["t4_active_theme"] = th_obj
+                        th_stocks = th_obj.get("stocks", [])
+                        if th_stocks:
+                            st.session_state["diagnosed_stock"] = {"code": th_stocks[0]["code"], "name": th_stocks[0]["name"], "market": th_stocks[0].get("market", "KRX")}
+                            st.session_state["t4_related_matches"] = th_stocks[1:]
+                        st.session_state["t4_search_buffer"] = th_obj.get("title", tkey)
                         st.rerun(scope="fragment")
 
-        # 연관 검색어 칩 (복수 검색 매칭 시)
-        t4_related = st.session_state.get("t4_related_matches", [])
-        if t4_related:
-            st.markdown(
-                f"<div style='font-size:0.85rem; color:#64748B; margin-top:4px;'>📌 <b>연관 종목 바로가기:</b></div>",
-                unsafe_allow_html=True,
+        active_stock = st.session_state.get("diagnosed_stock", default_stock)
+        target_code = active_stock["code"]
+        target_name = active_stock["name"]
+
+        # 3. 활성화된 업종/테마의 핵심 대장주 엑스레이 비교 매트릭스 카드
+        active_theme = st.session_state.get("t4_active_theme")
+        if not active_theme:
+            _, active_theme = find_theme_of_stock(target_code, target_name)
+
+        if active_theme:
+            st.html(
+                f"""<div style="background:{'#1E293B' if is_dark else '#F0FDF4'}; border:1.5px solid {'#10B981' if is_dark else '#059669'}; border-radius:12px; padding:14px 18px; margin:12px 0 10px 0; box-shadow:0 2px 8px {'rgba(16,185,129,0.1)' if is_dark else 'rgba(5,150,105,0.08)'};">
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                        <div>
+                            <span style="font-size:1.08rem; font-weight:900; color:{'#34D399' if is_dark else '#065F46'};">
+                                🎯 {active_theme.get('title', '')} 핵심 대장주 엑스레이 비교
+                            </span>
+                            <span style="font-size:0.83rem; color:{'#94A3B8' if is_dark else '#047857'}; margin-left:8px;">
+                                (원클릭 시 하단 차트 및 수급 즉시 전환)
+                            </span>
+                        </div>
+                        <div style="font-size:0.82rem; color:{'#A7F3D0' if is_dark else '#065F46'}; font-weight:600;">
+                            💡 {active_theme.get('desc', '')}
+                        </div>
+                    </div>
+                </div>"""
             )
-            rel_cols = st.columns(min(len(t4_related), 6))
-            for r_idx, rel_stock in enumerate(t4_related[:6]):
-                with rel_cols[r_idx]:
-                    if st.button(f"👉 {rel_stock['name']} ({rel_stock['code']})", key=f"t4_rel_chip_{rel_stock['code']}_{r_idx}", use_container_width=True):
-                        st.session_state["diagnosed_stock"] = rel_stock
-                        st.session_state["t4_search_buffer"] = rel_stock["name"]
+            theme_stocks = active_theme.get("stocks", [])
+            th_cols = st.columns(min(len(theme_stocks), 4))
+            for s_idx, t_st in enumerate(theme_stocks[:8]):
+                with th_cols[s_idx % min(len(theme_stocks), 4)]:
+                    is_current = (t_st["code"] == target_code)
+                    btn_label = f"⭐ {t_st['name']} (진단 중)" if is_current else f"👉 {t_st['name']} ({t_st.get('role', '')[:10]}..)"
+                    if st.button(btn_label, key=f"btn_th_st_{t_st['code']}_{s_idx}", use_container_width=True, type="primary" if is_current else "secondary"):
+                        st.session_state["diagnosed_stock"] = {"code": t_st["code"], "name": t_st["name"], "market": t_st.get("market", "KRX")}
+                        st.session_state["t4_search_buffer"] = t_st["name"]
                         st.rerun(scope="fragment")
 
         # 전체 목록 직접 선택 드롭다운 (선택적 확장)
@@ -3121,15 +3386,13 @@ with tab_chart:
                 if m_match:
                     st.session_state["diagnosed_stock"] = m_match[0]
                     st.session_state["t4_search_buffer"] = m_match[0]["name"]
+                    _, stock_theme = find_theme_of_stock(m_match[0]["code"], m_match[0]["name"])
+                    st.session_state["t4_active_theme"] = stock_theme
                     st.rerun(scope="fragment")
 
         st.markdown("---")
 
-        # 3. 조회 기간 선택 & 명확한 가이드 카드
-        active_stock = st.session_state.get("diagnosed_stock", default_stock)
-        target_code = active_stock["code"]
-        target_name = active_stock["name"]
-
+        # 4. 조회 기간 선택 & 명확한 가이드 카드
         col_period_ctrl, col_fullscreen = st.columns([3.8, 1.2])
         with col_period_ctrl:
             period_options = {
@@ -3174,7 +3437,7 @@ with tab_chart:
             </div>"""
         )
 
-        # 4. 차트 및 상세 분석 렌더링
+        # 5. 차트 및 상세 분석 렌더링
         render_stock_detailed_section(target_code, target_name, is_dark, in_modal=False, days=chart_days, key_prefix="tab4_diag")
 
     render_quick_diagnosis_tab(all_stocks_df, code_map, is_dark)
