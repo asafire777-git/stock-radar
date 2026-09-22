@@ -202,15 +202,18 @@ div[data-testid="stMain"] {
             tabs.forEach(btn => {
                 if (btn.textContent && (btn.textContent.includes('성과 검증실') || btn.textContent.includes('AI 성과'))) {
                     btn.classList.add('highlight-perf-tab');
-                    const isSelected = btn.getAttribute('aria-selected') === 'true' || btn.getAttribute('data-selected') === 'true';
-                    btn.style.setProperty('background', isSelected ? 'linear-gradient(135deg, #DC2626 0%, #991B1B 100%)' : 'linear-gradient(135deg, rgba(239, 68, 68, 0.18) 0%, rgba(220, 38, 38, 0.28) 100%)', 'important');
-                    btn.style.setProperty('border', isSelected ? '2px solid #FCA5A5' : '2px solid #EF4444', 'important');
-                    btn.style.setProperty('border-radius', '8px 8px 0 0', 'important');
-                    btn.style.setProperty('box-shadow', '0 0 14px rgba(239, 68, 68, 0.55)', 'important');
-                    btn.style.setProperty('padding', '6px 16px', 'important');
+                    btn.style.removeProperty('background');
+                    btn.style.removeProperty('border');
+                    btn.style.removeProperty('border-radius');
+                    btn.style.removeProperty('box-shadow');
+                    btn.style.removeProperty('padding');
+                    btn.style.setProperty('background', 'transparent', 'important');
+                    btn.style.setProperty('border', 'none', 'important');
+                    btn.style.setProperty('box-shadow', 'none', 'important');
                     btn.querySelectorAll('*').forEach(c => {
-                        c.style.setProperty('color', isSelected ? '#FFFFFF' : '#DC2626', 'important');
-                        c.style.setProperty('font-weight', '900', 'important');
+                        c.style.setProperty('color', '#EF4444', 'important');
+                        c.style.setProperty('font-weight', '800', 'important');
+                        c.style.removeProperty('font-size');
                     });
                 }
             });
@@ -590,7 +593,7 @@ div[class*="stFragment"][data-test-script-state="running"] * {
     transition: none !important;
 }
 
-/* 🎯 🏆 AI 성과 검증실 탭메뉴 초강력 시각 강조 (볼드 레드 폰트, 네온 글로우, 레드 블라인드 뱃지) */
+/* 🎯 🏆 AI 성과 검증실 탭메뉴 (깔끔한 레드 볼드 폰트 강조, 박스 테두리 제거) */
 [data-testid="stTabs"] [data-testid="stTab"]:nth-of-type(4),
 [data-testid="stTabs"] [data-testid="stTab"]:nth-child(4),
 [data-testid="stTabs"] [role="tab"]:nth-child(4),
@@ -603,14 +606,10 @@ div[data-baseweb="tab-list"] button:nth-of-type(4),
 button[data-baseweb="tab"]:nth-of-type(4),
 button[role="tab"]:nth-of-type(4),
 .highlight-perf-tab {
-    background: linear-gradient(135deg, rgba(239, 68, 68, 0.16) 0%, rgba(220, 38, 38, 0.28) 100%) !important;
-    border: 2px solid #EF4444 !important;
-    border-radius: 8px 8px 0 0 !important;
-    padding: 6px 16px !important;
-    margin-right: 4px !important;
-    position: relative !important;
-    box-shadow: 0 0 14px rgba(239, 68, 68, 0.45) !important;
-    animation: perfTabGlow 2.2s infinite alternate ease-in-out !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    animation: none !important;
 }
 
 [data-testid="stTabs"] [data-testid="stTab"]:nth-of-type(4) *,
@@ -625,11 +624,11 @@ div[data-baseweb="tab-list"] button:nth-of-type(4) *,
 button[data-baseweb="tab"]:nth-of-type(4) *,
 button[role="tab"]:nth-of-type(4) *,
 .highlight-perf-tab * {
-    color: #DC2626 !important;
-    font-weight: 900 !important;
-    font-size: 1.05rem !important;
-    letter-spacing: -0.2px !important;
-    text-shadow: 0 1px 3px rgba(239, 68, 68, 0.25) !important;
+    color: #EF4444 !important;
+    font-weight: 800 !important;
+    font-size: inherit !important;
+    letter-spacing: inherit !important;
+    text-shadow: none !important;
 }
 
 [data-testid="stTabs"] [data-testid="stTab"]:nth-of-type(4)[aria-selected="true"],
@@ -644,9 +643,9 @@ div[data-baseweb="tab-list"] button:nth-of-type(4)[aria-selected="true"],
 button[data-baseweb="tab"]:nth-of-type(4)[aria-selected="true"],
 button[role="tab"]:nth-of-type(4)[aria-selected="true"],
 .highlight-perf-tab[aria-selected="true"] {
-    background: linear-gradient(135deg, #EF4444 0%, #B91C1C 100%) !important;
-    border: 2px solid #FCA5A5 !important;
-    box-shadow: 0 4px 18px rgba(220, 38, 38, 0.65) !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
 }
 
 [data-testid="stTabs"] [data-testid="stTab"]:nth-of-type(4)[aria-selected="true"] *,
@@ -661,20 +660,10 @@ div[data-baseweb="tab-list"] button:nth-of-type(4)[aria-selected="true"] *,
 button[data-baseweb="tab"]:nth-of-type(4)[aria-selected="true"] *,
 button[role="tab"]:nth-of-type(4)[aria-selected="true"] *,
 .highlight-perf-tab[aria-selected="true"] * {
-    color: #FFFFFF !important;
-    font-weight: 900 !important;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.45) !important;
-}
-
-@keyframes perfTabGlow {
-    0% {
-        box-shadow: 0 0 6px rgba(239, 68, 68, 0.25);
-        border-color: #EF4444;
-    }
-    100% {
-        box-shadow: 0 0 18px rgba(239, 68, 68, 0.65);
-        border-color: #F87171;
-    }
+    color: #DC2626 !important;
+    font-weight: 800 !important;
+    font-size: inherit !important;
+    text-shadow: none !important;
 }
 """
 
@@ -2306,12 +2295,9 @@ st.html("""
 [data-testid="stTabs"] .react-aria-Tab:nth-child(4),
 [data-testid="stTab"][id="3"],
 [role="tab"][id="3"] {
-    background: linear-gradient(135deg, rgba(239, 68, 68, 0.16) 0%, rgba(220, 38, 38, 0.28) 100%) !important;
-    border: 2px solid #EF4444 !important;
-    border-radius: 8px 8px 0 0 !important;
-    padding: 6px 16px !important;
-    margin-right: 4px !important;
-    box-shadow: 0 0 14px rgba(239, 68, 68, 0.45) !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
 }
 [data-testid="stTabs"] [data-testid="stTab"]:nth-of-type(4) *,
 [data-testid="stTabs"] [data-testid="stTab"]:nth-child(4) *,
@@ -2320,25 +2306,25 @@ st.html("""
 [data-testid="stTabs"] .react-aria-Tab:nth-child(4) *,
 [data-testid="stTab"][id="3"] *,
 [role="tab"][id="3"] * {
-    color: #DC2626 !important;
-    font-weight: 900 !important;
-    font-size: 1.05rem !important;
-    letter-spacing: -0.2px !important;
+    color: #EF4444 !important;
+    font-weight: 800 !important;
+    font-size: inherit !important;
 }
 [data-testid="stTabs"] [data-testid="stTab"]:nth-of-type(4)[aria-selected="true"],
 [data-testid="stTabs"] [data-testid="stTab"]:nth-child(4)[aria-selected="true"],
 [data-testid="stTab"][id="3"][aria-selected="true"],
 [role="tab"][id="3"][aria-selected="true"] {
-    background: linear-gradient(135deg, #EF4444 0%, #B91C1C 100%) !important;
-    border: 2px solid #FCA5A5 !important;
-    box-shadow: 0 4px 18px rgba(220, 38, 38, 0.65) !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
 }
 [data-testid="stTabs"] [data-testid="stTab"]:nth-of-type(4)[aria-selected="true"] *,
 [data-testid="stTabs"] [data-testid="stTab"]:nth-child(4)[aria-selected="true"] *,
 [data-testid="stTab"][id="3"][aria-selected="true"] *,
 [role="tab"][id="3"][aria-selected="true"] * {
-    color: #FFFFFF !important;
-    font-weight: 900 !important;
+    color: #DC2626 !important;
+    font-weight: 800 !important;
+    font-size: inherit !important;
 }
 </style>
 <img src="data:image/svg+xml;utf8,<svg></svg>" style="display:none;" onerror="
@@ -2348,16 +2334,18 @@ st.html("""
         tabs.forEach(t => {
             if(t.textContent && (t.textContent.includes('성과 검증실') || t.textContent.includes('AI 성과'))){
                 t.classList.add('highlight-perf-tab');
-                const isSel = t.getAttribute('aria-selected') === 'true' || t.getAttribute('data-selected') === 'true';
-                t.style.setProperty('background', isSel ? 'linear-gradient(135deg, #DC2626 0%, #991B1B 100%)' : 'linear-gradient(135deg, rgba(239, 68, 68, 0.18) 0%, rgba(220, 38, 38, 0.28) 100%)', 'important');
-                t.style.setProperty('border', isSel ? '2px solid #FCA5A5' : '2px solid #EF4444', 'important');
-                t.style.setProperty('border-radius', '8px 8px 0 0', 'important');
-                t.style.setProperty('box-shadow', '0 0 14px rgba(239, 68, 68, 0.55)', 'important');
-                t.style.setProperty('padding', '6px 16px', 'important');
+                t.style.removeProperty('background');
+                t.style.removeProperty('border');
+                t.style.removeProperty('border-radius');
+                t.style.removeProperty('box-shadow');
+                t.style.removeProperty('padding');
+                t.style.setProperty('background', 'transparent', 'important');
+                t.style.setProperty('border', 'none', 'important');
+                t.style.setProperty('box-shadow', 'none', 'important');
                 t.querySelectorAll('*').forEach(c => {
-                    c.style.setProperty('color', isSel ? '#FFFFFF' : '#DC2626', 'important');
-                    c.style.setProperty('font-weight', '900', 'important');
-                    c.style.setProperty('font-size', '1.02rem', 'important');
+                    c.style.setProperty('color', '#EF4444', 'important');
+                    c.style.setProperty('font-weight', '800', 'important');
+                    c.style.removeProperty('font-size');
                 });
             }
         });
