@@ -65,6 +65,16 @@ try:
         get_usd_krw_rate,
         POPULAR_US_STOCKS,
     )
+    from src.stock_clinic import (
+        compute_precision_vitals,
+        generate_doctor_clinical_briefing,
+        generate_prescriptions,
+        render_clinic_banner_html,
+        render_health_summary_card_html,
+        render_doctor_briefing_card_html,
+        render_vital_signs_html,
+        render_prescriptions_html,
+    )
 except ImportError:
     from krx_collector import (
         get_investor_net_purchases,
@@ -110,6 +120,17 @@ except ImportError:
         get_usd_krw_rate,
         POPULAR_US_STOCKS,
     )
+    from stock_clinic import (
+        compute_precision_vitals,
+        generate_doctor_clinical_briefing,
+        generate_prescriptions,
+        render_clinic_banner_html,
+        render_health_summary_card_html,
+        render_doctor_briefing_card_html,
+        render_vital_signs_html,
+        render_prescriptions_html,
+    )
+
 
 
 # ----------------------------------------------------
@@ -2582,7 +2603,7 @@ tab_ai, tab_rising, tab_new, tab_perf, tab_chart = st.tabs([
     "🔥 실시간 급등 순위 (TOP 100)",
     "🚀 신규 상장주 모니터링",
     "🔥 🏆 AI 성과 검증실 & 실전 복기",
-    "📊 1초 종목 정밀 진단실",
+    "🩺 1초 종목 종합 정밀 진단실",
 ])
 
 
@@ -3239,27 +3260,13 @@ with tab_perf:
 
 
 # ====================================================
-# TAB 5: 종목 정밀 진단실 (전면 AI 검색 연동)
+# TAB 5: AI 1초 종합 정밀 진단실 (임상 소견 및 실전 처방전)
 # ====================================================
 with tab_chart:
     @st.fragment
     def render_quick_diagnosis_tab(all_stocks_df, code_map, is_dark):
-        st.subheader("📊 AI 업종·테마 & 1초 종목 정밀 엑스레이 진단실 (국내 & 해외 통합)")
-        st.caption("업종명(반도체, 2차전지, 원전, 로봇, 방산, 바이오 등)이나 개별 종목명을 입력하고 Enter를 누르면 1초 만에 섹터 대장주 비교 및 캔들 차트, 5·20·60일선, 볼린저밴드, RSI, 외인·기관 수급을 정밀 진단합니다.")
-
-        # 0. 상단 메인 검색창과의 명확한 차별점 안내 배너
-        st.html(
-            f"""<div style="background:{'#1E293B' if is_dark else '#EFF6FF'}; border:1.5px solid {'#3B82F6' if is_dark else '#2563EB'}; border-radius:12px; padding:14px 18px; margin-bottom:14px; box-shadow:0 2px 8px {'rgba(59,130,246,0.1)' if is_dark else 'rgba(37,99,235,0.08)'};">
-                <div style="display:flex; align-items:center; gap:8px; font-weight:900; font-size:0.98rem; color:{'#60A5FA' if is_dark else '#1D4ED8'}; margin-bottom:4px;">
-                    <span>💡</span>
-                    <span>1초 정밀 엑스레이 진단실만의 특화 기능 (상단 메인 검색창과의 차이점)</span>
-                </div>
-                <div style="font-size:0.87rem; color:{'#CBD5E1' if is_dark else '#334155'}; line-height:1.65;">
-                    • <b>🔍 상단 메인 검색창</b>: 바쁜 실전 매매 중 1개 종목의 실시간 가격, 목표가, 손절선을 빠르게 확인하는 <b>[단일 종목 1초 퀵 검색]</b><br/>
-                    • <b>📊 1초 정밀 엑스레이 진단실 (본 탭)</b>: <b>'업종·테마명(2차전지, 반도체, 원전, 로봇, 방산, 바이오 등)'</b>을 검색하여 <b>해당 섹터의 핵심 대장주 TOP 8 비교</b>와 <b>동종 테마주 동반 수급 흐름</b>까지 입체적으로 꿰뚫어 보는 <b>[AI 업종·테마 엑스레이 심층 분석실]</b>입니다.
-                </div>
-            </div>"""
-        )
+        # 0. AI 종합 진단실 프리미엄 안내 배너
+        st.html(render_clinic_banner_html(is_dark))
 
         # 기본 진단 종목 결정
         default_stock = st.session_state.get("t4_diagnosed_stock")
@@ -3271,19 +3278,19 @@ with tab_chart:
             else:
                 default_stock = {"code": "005930", "name": "삼성전자"}
 
-        # 1. 전용 프리미엄 검색 입력창 (업종명 또는 종목명 입력 후 Enter 즉시 실행)
+        # 1. 진단 전용 프리미엄 검색창 (업종명 또는 종목명 입력 후 Enter 즉시 실행)
         with st.form("t4_stock_search_form", clear_on_submit=False):
             col_in1, col_in2, col_in3 = st.columns([4.2, 1.1, 0.9])
             with col_in1:
                 t4_query = st.text_input(
                     "진단할 업종명이나 종목명을 입력하세요",
                     value=st.session_state.get("t4_search_buffer", ""),
-                    placeholder="🔍 업종·테마명(2차전지, 반도체, 원전, 로봇, 방산, 바이오 등) 또는 종목명 입력 후 Enter",
+                    placeholder="🔍 업종·테마명(2차전지, 반도체, 원전, 로봇, 방산, 바이오 등) 또는 종목명(삼성전자, 테슬라, NVDA 등) 입력 후 Enter",
                     label_visibility="collapsed",
                     key="t4_stock_search_input",
                 )
             with col_in2:
-                btn_t4_search = st.form_submit_button("🔍 1초 진단", use_container_width=True, type="primary")
+                btn_t4_search = st.form_submit_button("🩺 1초 정밀 진단", use_container_width=True, type="primary")
             with col_in3:
                 btn_t4_clear = st.form_submit_button("🔄 초기화", use_container_width=True)
 
@@ -3307,6 +3314,7 @@ with tab_chart:
                     st.session_state["t4_diagnosed_stock"] = {"code": theme_stocks[0]["code"], "name": theme_stocks[0]["name"], "market": theme_stocks[0].get("market", "KRX")}
                     st.session_state["t4_related_matches"] = theme_stocks[1:]
                 st.session_state["t4_search_buffer"] = t4_query
+                st.rerun(scope="fragment")
             else:
                 # 개별 종목 검색 시도
                 matches = resolve_stock_search(t4_query, all_stocks_df, code_map)
@@ -3317,6 +3325,7 @@ with tab_chart:
                     # 해당 종목의 소속 테마 확인
                     _, stock_theme = find_theme_of_stock(matches[0]["code"], matches[0]["name"])
                     st.session_state["t4_active_theme"] = stock_theme
+                    st.rerun(scope="fragment")
                 else:
                     st.warning(f"'{t4_query}'에 해당하는 상장 종목 또는 업종/테마를 찾지 못했습니다. '2차전지', '반도체', '원전', '로봇', '방산' 등의 업종명 또는 종목명을 확인해 주세요.")
 
@@ -3352,8 +3361,8 @@ with tab_chart:
                         st.rerun(scope="fragment")
 
         active_stock = st.session_state.get("t4_diagnosed_stock", default_stock)
-        target_code = active_stock["code"]
-        target_name = active_stock["name"]
+        target_code = str(active_stock["code"])
+        target_name = str(active_stock["name"])
 
         # 3. 활성화된 업종/테마의 핵심 대장주 엑스레이 비교 매트릭스 카드
         active_theme = st.session_state.get("t4_active_theme")
@@ -3366,10 +3375,10 @@ with tab_chart:
                     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
                         <div>
                             <span style="font-size:1.08rem; font-weight:900; color:{'#34D399' if is_dark else '#065F46'};">
-                                🎯 {active_theme.get('title', '')} 핵심 대장주 엑스레이 비교
+                                🎯 [{active_theme.get('title', '')}] 주도 섹터 대장주 체력 비교 매트릭스
                             </span>
                             <span style="font-size:0.83rem; color:{'#94A3B8' if is_dark else '#047857'}; margin-left:8px;">
-                                (대장주 클릭 시 아래 차트 및 수급 즉시 전환)
+                                (대장주 클릭 시 아래 종합 정밀 진단서 즉시 전환)
                             </span>
                         </div>
                         <div style="font-size:0.82rem; color:{'#A7F3D0' if is_dark else '#065F46'}; font-weight:600;">
@@ -3391,7 +3400,7 @@ with tab_chart:
 
         st.markdown("---")
 
-        # 4. 조회 기간 선택 & 가이드 컨트롤
+        # 4. 차트 및 수급 분석 조회 기간 선택
         col_period_ctrl, col_fullscreen = st.columns([3.8, 1.2])
         with col_period_ctrl:
             period_options = {
@@ -3413,7 +3422,140 @@ with tab_chart:
             if st.button(f"🖥️ '{target_name}' 전체화면 팝업", key=f"btn_t4_full_{target_code}", use_container_width=True):
                 show_stock_chart_dialog(target_code, target_name, is_dark)
 
-        with st.expander("💡 차트 조회 기간이 필요한 이유 & 투자자별 선택 기준 가이드 (클릭하여 보기)"):
+        # 5. 종목 데이터 로드 및 5대 바이탈, AI 주치의 브리핑 연산
+        is_ovs = (len(target_code) <= 5 and target_code.isalpha()) or any(s["symbol"] == target_code for s in POPULAR_US_STOCKS) or active_stock.get("is_overseas", False)
+        usd_rate = get_usd_krw_rate()
+
+        if is_ovs:
+            ohlcv = load_overseas_stock_chart(target_code, timeframe="1달")
+            detail = load_overseas_detail(target_code)
+            inv_df = pd.DataFrame()
+        else:
+            ohlcv = load_stock_chart(target_code, days=chart_days)
+            if ohlcv is None or ohlcv.empty or len(ohlcv) < 2:
+                ohlcv_fb = load_stock_timeframe_chart(target_code, timeframe="24시간")
+                if ohlcv_fb is not None and not ohlcv_fb.empty and len(ohlcv_fb) >= 2:
+                    ohlcv = ohlcv_fb
+            detail = load_stock_realtime_detail(target_code)
+            inv_df = load_stock_investors(target_code)
+
+        if ohlcv is None or ohlcv.empty or len(ohlcv) < 2:
+            st.warning(f"'{target_name}'({target_code})의 주가 데이터를 불러올 수 없습니다.")
+            return
+
+        ohlcv_ind = compute_technical_indicators(ohlcv)
+        signals = analyze_stock_signals(ohlcv_ind)
+
+        if is_ovs:
+            curr_price_usd = float(detail.get("price", ohlcv["close"].iloc[-1])) if detail else float(ohlcv["close"].iloc[-1])
+            curr_price = curr_price_usd
+            change_rate = float(detail.get("change_rate", 0.0)) if detail else float(signals.get("change_rate", 0.0))
+            mkt_name = detail.get("market", "NASDAQ") if detail else "NASDAQ"
+            marcap_val = float(detail.get("marcap_억", 0.0)) if detail else 0.0
+            trade_val = 0.0
+        else:
+            curr_price = int(detail.get("price", ohlcv["close"].iloc[-1])) if detail else int(ohlcv["close"].iloc[-1])
+            change_rate = float(detail.get("change_rate", 0.0)) if detail else float(signals.get("change_rate", 0.0))
+            trade_val = float(detail.get("trade_value_억", 0.0)) if detail else 0.0
+            marcap_val = float(detail.get("marcap_억", 0.0)) if detail else 0.0
+            mkt_name = active_stock.get("market", "KRX")
+
+        sma5 = float(ohlcv_ind["sma5"].iloc[-1]) if "sma5" in ohlcv_ind.columns and not pd.isna(ohlcv_ind["sma5"].iloc[-1]) else float(curr_price)
+        sma20 = float(ohlcv_ind["sma20"].iloc[-1]) if "sma20" in ohlcv_ind.columns and not pd.isna(ohlcv_ind["sma20"].iloc[-1]) else float(curr_price)
+        sma60 = float(ohlcv_ind["sma60"].iloc[-1]) if "sma60" in ohlcv_ind.columns and not pd.isna(ohlcv_ind["sma60"].iloc[-1]) else float(curr_price)
+        rsi14 = float(ohlcv_ind["rsi14"].iloc[-1]) if "rsi14" in ohlcv_ind.columns and not pd.isna(ohlcv_ind["rsi14"].iloc[-1]) else 50.0
+        bb_upper = float(ohlcv_ind["bb_upper"].iloc[-1]) if "bb_upper" in ohlcv_ind.columns and not pd.isna(ohlcv_ind["bb_upper"].iloc[-1]) else float(curr_price)
+        bb_lower = float(ohlcv_ind["bb_lower"].iloc[-1]) if "bb_lower" in ohlcv_ind.columns and not pd.isna(ohlcv_ind["bb_lower"].iloc[-1]) else float(curr_price)
+
+        f_sum_5d = inv_df["foreign"].tail(5).sum() if not inv_df.empty and "foreign" in inv_df.columns else 0.0
+        org_sum_5d = inv_df["institution"].tail(5).sum() if not inv_df.empty and "institution" in inv_df.columns else 0.0
+
+        item_dict = {"change_rate": change_rate, "trade_value_억": trade_val if not is_ovs else 500.0, "days_since_listing": 90}
+        quant_res = calculate_quant_score(item_dict, signals, inv_df, strategy="스윙")
+        pred_res = predictor.predict_probability(ohlcv_ind, quant_score=quant_res["total_score"])
+
+        vitals_data = compute_precision_vitals(
+            price=curr_price,
+            change_rate=change_rate,
+            sma5=sma5,
+            sma20=sma20,
+            sma60=sma60,
+            rsi14=rsi14,
+            bb_upper=bb_upper,
+            bb_lower=bb_lower,
+            f_sum_5d=f_sum_5d,
+            org_sum_5d=org_sum_5d,
+            signals=signals,
+            quant_score=quant_res["total_score"],
+            quant_grade=quant_res["grade"],
+            upside_prob=pred_res["upside_probability"],
+            is_ovs=is_ovs,
+            usd_rate=usd_rate,
+        )
+
+        briefing = generate_doctor_clinical_briefing(
+            name=target_name,
+            code=target_code,
+            market=mkt_name,
+            price=curr_price,
+            change_rate=change_rate,
+            vitals_data=vitals_data,
+            is_ovs=is_ovs,
+            usd_rate=usd_rate,
+        )
+
+        prescriptions = generate_prescriptions(
+            price=curr_price,
+            vitals_data=vitals_data,
+            is_ovs=is_ovs,
+            usd_rate=usd_rate,
+        )
+
+        # 6. [AI 1초 정밀 진단 결과 렌더링]
+        # 6-1. 종합 건강검진 결과표
+        st.html(render_health_summary_card_html(
+            name=target_name,
+            code=target_code,
+            market=mkt_name,
+            price=curr_price,
+            change_rate=change_rate,
+            trade_val=trade_val,
+            marcap_val=marcap_val,
+            vitals_data=vitals_data,
+            is_ovs=is_ovs,
+            usd_rate=usd_rate,
+            is_dark=is_dark,
+        ))
+
+        # 6-2. AI 전담 주치의 1초 심층 임상 소견서 (자연어 심층 브리핑)
+        st.html(render_doctor_briefing_card_html(
+            name=target_name,
+            code=target_code,
+            market=mkt_name,
+            briefing=briefing,
+            vitals_data=vitals_data,
+            is_dark=is_dark,
+        ))
+
+        # 6-3. 5대 핵심 생체 바이탈 사인 정밀 검진표
+        st.html(render_vital_signs_html(vitals_data, is_dark=is_dark))
+
+        # 6-4. AI 주치의 실전 맞춤 처방전 (4단 그리드)
+        st.html(render_prescriptions_html(prescriptions, is_dark=is_dark))
+
+        # 7. 🔬 [정밀 엑스레이 캔들 영상 & 큰손 수급 해부도]
+        with st.expander(f"🔬 [정밀 엑스레이 판독실] {target_name}({target_code}) 3단 캔들 차트 & 일별 수급표 펼쳐보기", expanded=True):
+            render_stock_detailed_section(
+                target_code,
+                target_name,
+                is_dark,
+                in_modal=False,
+                days=chart_days,
+                key_prefix="tab4_diag",
+                preloaded_data=(ohlcv, detail, inv_df),
+            )
+
+        with st.expander("💡 차트 조회 기간이 필요한 이유 & 투자 스타일별 가이드 (클릭하여 보기)"):
             st.html(
                 f"""<div style="background:{'#1E293B' if is_dark else '#F0F9FF'}; border:1px solid {'#38BDF8' if is_dark else '#0284C7'}; border-radius:10px; padding:12px 16px; margin:4px 0 8px 0;">
                     <div style="font-size:0.87rem; color:{'#CBD5E1' if is_dark else '#334155'}; line-height:1.65;">
@@ -3432,7 +3574,5 @@ with tab_chart:
                 </div>"""
             )
 
-        # 5. 차트 및 상세 분석 렌더링
-        render_stock_detailed_section(target_code, target_name, is_dark, in_modal=False, days=chart_days, key_prefix="tab4_diag")
-
     render_quick_diagnosis_tab(all_stocks_df, code_map, is_dark)
+
