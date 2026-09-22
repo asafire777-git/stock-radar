@@ -1828,25 +1828,21 @@ def display_investor_table(investor_df: pd.DataFrame, rows: int = 5):
 
 
 def render_quantum_radar_loader(name: str, code: str, is_ovs: bool, is_dark: bool) -> str:
-    market_text = "글로벌 기관 수급" if is_ovs else "큰손 수급"
+    market_text = "글로벌 나스닥·미국 기관 수급" if is_ovs else "코스피·코스닥 큰손 수급"
     bg = "#0F172A" if is_dark else "#F0FDF4"
     border = "#10B981" if is_dark else "#059669"
     title_color = "#34D399" if is_dark else "#065F46"
     sub_color = "#94A3B8" if is_dark else "#047857"
-    bar_bg = "#1E293B" if is_dark else "#D1FAE5"
-    shadow = "rgba(16,185,129,0.18)" if is_dark else "rgba(2,132,199,0.12)"
-    return f"""<div style="background:{bg}; border:1.5px solid {border}; border-radius:12px; padding:18px 24px; text-align:center; margin-top:10px; margin-bottom:14px; box-shadow:0 4px 16px {shadow};">
-        <div style="display:flex; justify-content:center; align-items:center; gap:10px; margin-bottom:6px;">
-            <span style="font-size:1.35rem;">📡</span>
-            <span style="font-size:1.08rem; font-weight:800; color:{title_color};">
-                AI 퀀트 레이더 정밀 분석 가동 중...
+    shadow = "rgba(16,185,129,0.18)" if is_dark else "rgba(2,132,199,0.10)"
+    return f"""<div style="background:{bg}; border:1.5px solid {border}; border-radius:12px; padding:12px 20px; text-align:center; margin-top:8px; margin-bottom:14px; box-shadow:0 3px 12px {shadow};">
+        <div style="display:flex; justify-content:center; align-items:center; gap:8px; margin-bottom:4px;">
+            <span style="font-size:1.25rem;">📡</span>
+            <span style="font-size:1.02rem; font-weight:800; color:{title_color};">
+                AI 퀀트 레이더 정밀 엑스레이 진단
             </span>
         </div>
-        <div style="font-size:0.88rem; color:{sub_color}; font-weight:600;">
-            [{name} ({code})] 실시간 시세, 이동평균선(5·20·60일) 및 {market_text} 패킷을 초고속 수신·디코딩하고 있습니다
-        </div>
-        <div style="max-width:280px; margin:12px auto 0 auto; height:4px; background:{bar_bg}; border-radius:10px; overflow:hidden;">
-            <div style="width:100%; height:100%; background:linear-gradient(90deg, #10B981, #38BDF8); animation:pulse 1s infinite;"></div>
+        <div style="font-size:0.85rem; color:{sub_color}; font-weight:600;">
+            [{name} ({code})] 실시간 시세, 이동평균선(5·20·60일) 및 {market_text} 패킷 초고속 디코딩 완료
         </div>
     </div>"""
 
@@ -1861,8 +1857,6 @@ def render_stock_detailed_section(code: str, name: str, is_dark: bool, in_modal:
     if preloaded_data:
         ohlcv, detail, inv_df = preloaded_data
     else:
-        loader_ph = st.empty()
-        loader_ph.html(render_quantum_radar_loader(name, code, is_ovs, is_dark))
         if is_ovs:
             ohlcv = load_overseas_stock_chart(code, timeframe="1달")
             detail = load_overseas_detail(code)
@@ -1871,8 +1865,8 @@ def render_stock_detailed_section(code: str, name: str, is_dark: bool, in_modal:
             ohlcv = load_stock_chart(code, days=days)
             detail = load_stock_realtime_detail(code)
             inv_df = load_stock_investors(code)
-        time.sleep(0.18)
-        loader_ph.empty()
+
+    st.html(render_quantum_radar_loader(name, code, is_ovs, is_dark))
 
     is_ipo_day1 = False
     if ohlcv is None or ohlcv.empty or len(ohlcv) < 2:
@@ -2450,9 +2444,6 @@ def render_search_section_fragment(all_stocks_df, code_map, is_dark):
         search_name = active_diag["name"]
         is_ovs = active_diag.get("is_overseas", False) or (len(search_code) <= 5 and search_code.isalpha())
 
-        loader_ph = st.empty()
-        loader_ph.html(render_quantum_radar_loader(search_name, search_code, is_ovs, is_dark))
-
         if is_ovs:
             s_ohlcv = load_overseas_stock_chart(search_code, timeframe="1달")
             s_detail = load_overseas_detail(search_code)
@@ -2466,8 +2457,6 @@ def render_search_section_fragment(all_stocks_df, code_map, is_dark):
             s_detail = load_stock_realtime_detail(search_code)
             s_inv = load_stock_investors(search_code)
 
-        time.sleep(0.18)
-        loader_ph.empty()
         render_stock_detailed_section(search_code, search_name, is_dark, in_modal=False, key_prefix="search_main", preloaded_data=(s_ohlcv, s_detail, s_inv))
 
 
@@ -3234,7 +3223,9 @@ with tab_chart:
         )
 
         # 기본 진단 종목 결정
-        default_stock = st.session_state.get("diagnosed_stock")
+        default_stock = st.session_state.get("t4_diagnosed_stock")
+        if not default_stock:
+            default_stock = st.session_state.get("diagnosed_stock")
         if not default_stock:
             if not df_rising.empty:
                 default_stock = {"code": str(df_rising.iloc[0]["code"]), "name": str(df_rising.iloc[0]["name"])}
@@ -3247,8 +3238,8 @@ with tab_chart:
             with col_in1:
                 t4_query = st.text_input(
                     "진단할 업종명이나 종목명을 입력하세요",
-                    value=st.session_state.get("t4_search_buffer", default_stock.get("name", "")),
-                    placeholder="🔍 업종·테마명(2차전지, 반도체, 원전, 로봇, 방산 등) 또는 종목명 입력 후 Enter",
+                    value=st.session_state.get("t4_search_buffer", ""),
+                    placeholder="🔍 업종·테마명(2차전지, 반도체, 원전, 로봇, 방산, 바이오 등) 또는 종목명 입력 후 Enter",
                     label_visibility="collapsed",
                     key="t4_stock_search_input",
                 )
@@ -3259,9 +3250,9 @@ with tab_chart:
 
         if btn_t4_clear:
             if not df_rising.empty:
-                st.session_state["diagnosed_stock"] = {"code": str(df_rising.iloc[0]["code"]), "name": str(df_rising.iloc[0]["name"])}
+                st.session_state["t4_diagnosed_stock"] = {"code": str(df_rising.iloc[0]["code"]), "name": str(df_rising.iloc[0]["name"])}
             else:
-                st.session_state["diagnosed_stock"] = {"code": "005930", "name": "삼성전자"}
+                st.session_state["t4_diagnosed_stock"] = {"code": "005930", "name": "삼성전자"}
             st.session_state["t4_search_buffer"] = ""
             st.session_state["t4_related_matches"] = []
             st.session_state["t4_active_theme"] = None
@@ -3274,23 +3265,21 @@ with tab_chart:
                 st.session_state["t4_active_theme"] = t_info
                 theme_stocks = t_info.get("stocks", [])
                 if theme_stocks:
-                    st.session_state["diagnosed_stock"] = {"code": theme_stocks[0]["code"], "name": theme_stocks[0]["name"], "market": theme_stocks[0].get("market", "KRX")}
+                    st.session_state["t4_diagnosed_stock"] = {"code": theme_stocks[0]["code"], "name": theme_stocks[0]["name"], "market": theme_stocks[0].get("market", "KRX")}
                     st.session_state["t4_related_matches"] = theme_stocks[1:]
                 st.session_state["t4_search_buffer"] = t4_query
-                st.rerun(scope="fragment")
             else:
                 # 개별 종목 검색 시도
                 matches = resolve_stock_search(t4_query, all_stocks_df, code_map)
                 if matches:
-                    st.session_state["diagnosed_stock"] = matches[0]
+                    st.session_state["t4_diagnosed_stock"] = matches[0]
                     st.session_state["t4_related_matches"] = matches[1:7]
                     st.session_state["t4_search_buffer"] = matches[0]["name"]
                     # 해당 종목의 소속 테마 확인
                     _, stock_theme = find_theme_of_stock(matches[0]["code"], matches[0]["name"])
                     st.session_state["t4_active_theme"] = stock_theme
-                    st.rerun(scope="fragment")
                 else:
-                    st.warning(f"'{t4_query}'에 해당하는 상장 종목 또는 업종/테마를 찾지 못했습니다. '2차전지', '반도체', '원전', '로봇' 등의 업종명 또는 종목명을 확인해 주세요.")
+                    st.warning(f"'{t4_query}'에 해당하는 상장 종목 또는 업종/테마를 찾지 못했습니다. '2차전지', '반도체', '원전', '로봇', '방산' 등의 업종명 또는 종목명을 확인해 주세요.")
 
         # 2. 10대 핵심 주도 섹터 퀵 필터 칩 (원클릭 레이더)
         st.markdown(
@@ -3318,12 +3307,12 @@ with tab_chart:
                         st.session_state["t4_active_theme"] = th_obj
                         th_stocks = th_obj.get("stocks", [])
                         if th_stocks:
-                            st.session_state["diagnosed_stock"] = {"code": th_stocks[0]["code"], "name": th_stocks[0]["name"], "market": th_stocks[0].get("market", "KRX")}
+                            st.session_state["t4_diagnosed_stock"] = {"code": th_stocks[0]["code"], "name": th_stocks[0]["name"], "market": th_stocks[0].get("market", "KRX")}
                             st.session_state["t4_related_matches"] = th_stocks[1:]
                         st.session_state["t4_search_buffer"] = th_obj.get("title", tkey)
                         st.rerun(scope="fragment")
 
-        active_stock = st.session_state.get("diagnosed_stock", default_stock)
+        active_stock = st.session_state.get("t4_diagnosed_stock", default_stock)
         target_code = active_stock["code"]
         target_name = active_stock["name"]
 
@@ -3341,7 +3330,7 @@ with tab_chart:
                                 🎯 {active_theme.get('title', '')} 핵심 대장주 엑스레이 비교
                             </span>
                             <span style="font-size:0.83rem; color:{'#94A3B8' if is_dark else '#047857'}; margin-left:8px;">
-                                (원클릭 시 하단 차트 및 수급 즉시 전환)
+                                (대장주 클릭 시 아래 차트 및 수급 즉시 전환)
                             </span>
                         </div>
                         <div style="font-size:0.82rem; color:{'#A7F3D0' if is_dark else '#065F46'}; font-weight:600;">
@@ -3357,42 +3346,13 @@ with tab_chart:
                     is_current = (t_st["code"] == target_code)
                     btn_label = f"⭐ {t_st['name']} (진단 중)" if is_current else f"👉 {t_st['name']} ({t_st.get('role', '')[:10]}..)"
                     if st.button(btn_label, key=f"btn_th_st_{t_st['code']}_{s_idx}", use_container_width=True, type="primary" if is_current else "secondary"):
-                        st.session_state["diagnosed_stock"] = {"code": t_st["code"], "name": t_st["name"], "market": t_st.get("market", "KRX")}
+                        st.session_state["t4_diagnosed_stock"] = {"code": t_st["code"], "name": t_st["name"], "market": t_st.get("market", "KRX")}
                         st.session_state["t4_search_buffer"] = t_st["name"]
                         st.rerun(scope="fragment")
 
-        # 전체 목록 직접 선택 드롭다운 (선택적 확장)
-        with st.expander("📋 국내 2,800+ 및 해외 상장 전 종목 드롭다운 목록에서 직접 고르기"):
-            us_options_list = [f"{s['name']} ({s['symbol']}) · {s['market']}" for s in POPULAR_US_STOCKS]
-            combined_diag_options = us_options_list + (all_options if all_options else [])
-            cur_stock = st.session_state.get("diagnosed_stock", default_stock)
-            def_idx = 0
-            cur_token = f"({cur_stock['code']})"
-            for idx, opt in enumerate(combined_diag_options):
-                if cur_token in opt:
-                    def_idx = idx
-                    break
-            chosen_opt = st.selectbox(
-                "종목 목록",
-                options=combined_diag_options,
-                index=def_idx,
-                key="t4_dropdown_select",
-                label_visibility="collapsed",
-            )
-            import re
-            m_code = re.search(r"\(([A-Za-z0-9.]+)\)", chosen_opt)
-            if m_code and m_code.group(1) != cur_stock["code"]:
-                m_match = resolve_stock_search(m_code.group(1), all_stocks_df, code_map)
-                if m_match:
-                    st.session_state["diagnosed_stock"] = m_match[0]
-                    st.session_state["t4_search_buffer"] = m_match[0]["name"]
-                    _, stock_theme = find_theme_of_stock(m_match[0]["code"], m_match[0]["name"])
-                    st.session_state["t4_active_theme"] = stock_theme
-                    st.rerun(scope="fragment")
-
         st.markdown("---")
 
-        # 4. 조회 기간 선택 & 명확한 가이드 카드
+        # 4. 조회 기간 선택 & 가이드 컨트롤
         col_period_ctrl, col_fullscreen = st.columns([3.8, 1.2])
         with col_period_ctrl:
             period_options = {
@@ -3414,28 +3374,24 @@ with tab_chart:
             if st.button(f"🖥️ '{target_name}' 전체화면 팝업", key=f"btn_t4_full_{target_code}", use_container_width=True):
                 show_stock_chart_dialog(target_code, target_name, is_dark)
 
-        # 조회 기간이 필요한 이유 및 선택 기준 명확 가이드 배너
-        st.html(
-            f"""<div style="background:{'#1E293B' if is_dark else '#F0F9FF'}; border:1.5px solid {'#38BDF8' if is_dark else '#0284C7'}; border-radius:12px; padding:14px 18px; margin:8px 0 16px 0; box-shadow:0 2px 8px {'rgba(56,189,248,0.08)' if is_dark else 'rgba(2,132,199,0.08)'};">
-                <div style="display:flex; align-items:center; gap:8px; font-weight:900; font-size:0.95rem; color:{'#38BDF8' if is_dark else '#0369A1'}; margin-bottom:8px;">
-                    <span>💡</span>
-                    <span>차트 조회 기간이 필요한 이유 & 투자자별 선택 기준 가이드</span>
-                </div>
-                <div style="font-size:0.87rem; color:{'#CBD5E1' if is_dark else '#334155'}; line-height:1.65;">
-                    <div style="margin-bottom:6px;">
-                        <b>1. 왜 조회 기간이 꼭 필요한가요?</b><br/>
-                        • 주식 차트의 <b>5일·20일선(단기선), 60일선(수급선), 120일·200일선(대세 생명선)</b> 및 보조지표(RSI, 볼린저밴드)를 정확히 계산하고 골든크로스를 판정하려면, 최소 해당 일수 이상의 과거 거래 데이터가 물리적으로 존재해야 합니다.
+        with st.expander("💡 차트 조회 기간이 필요한 이유 & 투자자별 선택 기준 가이드 (클릭하여 보기)"):
+            st.html(
+                f"""<div style="background:{'#1E293B' if is_dark else '#F0F9FF'}; border:1px solid {'#38BDF8' if is_dark else '#0284C7'}; border-radius:10px; padding:12px 16px; margin:4px 0 8px 0;">
+                    <div style="font-size:0.87rem; color:{'#CBD5E1' if is_dark else '#334155'}; line-height:1.65;">
+                        <div style="margin-bottom:6px;">
+                            <b>1. 왜 조회 기간이 꼭 필요한가요?</b><br/>
+                            • 주식 차트의 <b>5일·20일선(단기선), 60일선(수급선), 120일·200일선(대세 생명선)</b> 및 보조지표(RSI, 볼린저밴드)를 정확히 계산하고 골든크로스를 판정하려면, 최소 해당 일수 이상의 과거 거래 데이터가 물리적으로 존재해야 합니다.
+                        </div>
+                        <div>
+                            <b>2. 어떤 기간을 선택해야 하나요? (투자 스타일별 가이드)</b><br/>
+                            • <b style="color:{'#FCD34D' if is_dark else '#D97706'};">⚡ 60일 (약 3개월)</b>: 최근 3개월간의 박스권 돌파, 거래량 급증, 단기 전고점 지지 여부를 돋보기처럼 확대 분석할 때 최적 (단타/급등주 매매)<br/>
+                            • <b style="color:{'#34D399' if is_dark else '#059669'};">🌟 100일 (약 5개월, AI 기본 추천 ⭐)</b>: 5·20·60일선 완전 정배열 안착 여부와 외인·기관의 5개월 누적 매집 추세를 가장 신뢰도 높게 균형 분석 (스윙/추세 매매)<br/>
+                            • <b style="color:{'#60A5FA' if is_dark else '#2563EB'};">📈 150일 (약 7.5개월)</b>: 2개 분기 실적 발표 사이클과 테마 순환매 저점을 점검할 때 적합 (중기 추세 매매)<br/>
+                            • <b style="color:{'#A78BFA' if is_dark else '#7C3AED'};">🏛️ 200일 (약 10개월)</b>: 기관 투자자와 외인이 생명선으로 여기는 200일 이동평균선 돌파(골든크로스) 및 1년 대세 상승 국면을 검증할 때 필수 (대세 판단)
+                        </div>
                     </div>
-                    <div>
-                        <b>2. 어떤 기간을 선택해야 하나요? (투자 스타일별 가이드)</b><br/>
-                        • <b style="color:{'#FCD34D' if is_dark else '#D97706'};">⚡ 60일 (약 3개월)</b>: 최근 3개월간의 박스권 돌파, 거래량 급증, 단기 전고점 지지 여부를 돋보기처럼 확대 분석할 때 최적 (단타/급등주 매매)<br/>
-                        • <b style="color:{'#34D399' if is_dark else '#059669'};">🌟 100일 (약 5개월, AI 기본 추천 ⭐)</b>: 5·20·60일선 완전 정배열 안착 여부와 외인·기관의 5개월 누적 매집 추세를 가장 신뢰도 높게 균형 분석 (스윙/추세 매매)<br/>
-                        • <b style="color:{'#60A5FA' if is_dark else '#2563EB'};">📈 150일 (약 7.5개월)</b>: 2개 분기 실적 발표 사이클과 테마 순환매 저점을 점검할 때 적합 (중기 추세 매매)<br/>
-                        • <b style="color:{'#A78BFA' if is_dark else '#7C3AED'};">🏛️ 200일 (약 10개월)</b>: 기관 투자자와 외인이 생명선으로 여기는 200일 이동평균선 돌파(골든크로스) 및 1년 대세 상승 국면을 검증할 때 필수 (대세 판단)
-                    </div>
-                </div>
-            </div>"""
-        )
+                </div>"""
+            )
 
         # 5. 차트 및 상세 분석 렌더링
         render_stock_detailed_section(target_code, target_name, is_dark, in_modal=False, days=chart_days, key_prefix="tab4_diag")
