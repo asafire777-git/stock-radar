@@ -3537,7 +3537,7 @@ with tab_chart:
             change_rate = float(detail.get("change_rate", 0.0)) if detail else float(signals.get("change_rate", 0.0))
             mkt_name = detail.get("market", "NASDAQ") if detail else "NASDAQ"
             marcap_val = float(detail.get("marcap_억", 0.0)) if detail else 0.0
-            trade_val = 0.0
+            trade_val = float(detail.get("trade_value_억", 0.0)) if detail else 0.0
         else:
             curr_price = int(detail.get("price", ohlcv["close"].iloc[-1])) if detail else int(ohlcv["close"].iloc[-1])
             change_rate = float(detail.get("change_rate", 0.0)) if detail else float(signals.get("change_rate", 0.0))
@@ -3595,6 +3595,11 @@ with tab_chart:
             vitals_data=vitals_data,
             is_ovs=is_ovs,
             usd_rate=usd_rate,
+            name=target_name,
+            code=target_code,
+            market=mkt_name,
+            detail=detail,
+            active_theme=active_theme,
         )
 
         # 6. [AI 1초 정밀 진단 결과 렌더링]

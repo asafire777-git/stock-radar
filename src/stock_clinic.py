@@ -373,54 +373,278 @@ def generate_prescriptions(
     vitals_data: Dict[str, Any],
     is_ovs: bool = False,
     usd_rate: float = 1350.0,
+    name: str = "",
+    code: str = "",
+    market: str = "",
+    detail: Optional[Dict[str, Any]] = None,
+    active_theme: Optional[Dict[str, Any]] = None,
 ) -> List[Dict[str, str]]:
     """
-    AI 주치의의 4대 실전 맞춤 처방전 (진입 타이밍, 목표가, 손절선, 복용 주의사항)
+    AI 주치의의 4대 실전 맞춤 처방전 (진입 타이밍, 단계별 목표가, 비상 손절선, 종목 특이체질 복용 주의사항)
+    - 종목의 실제 주가 체급(대형주 vs 바이오/테마주 vs 중소형주), 변동성, 20일선 이격도, 52주 고저가, 실제 거래대금 및 섹터 특성에 따라
+      100% 개별화된 현실적 진단 멘트 및 액션 플랜을 정밀 처방합니다.
     """
-    grade = vitals_data["health_grade"]
-    inds = vitals_data["indicators"]
+    grade = vitals_data.get("health_grade", "B")
+    inds = vitals_data.get("indicators", {})
+    sma5 = float(inds.get("sma5", price))
+    sma20 = float(inds.get("sma20", price))
+    rsi14 = float(inds.get("rsi14", 50.0))
 
+    d20 = ((price - sma20) / sma20 * 100) if sma20 > 0 else 0.0
+    d5 = ((price - sma5) / sma5 * 100) if sma5 > 0 else 0.0
+
+    trade_val = float(detail.get("trade_value_억", 0.0)) if detail else 0.0
+    marcap_val = float(detail.get("marcap_억", 0.0)) if detail else 0.0
+    high_52w = detail.get("high_52w", "") if detail else ""
+    low_52w = detail.get("low_52w", "") if detail else ""
+
+    # 1. 섹터/테마 특성 판별
+    theme_title = (active_theme.get("title", "") if active_theme else "").lower()
+    name_lower = name.lower()
+
+    is_biotech = any(k in theme_title or k in name_lower for k in ["바이오", "제약", "신약", "치료제", "메디", "팜", "셀", "생명", "임상", "adc"])
+    is_semi = any(k in theme_title or k in name_lower for k in ["반도체", "하이닉스", "hbm", "메모리", "소부장", "웨이퍼", "팹리스"])
+    is_battery = any(k in theme_title or k in name_lower for k in ["2차전지", "배터리", "에너지솔루션", "에코프로", "엘앤에프", "포스코", "양극재", "음극재"])
+    is_defense = any(k in theme_title or k in name_lower for k in ["방산", "우주항공", "에어로", "로템", "넥스원", "k9", "풍산"])
+    is_nuclear = any(k in theme_title or k in name_lower for k in ["원전", "원자력", "에너빌", "전력", "변압기", "smr", "효성중공업", "산일전기"])
+    is_robot = any(k in theme_title or k in name_lower for k in ["로봇", "로보", "뉴로", "자동화", "ai"])
+    is_auto = any(k in theme_title or k in name_lower for k in ["자동차", "현대차", "기아", "모비스", "모빌리티", "전장", "타이어"])
+    is_ship = any(k in theme_title or k in name_lower for k in ["조선", "해양", "해운", "선박", "중공업", "hmm", "팬오션", "lng"])
+    is_beauty = any(k in theme_title or k in name_lower for k in ["화장품", "뷰티", "콜마", "코스맥스", "실리콘투", "아모레", "에이피알"])
+    is_enter = any(k in theme_title or k in name_lower for k in ["엔터", "콘텐츠", "게임", "음반", "하이브", "에스엠", "jyp", "크래프톤", "넷마블"])
+
+    # ----------------------------------------------------
+    # [처방 1: 맞춤 진입 타이밍 & 비중 조절 처방]
+    # ----------------------------------------------------
     if is_ovs:
-        target1 = round(price * 1.06, 2)
-        target2 = round(price * 1.12, 2)
-        stop = round(price * 0.97, 2)
-        target1_str = f"${target1:.2f} (약 {int(target1*usd_rate):,}원, +6.0%)"
-        target2_str = f"${target2:.2f} (약 {int(target2*usd_rate):,}원, +12.0%)"
-        stop_str = f"${stop:.2f} (약 {int(stop*usd_rate):,}원, -3.0%)"
-        entry_pt = f"${inds['sma20']:.2f}" if inds['sma20'] > 0 else f"${price:.2f}"
+        entry_pt = f"${sma20:.2f}" if sma20 > 0 else f"${price:.2f}"
     else:
-        target1 = int(price * 1.06)
-        target2 = int(price * 1.12)
-        stop = int(price * 0.97)
-        target1_str = f"{target1:,}원 (+6.0%)"
-        target2_str = f"{target2:,}원 (+12.0%)"
-        stop_str = f"{stop:,}원 (-3.0%)"
-        entry_pt = f"{int(inds['sma20']):,}원" if inds['sma20'] > 0 else f"{int(price):,}원"
+        entry_pt = f"{int(sma20):,}원" if sma20 > 0 else f"{int(price):,}원"
 
-    if grade in ["S", "A"]:
-        rx1_title = "💊 [처방 1: 적극 진입 타이밍]"
-        rx1_content = f"현 가격 즉시 1차 분할 매수(비중 40%) 권장. 만약 20일선({entry_pt})까지 단기 눌림목 발생 시 2차 추가 매수(비중 60%)로 완벽 매집을 완료하십시오."
-    elif grade == "B":
-        rx1_title = "💊 [처방 1: 눌림목 분할 진입]"
-        rx1_content = f"급등 시 추격매수를 절대 금지하며, 20일 생명선({entry_pt}) 부근 지지력을 확인할 때 30%씩 3회에 걸쳐 분할 매수하는 완충 전략을 처방합니다."
+    if rsi14 >= 72.0 or d20 >= 8.5:
+        rx1_title = "💊 [처방 1: 과열 이격 경계 & 눌림목 대기 처방]"
+        rx1_content = (
+            f"주가가 20일선({entry_pt}) 대비 <b>+{d20:.1f}% 이상 급등</b>하여 심박수(RSI {rsi14:.1f})가 단기 과열(열병)권에 도달했습니다. "
+            f"지금 시장가 추격 매수는 단기 상투를 잡을 리스크가 높습니다. 신규 매수는 5일선 지지 또는 20일 생명선({entry_pt}) 부근까지 "
+            f"건강한 숨고르기 눌림목이 형성될 때까지 템포를 늦추고, 지지 확인 후 <b>1차 분할 매수(비중 30%)</b>로 접근하십시오."
+        )
+        rx1_color_pkg = {"bg": "#FFFBEB", "border": "#F59E0B", "text": "#B45309"}
+    elif 4.0 < d20 < 8.5 and grade in ["S", "A"]:
+        rx1_title = "💊 [처방 1: 5일선 가속 추세 추종 처방]"
+        rx1_content = (
+            f"주가가 20일선({entry_pt}) 위에서 <b>+{d20:.1f}% 안착</b>하여 5일선을 타고 가파르게 달리는 <b>'강력한 가속 상승 레일'</b>입니다. "
+            f"상승 모멘텀이 살아있으므로, 장중 5일선 지지력을 확인하며 <b>1차 분할 매수(비중 40%)</b>로 적극 편입하고, "
+            f"5일선 종가 이탈 전까지 추세를 즐기며 포지션을 유지하십시오."
+        )
+        rx1_color_pkg = {"bg": "#EFF6FF", "border": "#3B82F6", "text": "#1D4ED8"}
+    elif -2.5 <= d20 <= 4.0 and grade in ["S", "A"]:
+        rx1_title = "💊 [처방 1: 황금 눌림목 적극 분할 진입 처방]"
+        rx1_content = (
+            f"주가가 20일 생명선({entry_pt})에 오차 없이 밀착·안착한 <b>'교과서적 최적 분할 매수 궤도'</b>입니다. "
+            f"하방 경직성이 탄탄하므로, 현 가격 즉시 <b>1차 분할 매수(비중 40~50%)</b>를 실행하고, "
+            f"5일선 위로 반등 탄력 강화 시 <b>2차 추가 매수(비중 50%)</b>로 포트폴리오를 적극 구축하십시오."
+        )
+        rx1_color_pkg = {"bg": "#EFF6FF", "border": "#3B82F6", "text": "#1D4ED8"}
+    elif d20 >= 0 and grade == "B":
+        rx1_title = "💊 [처방 1: 박스권 눌림목 3분할 매집 처방]"
+        rx1_content = (
+            f"중기 상승 궤도는 유효하나 단기 매물 소화 과정에서 일시적 변동성이 나타날 수 있습니다. "
+            f"무리한 일시 몰빵을 지양하고, 20일 지지선({entry_pt}) 전후에서 <b>30%씩 3회에 걸쳐 호흡을 길게 가져가는 분할 매수</b>로 "
+            f"단가를 낮추는 완충 스윙 전략을 처방합니다."
+        )
+        rx1_color_pkg = {"bg": "#F0FDF4", "border": "#10B981", "text": "#047857"}
     else:
-        rx1_title = "💊 [처방 1: 신규 진입 보류 처방]"
-        rx1_content = f"신규 매수를 즉시 중단하십시오. 5일선이 20일선을 상향 돌파(골든크로스)하고 거래량이 전일비 150% 이상 폭증할 때까지 관망 처방을 유지합니다."
+        rx1_title = "💊 [처방 1: 신규 진입 보류 & 추세 반전 대기 처방]"
+        rx1_content = (
+            f"주가가 20일 생명선({entry_pt}) 아래로 하회({d20:.1f}%)하여 하방 압력이 우세한 역배열 상태입니다. "
+            f"섣부른 물타기를 중단하고, 5일선이 20일선을 상향 돌파(골든크로스)하며 20일선({entry_pt})을 거래량과 함께 강하게 양봉 탈환할 때까지 "
+            f"<b>'자산 보호 및 치료 관망 처방'</b>을 유지하십시오."
+        )
+        rx1_color_pkg = {"bg": "#FEF2F2", "border": "#EF4444", "text": "#B91C1C"}
 
-    rx2_title = "🎯 [처방 2: 단계별 목표가 & 분할 익절]"
-    rx2_content = f"<b>1차 목표가 {target1_str}</b> 도달 시 보유 비중의 50%를 확정 매도하여 원금을 회수하고, 잔여 50%는 <b>2차 목표가 {target2_str}</b>까지 추세 홀딩하십시오."
+    # ----------------------------------------------------
+    # [처방 2: 주가 체급 & 변동성 기반 단계별 목표가 & 분할 익절]
+    # ----------------------------------------------------
+    if is_ovs:
+        t1_pct = 0.07
+        t2_pct = 0.14
+        target1 = round(price * (1.0 + t1_pct), 2)
+        target2 = round(price * (1.0 + t2_pct), 2)
+        target1_str = f"${target1:.2f} (약 {int(target1*usd_rate):,}원, +{t1_pct*100:.1f}%)"
+        target2_str = f"${target2:.2f} (약 {int(target2*usd_rate):,}원, +{t2_pct*100:.1f}%)"
+        tier_desc = "미국 시장 성장 모멘텀을 반영한"
+    elif marcap_val >= 100000:  # 시총 10조 이상 초대형 우량주 (삼성전자, 현대차 등)
+        t1_pct = 0.05
+        t2_pct = 0.095
+        target1 = int(price * (1.0 + t1_pct))
+        target2 = int(price * (1.0 + t2_pct))
+        target1_str = f"{target1:,}원 (+{t1_pct*100:.1f}%)"
+        target2_str = f"{target2:,}원 (+{t2_pct*100:.1f}%)"
+        tier_desc = "대형 우량주의 체급과 펀더멘털을 고려한 안정적"
+    elif is_biotech or is_robot or is_battery or marcap_val < 30000:  # 고변동성 바이오/테마/성장주 (삼천당제약 등)
+        t1_pct = 0.085
+        t2_pct = 0.16
+        target1 = int(price * (1.0 + t1_pct))
+        target2 = int(price * (1.0 + t2_pct))
+        target1_str = f"{target1:,}원 (+{t1_pct*100:.1f}%)"
+        target2_str = f"{target2:,}원 (+{t2_pct*100:.1f}%)"
+        tier_desc = "고변동성 주도 성장주의 탄력적 모멘텀을 반영한"
+    else:  # 일반 코스피/코스닥
+        t1_pct = 0.065
+        t2_pct = 0.125
+        target1 = int(price * (1.0 + t1_pct))
+        target2 = int(price * (1.0 + t2_pct))
+        target1_str = f"{target1:,}원 (+{t1_pct*100:.1f}%)"
+        target2_str = f"{target2:,}원 (+{t2_pct*100:.1f}%)"
+        tier_desc = "스윙 추세 추종에 적합한 단계별"
+
+    rx2_title = f"🎯 [처방 2: 단계별 목표가 & 분할 익절 ({tier_desc[:12]}..)]"
+    rx2_content = (
+        f"<b>1차 목표가 {target1_str}</b> 도달 시 보유 비중의 50%를 확정 매도하여 투자 원금을 안전하게 회수하고, "
+        f"잔여 50% 물량은 <b>2차 목표가 {target2_str}</b>까지 추세를 끝까지 추종하며 수익을 극대화하십시오."
+    )
+    if high_52w and high_52w != "조회 중":
+        rx2_content += f" (※ 52주 최고점은 <b>{high_52w}</b>에 형성되어 있어 상단 저항선 돌파 여부가 핵심 척도입니다.)"
+
+    # ----------------------------------------------------
+    # [처방 3: 생명선 방어 & 종목 맞춤 비상 손절선]
+    # ----------------------------------------------------
+    if is_ovs:
+        stop_pct = 0.035
+        stop_val = round(price * (1.0 - stop_pct), 2)
+        stop_str = f"${stop_val:.2f} (약 {int(stop_val*usd_rate):,}원, -{stop_pct*100:.1f}%)"
+        ref_text = f"20일선(${sma20:.2f}) 이탈 버퍼" if sma20 > 0 else "단기 손절선"
+    elif marcap_val >= 100000:
+        stop_pct = 0.028
+        stop_val = int(price * (1.0 - stop_pct))
+        stop_str = f"{stop_val:,}원 (-{stop_pct*100:.1f}%)"
+        ref_text = f"20일선({int(sma20):,}원) -1.2% 지지 버퍼선" if sma20 > 0 else "우량주 방어선"
+    elif is_biotech or is_robot or is_battery:
+        stop_pct = 0.042
+        stop_val = int(price * (1.0 - stop_pct))
+        stop_str = f"{stop_val:,}원 (-{stop_pct*100:.1f}%)"
+        ref_text = f"20일선({int(sma20):,}원) -2.0% 휩소 방어선" if sma20 > 0 else "변동성 마지노선"
+    else:
+        stop_pct = 0.032
+        stop_val = int(price * (1.0 - stop_pct))
+        stop_str = f"{stop_val:,}원 (-{stop_pct*100:.1f}%)"
+        ref_text = f"20일선({int(sma20):,}원) -1.5% 지지선" if sma20 > 0 else "추세 이탈선"
 
     rx3_title = "🛡️ [처방 3: 생명선 방어 & 비상 손절선]"
-    rx3_content = f"<b>권장 손절선 {stop_str}</b> 또는 20일선 종가 이탈 시 미련을 버리고 즉시 퇴원(전량 손절)하여 자산을 보호하는 기계적 원칙을 준수하십시오."
+    rx3_content = (
+        f"<b>비상 생명선 손절가: {stop_str} ({ref_text})</b><br/>"
+        f"장중 일시적 아래꼬리 흔들기에 뇌동매매하지 마시고, <b>종가 기준으로 {stop_str}을 명확히 이탈할 경우</b> "
+        f"주포의 지지 의지가 꺾인 것으로 판정합니다. 반등에 대한 막연한 미련을 버리고 즉시 비중 축소 또는 전량 퇴원(손절)하여 "
+        f"소중한 투자 원금을 지키는 기계적 원칙을 엄수하십시오."
+    )
 
-    rx4_title = "⚠️ [처방 4: 특이체질 및 복용 주의사항]"
-    if is_ovs:
-        rx4_content = "미국 FOMC 금리 발표 및 달러 환율 변동성 확대 시 장중 급변동이 나타날 수 있으므로 프리마켓 및 정규장 개장 직후 30분간의 무리한 주문을 피하십시오."
+    # ----------------------------------------------------
+    # [처방 4: 종목 및 업종 특이체질별 핀포인트 복용 주의사항]
+    # ----------------------------------------------------
+    # 동적 거래대금 수급 임계치 산출
+    effective_tv = trade_val if trade_val > 0 else (marcap_val * 0.008)
+
+    if effective_tv >= 10000:  # 1조원 이상 초대형주
+        lim_val = int(effective_tv * 0.45)
+        lim_str = f"약 {lim_val//10000}조 {lim_val%10000:,}억" if lim_val >= 10000 else f"약 {lim_val:,}억"
+        liq_alert = f"당일 실시간 거래대금이 평소 대비 <b>{lim_str} 이하로 둔화</b>될 경우, 지수 주도력이 약화될 수 있으니 외인 순매수 전환 여부를 필수 확인하십시오."
+    elif effective_tv >= 1000:  # 1,000억 ~ 1조원 대형·주도주 (삼천당제약 등)
+        lim_val = int(effective_tv * 0.35)
+        liq_alert = f"당일 실시간 거래대금이 <b>약 {lim_val:,}억 이하로 마를 경우</b>, 세력의 단기 차익 실현 후 유동성 공백이 발생할 수 있으니 무리한 추격 매수를 자제하십시오."
+    elif effective_tv > 0:  # 중소형주
+        lim_val = max(30, int(effective_tv * 0.35))
+        liq_alert = f"당일 거래대금이 <b>약 {lim_val:,}억 미만으로 급감</b>할 경우, 호가창 얇아짐으로 인한 작은 매도에도 급락이 나타날 수 있으니 시장가 매매를 엄금하십시오."
     else:
-        rx4_content = "실적 발표 시즌 어닝 서프라이즈 여부 및 코스피/코스닥 지수 급락 시 테마 동반 조정에 유의하시고, 거래대금이 300억 미만으로 급감할 경우 매도 대응을 서두르십시오."
+        liq_alert = "당일 거래량이 평소 대비 40% 이하로 급감할 경우 수급 유출을 경계하십시오."
+
+    # 업종/섹터별 특화 임상 처방전
+    if is_ovs:
+        rx4_title = "⚠️ [처방 4: 미국 정규장 및 FOMC 복용 주의사항]"
+        rx4_content = (
+            f"🇺🇸 <b>[FOMC 금리 결정 및 실적 발표(어닝 콜) 갭 변동 주의]</b>: 정규장 마감 직후 분기 실적 발표 시 시간외(애프터마켓)에서 "
+            f"급격한 갭(Gap)이 발생합니다. 주요 이벤트 당일 프리마켓 추격 매수를 지양하고 철저히 분할 주문하십시오.<br/>"
+            f"• <b>환율 리스크:</b> 원/달러 환율({usd_rate:,.1f}원) 변동에 따른 환차손익을 반드시 계좌에서 교차 점검하십시오."
+        )
+    elif is_biotech:
+        rx4_title = "⚠️ [처방 4: 바이오·신약 특이체질 임상 주의사항]"
+        rx4_content = (
+            f"💉 <b>[임상 데이터 및 학회 재료 소멸 주의]</b>: 바이오·제약주는 글로벌 기술수출(L/O), FDA 품목허가 승인, 임상 탑라인 발표 및 "
+            f"주요 글로벌 학회(AACR, ASCO, 바이오USA 등) 일정 전후로 <b>'재료 소멸에 따른 급락 롤러코스터'</b>가 빈번합니다. "
+            f"호재 뉴스 당일 시초가 급등 시에는 추격 매수 대신 분할 익절이 원칙입니다.<br/>"
+            f"• <b>수급 경계선:</b> {liq_alert}"
+        )
+    elif is_semi:
+        rx4_title = "⚠️ [처방 4: 반도체·AI 사이클 특이체질 주의사항]"
+        rx4_content = (
+            f"💾 <b>[글로벌 빅테크 CapEx 및 필라델피아 지수 연동]</b>: 미국 엔비디아·TSMC 실적 발표, 필라델피아 반도체 지수(SOX) 및 "
+            f"HBM 공급망 뉴스에 주가가 강하게 동조화됩니다. D램/낸드 현물 가격 추이와 외인의 선물 연계 매수세가 둔화될 때를 분할 매도 신호로 삼으십시오.<br/>"
+            f"• <b>수급 경계선:</b> {liq_alert}"
+        )
+    elif is_battery:
+        rx4_title = "⚠️ [처방 4: 2차전지·소재 밸류체인 복용 주의사항]"
+        rx4_content = (
+            f"⚡ <b>[리튬 원자재 가격 및 공매도 잔고 모니터링]</b>: 탄산리튬/니켈 스팟 가격과 글로벌 완성차 업체의 전기차(EV) 전환 속도 뉴스에 민감합니다. "
+            f"공매도 잔고 추이와 양극재 판가 스프레드가 회복되는지 점검하십시오.<br/>"
+            f"• <b>수급 경계선:</b> {liq_alert}"
+        )
+    elif is_defense:
+        rx4_title = "⚠️ [처방 4: K-방산 수주 사이클 복용 주의사항]"
+        rx4_content = (
+            f"🛡️ <b>[정부 수주 계약 공시 직후 단기 차익 주의]</b>: 폴란드, 중동, 루마니아 등 대규모 무기 수출 계약 공시 직후 '뉴스에 팔아라' 매물이 출회될 수 있습니다. "
+            f"60일 수급선을 중기 마지노선으로 잡고 수주 잔고의 실제 납품 전환율을 점검하십시오.<br/>"
+            f"• <b>수급 경계선:</b> {liq_alert}"
+        )
+    elif is_nuclear:
+        rx4_title = "⚠️ [처방 4: 원전·AI 전력망 특이체질 주의사항]"
+        rx4_content = (
+            f"⚛️ <b>[데이터센터 전력 인프라 및 체코 원전 모멘텀]</b>: 미국 AI 데이터센터 전력 증설 및 해외 원전 수주 모멘텀을 타는 체질입니다. "
+            f"전력망 변압기 납품 주기와 정부 에너지 정책 모멘텀 지속 여부를 체크하십시오.<br/>"
+            f"• <b>수급 경계선:</b> {liq_alert}"
+        )
+    elif is_robot:
+        rx4_title = "⚠️ [처방 4: 로봇·AI 미래성장주 복용 주의사항]"
+        rx4_content = (
+            f"🤖 <b>[고밸류(High PER) 체질 및 금리 변동성 경보]</b>: 실적 대비 미래 기대감이 크게 선반영된 체질이므로, 시장 금리 반등 시 "
+            f"주가 조정 폭이 깊어질 수 있습니다. 총자산 대비 비중을 20% 이내로 엄격히 제한하십시오.<br/>"
+            f"• <b>수급 경계선:</b> {liq_alert}"
+        )
+    elif is_auto:
+        rx4_title = "⚠️ [처방 4: 완성차·전장 밸류업 복용 주의사항]"
+        rx4_content = (
+            f"🚗 <b>[환율 변동성 및 주주환원 밸류업 점검]</b>: 원/달러 환율 하락 시 수출 마진 둔화 우려가 발생할 수 있습니다. "
+            f"자사주 소각 등 주주환원 밸류업 프로그램과 하이브리드 판매 추이를 필수 점검하십시오.<br/>"
+            f"• <b>수급 경계선:</b> {liq_alert}"
+        )
+    elif is_ship:
+        rx4_title = "⚠️ [처방 4: 조선 슈퍼사이클 복용 주의사항]"
+        rx4_content = (
+            f"🚢 <b>[신조선가 지수 및 후판 가격 연동]</b>: 3년 치 이상의 건조 수주 잔고를 확보했으나, 후판 철강 가격 인상 시 수익성 훼손 우려가 있습니다. "
+            f"클락슨 신조선가 지수 상승세 지속 여부를 확인하십시오.<br/>"
+            f"• <b>수급 경계선:</b> {liq_alert}"
+        )
+    elif is_beauty:
+        rx4_title = "⚠️ [처방 4: K-뷰티 인디브랜드 복용 주의사항]"
+        rx4_content = (
+            f"💄 <b>[미국 아마존 랭킹 및 수출 통관 데이터 점검]</b>: 관세청 월별 화장품 수출액 및 미국/일본 유통 채널 입점 확대 추이를 점검하십시오. "
+            f"경쟁 심화에 따른 마케팅비 증가 시 영업이익률을 확인하십시오.<br/>"
+            f"• <b>수급 경계선:</b> {liq_alert}"
+        )
+    elif is_enter:
+        rx4_title = "⚠️ [처방 4: 엔터·콘텐츠 IP 복용 주의사항]"
+        rx4_content = (
+            f"🎵 <b>[아티스트 컴백 주기 및 음원·월드투어 실적]</b>: 주요 아티스트의 군입대, 재계약 이슈 및 신작 게임 흥행 여부에 주가가 급변동합니다. "
+            f"음반 초동 판매량과 글로벌 투어 모객수를 주시하십시오.<br/>"
+            f"• <b>수급 경계선:</b> {liq_alert}"
+        )
+    else:
+        rx4_title = "⚠️ [처방 4: 실적 시즌 및 수급 복용 주의사항]"
+        rx4_content = (
+            f"📢 <b>[실적 발표 및 지수 급변동 주의]</b>: 분기 실적 어닝 서프라이즈 여부 및 코스피/코스닥 지수 급락 시 동반 조정에 유의하십시오.<br/>"
+            f"• <b>수급 경계선:</b> {liq_alert}"
+        )
 
     return [
-        {"title": rx1_title, "content": rx1_content, "bg": "#EFF6FF", "border": "#3B82F6", "text": "#1D4ED8"},
+        {"title": rx1_title, "content": rx1_content, "bg": rx1_color_pkg["bg"], "border": rx1_color_pkg["border"], "text": rx1_color_pkg["text"]},
         {"title": rx2_title, "content": rx2_content, "bg": "#F0FDF4", "border": "#10B981", "text": "#047857"},
         {"title": rx3_title, "content": rx3_content, "bg": "#FEF2F2", "border": "#EF4444", "text": "#B91C1C"},
         {"title": rx4_title, "content": rx4_content, "bg": "#FFFBEB", "border": "#F59E0B", "text": "#B45309"},
