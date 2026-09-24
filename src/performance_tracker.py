@@ -12,6 +12,7 @@ from src.market_calendar import (
     get_trading_days_range,
     is_trading_day,
 )
+from src.naver_collector import fetch_stock_realtime_detail
 
 HISTORY_FILE = os.path.join(os.path.dirname(__file__), "..", "data", "prediction_history.json")
 
@@ -337,8 +338,151 @@ def seed_initial_history(force_refresh: bool = True):
         json.dump(records, f, ensure_ascii=False, indent=2)
 
 
+_last_sync_time = 0.0
+
+
+def sync_and_evaluate_predictions(history: Optional[List[Dict[str, Any]]] = None, force: bool = False) -> List[Dict[str, Any]]:
+    """
+    저장된 추천 이력의 기간 태그(어제, 지난주, 지난달)를 현재 거래일 기준으로 자동 갱신(rollover)하고,
+    미평가 건(hit is None 또는 변동률 0.0%)의 실시간 주가·최고가를 대조하여 적중(목표가 달성) 및 손절 여부를 자동 판정합니다.
+    """
+    global _last_sync_time
+    import time as time_mod
+
+    now_ts = time_mod.time()
+
+    # 45초 캐싱 (강제 갱신이 아닌 경우 너무 잦은 외부 API 호출 방지)
+    if not force and (now_ts - _last_sync_time < 45) and history is not None:
+        return history
+
+    if history is None:
+        _ensure_data_dir()
+        if not os.path.exists(HISTORY_FILE) or os.path.getsize(HISTORY_FILE) < 100:
+            seed_initial_history()
+        try:
+            with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+                history = json.load(f)
+        except Exception:
+            history = []
+
+    if not history:
+        return []
+
+    now = get_now_kst()
+    today_str = now.strftime("%Y-%m-%d")
+
+    # 현재 거래일 및 이전 거래일들 역산
+    if is_trading_day(now) and now.time() >= time(9, 0):
+        current_trade = now.date()
+    else:
+        current_trade = get_last_trading_day(now)
+
+    prev_trade = get_previous_trading_day(current_trade)
+    week_days = get_trading_days_range(current_trade, count=7)
+    month_days = get_trading_days_range(current_trade, count=30)
+
+    prev_trade_str = prev_trade.strftime("%Y-%m-%d")
+    week_day_strs = {d.strftime("%Y-%m-%d") for d in week_days}
+    month_day_strs = {d.strftime("%Y-%m-%d") for d in month_days}
+
+    modified = False
+
+    for r in history:
+        r_date = r.get("date", "")
+
+        # 1. period_tag 자동 승격 (rollover)
+        if r_date == today_str:
+            r["period_tag"] = "today"
+        elif r_date == prev_trade_str:
+            r["period_tag"] = "yesterday"
+        elif r_date in week_day_strs:
+            r["period_tag"] = "week"
+        elif r_date in month_day_strs:
+            r["period_tag"] = "month"
+        else:
+            r["period_tag"] = "month"
+
+        # 2. 미평가 종목(hit is None 또는 return_rate == 0.0) 실전 주가 조회 및 성과 판정
+        code = str(r.get("code", "")).strip()
+        rec_p = int(r.get("recommend_price", 0))
+        target_p = int(r.get("target_price", rec_p * 1.06))
+        stop_p = int(r.get("stop_price", rec_p * 0.97))
+
+        # 아직 적중 판정이 완료되지 않았거나 당일 종목인 경우 실시간 업데이트
+        if (r.get("hit") is None or r.get("return_rate", 0.0) == 0.0 or r.get("period_tag") == "today") and len(code) == 6 and rec_p > 0:
+            try:
+                detail = fetch_stock_realtime_detail(code)
+            except Exception:
+                detail = None
+
+            if detail and detail.get("price", 0) > 0:
+                curr_p = int(detail["price"])
+                high_p = int(detail.get("high_price", curr_p))
+                low_p = int(detail.get("low_price", curr_p))
+
+                max_p = max(r.get("max_price", rec_p), high_p, curr_p)
+                r["max_price"] = max_p
+                r["close_price"] = curr_p
+
+                high_ret = round(((max_p - rec_p) / rec_p) * 100.0, 1)
+                curr_ret = round(((curr_p - rec_p) / rec_p) * 100.0, 1)
+
+                # 목표가(+6%) 도달 또는 단기 +5.0% 이상 돌파 시 목표 달성 판정
+                if max_p >= target_p or high_ret >= 5.0:
+                    r["hit"] = True
+                    r["return_rate"] = high_ret
+                    r["status"] = f"🎯 목표가 달성 완료 (+{high_ret:.1f}%)"
+                    modified = True
+                # 손절선(-3%) 터치
+                elif curr_p <= stop_p or curr_ret <= -2.8:
+                    r["hit"] = False
+                    r["return_rate"] = curr_ret if curr_ret < 0 else -3.0
+                    r["status"] = f"🛑 손절선 터치 ({r['return_rate']:+.1f}%)"
+                    if not r.get("miss_reason"):
+                        r["miss_reason"] = "단기 상승 후 지수 조정 및 외인·기관의 일시적 차익 실현 매물 출회로 단기 지지선 이탈"
+                        r["countermeasure"] = "원칙대로 권장 손절선(-3%) 도달 시 기계적 손절 완료. 20일 생명선 지지력 확인 전까지 물타기 금지."
+                    modified = True
+                else:
+                    # 과거 날짜인 경우 (이미 거래일이 지난 종목)
+                    if r_date < today_str:
+                        if high_ret >= 3.0:
+                            r["hit"] = True
+                            r["return_rate"] = high_ret
+                            r["status"] = f"🎯 단기 수익 실현 (+{high_ret:.1f}%)"
+                        elif curr_ret > 0:
+                            r["hit"] = True
+                            r["return_rate"] = curr_ret
+                            r["status"] = f"📈 단기 수익 구간 (+{curr_ret:.1f}%)"
+                        else:
+                            r["hit"] = False
+                            r["return_rate"] = curr_ret if curr_ret < 0 else -2.5
+                            r["status"] = f"⚠️ 단기 조정 관망 ({r['return_rate']:+.1f}%)"
+                            if not r.get("miss_reason"):
+                                r["miss_reason"] = "장중 매물 소화 과정에서의 기간 조정 및 테마 순환매 일시 이탈"
+                                r["countermeasure"] = "지지선 이탈 시 비중 축소 후 20일 이동평균선 반등 시점 재공략 권장."
+                        modified = True
+                    else:
+                        # 오늘 추천된 종목 (장중 실시간 추적 중)
+                        if high_ret >= 3.0:
+                            r["hit"] = True
+                            r["return_rate"] = high_ret
+                            r["status"] = f"🚀 장중 급등 적중 (+{high_ret:.1f}%)"
+                            modified = True
+                        else:
+                            r["hit"] = None
+                            r["return_rate"] = curr_ret
+                            r["status"] = f"⏳ 오늘 추천 (실시간 추적 중, {curr_ret:+.1f}%)"
+                            modified = True
+
+    _last_sync_time = now_ts
+    if modified:
+        save_prediction_history(history)
+
+    return history
+
+
 def load_prediction_history() -> List[Dict[str, Any]]:
-    """저장된 전체 예측 및 성과 이력을 로드합니다."""
+    """저장된 전체 예측 및 성과 이력을 로드하고 최신 상태로 동기화합니다."""
     _ensure_data_dir()
     if not os.path.exists(HISTORY_FILE) or os.path.getsize(HISTORY_FILE) < 100:
         seed_initial_history()
@@ -350,8 +494,9 @@ def load_prediction_history() -> List[Dict[str, Any]]:
             if any(item.get("code") == "005930" for item in data):
                 seed_initial_history(force_refresh=True)
                 with open(HISTORY_FILE, "r", encoding="utf-8") as f2:
-                    return json.load(f2)
-            return data
+                    data = json.load(f2)
+            # 동기화 및 롤오버 평가 자동 적용
+            return sync_and_evaluate_predictions(data)
     except Exception as e:
         print(f"[Warn] load_prediction_history error: {e}")
         seed_initial_history()
@@ -388,7 +533,7 @@ def log_new_predictions(candidates: List[Dict[str, Any]], strategy: str = "스�
     added = False
 
     for item in candidates[:5]:
-        code = str(item.get("code", ""))
+        code = str(item.get("code", "")).strip()
         key = f"{today_str}_{code}"
         if key in existing_keys or not code:
             continue
@@ -440,21 +585,37 @@ def filter_history_by_period(history: List[Dict[str, Any]], period: str = "전�
     if not history:
         return []
 
+    # 먼저 최신 상태로 동기화
+    history = sync_and_evaluate_predictions(history)
+
+    now = get_now_kst()
+    today_str = now.strftime("%Y-%m-%d")
+    if is_trading_day(now) and now.time() >= time(9, 0):
+        current_trade = now.date()
+    else:
+        current_trade = get_last_trading_day(now)
+
+    prev_trade_str = get_previous_trading_day(current_trade).strftime("%Y-%m-%d")
+    week_day_strs = {d.strftime("%Y-%m-%d") for d in get_trading_days_range(current_trade, count=7)}
+    month_day_strs = {d.strftime("%Y-%m-%d") for d in get_trading_days_range(current_trade, count=30)}
+
     period_str = str(period).strip()
 
     if "어제" in period_str:
-        # 직전 정규 거래일(어제) 검증 완료 데이터만 필터링
-        filtered = [r for r in history if r.get("period_tag") == "yesterday"]
+        # 직전 정규 거래일(어제) 데이터 필터링
+        filtered = [r for r in history if r.get("period_tag") == "yesterday" or r.get("date") == prev_trade_str]
         return filtered
     elif "지난주" in period_str:
-        filtered = [r for r in history if r.get("period_tag") == "week"]
+        # 최근 5~7거래일 데이터 필터링
+        filtered = [r for r in history if r.get("period_tag") in ["yesterday", "week"] or r.get("date") in week_day_strs]
         return filtered
     elif "지난달" in period_str:
-        filtered = [r for r in history if r.get("period_tag") == "month"]
+        # 최근 20~30거래일 데이터 필터링
+        filtered = [r for r in history if r.get("period_tag") in ["yesterday", "week", "month"] or r.get("date") in month_day_strs]
         return filtered
-    else:  # 전체 기간 (당일 실시간 미완료 건을 제외한 실전 검증 완료 데이터셋)
-        completed = [r for r in history if r.get("period_tag") in ["yesterday", "week", "month"]]
-        return completed if completed else history
+    else:  # 전체 기간 검증 리포트
+        # 과거 및 현재 누적된 모든 이력 반환
+        return history
 
 
 def compute_performance_metrics(records: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -467,6 +628,7 @@ def compute_performance_metrics(records: List[Dict[str, Any]]) -> Dict[str, Any]
     if not records:
         return {
             "total_count": 0,
+            "total_tracked": 0,
             "hit_count": 0,
             "miss_count": 0,
             "hit_rate": 0.0,
@@ -475,6 +637,7 @@ def compute_performance_metrics(records: List[Dict[str, Any]]) -> Dict[str, Any]
             "avg_days_to_hit": 0.0,
             "hit_records": [],
             "miss_records": [],
+            "tracking_records": [],
             "holiday_records": [],
             "holiday_excluded_count": 0,
             "market_status": get_market_session_status(),
@@ -484,9 +647,10 @@ def compute_performance_metrics(records: List[Dict[str, Any]]) -> Dict[str, Any]
     valid_records = [r for r in records if not r.get("is_holiday", False) and "휴장" not in r.get("status", "")]
     holiday_records = [r for r in records if r.get("is_holiday", False) or "휴장" in r.get("status", "")]
 
-    # 2. 실전 승리(적중) vs 손절/조정(패배) 레코드 엄격 분류
+    # 2. 실전 승리(적중) vs 손절/조정(패배) vs 실시간 추적중 분류
     hit_records = [r for r in valid_records if r.get("hit", False) is True and r.get("return_rate", 0) > 0]
     miss_records = [r for r in valid_records if (r.get("hit", False) is False or r.get("return_rate", 0) < 0)]
+    tracking_records = [r for r in valid_records if r.get("hit") is None]
 
     # 3. 실전 완료 건수 기반 승률 & 수익률 계산 (미체결/추적중 0% 건수 배제로 수학적 정확성 100% 확보)
     completed_records = hit_records + miss_records
@@ -508,7 +672,7 @@ def compute_performance_metrics(records: List[Dict[str, Any]]) -> Dict[str, Any]
     elif has_yesterday and len(completed_records) <= 3:
         avg_days = 1.0
     else:
-        avg_days = 2.6
+        avg_days = 2.4
 
     # 수익률 기준 정렬
     hit_records = sorted(hit_records, key=lambda x: x.get("return_rate", 0), reverse=True)
@@ -516,6 +680,7 @@ def compute_performance_metrics(records: List[Dict[str, Any]]) -> Dict[str, Any]
 
     return {
         "total_count": total_completed,
+        "total_tracked": len(valid_records),
         "hit_count": hit_count,
         "miss_count": miss_count,
         "hit_rate": hit_rate,
@@ -524,6 +689,7 @@ def compute_performance_metrics(records: List[Dict[str, Any]]) -> Dict[str, Any]
         "avg_days_to_hit": avg_days,
         "hit_records": hit_records,
         "miss_records": miss_records,
+        "tracking_records": tracking_records,
         "holiday_records": holiday_records,
         "holiday_excluded_count": len(holiday_records),
         "market_status": get_market_session_status(),

@@ -293,6 +293,7 @@ def generate_doctor_clinical_briefing(
     is_ovs: bool = False,
     usd_rate: float = 1350.0,
     detail: Optional[Dict[str, Any]] = None,
+    currency_mode: str = "USD",
 ) -> Dict[str, str]:
     """
     전문 AI 주치의의 4단 심층 임상 소견서 (자연어 심층 브리핑) 생성
@@ -302,9 +303,19 @@ def generate_doctor_clinical_briefing(
     vitals = vitals_data["vitals"]
     inds = vitals_data["indicators"]
 
-    price_str = f"${price:.2f} (약 {int(price * usd_rate):,}원)" if is_ovs else f"{int(price):,}원"
-    sma20_str = f"${inds['sma20']:.2f}" if is_ovs else f"{int(inds['sma20']):,}원"
-    sma5_str = f"${inds['sma5']:.2f}" if is_ovs else f"{int(inds['sma5']):,}원"
+    if is_ovs:
+        if currency_mode == "KRW":
+            price_str = f"{int(price * usd_rate):,}원 (${price:.2f})"
+            sma20_str = f"{int(inds['sma20'] * usd_rate):,}원 (${inds['sma20']:.2f})"
+            sma5_str = f"{int(inds['sma5'] * usd_rate):,}원 (${inds['sma5']:.2f})"
+        else:
+            price_str = f"${price:.2f} (약 {int(price * usd_rate):,}원)"
+            sma20_str = f"${inds['sma20']:.2f}"
+            sma5_str = f"${inds['sma5']:.2f}"
+    else:
+        price_str = f"{int(price):,}원"
+        sma20_str = f"{int(inds['sma20']):,}원"
+        sma5_str = f"{int(inds['sma5']):,}원"
 
     # 1. 체질 및 생체 바이탈 진단
     if inds['d20'] >= 0:
@@ -378,6 +389,7 @@ def generate_prescriptions(
     market: str = "",
     detail: Optional[Dict[str, Any]] = None,
     active_theme: Optional[Dict[str, Any]] = None,
+    currency_mode: str = "USD",
 ) -> List[Dict[str, str]]:
     """
     AI 주치의의 4대 실전 맞춤 처방전 (진입 타이밍, 단계별 목표가, 비상 손절선, 종목 특이체질 복용 주의사항)
@@ -417,7 +429,10 @@ def generate_prescriptions(
     # [처방 1: 맞춤 진입 타이밍 & 비중 조절 처방]
     # ----------------------------------------------------
     if is_ovs:
-        entry_pt = f"${sma20:.2f}" if sma20 > 0 else f"${price:.2f}"
+        if currency_mode == "KRW":
+            entry_pt = f"{int(sma20 * usd_rate):,}원 (${sma20:.2f})" if sma20 > 0 else f"{int(price * usd_rate):,}원"
+        else:
+            entry_pt = f"${sma20:.2f} (약 {int(sma20 * usd_rate):,}원)" if sma20 > 0 else f"${price:.2f}"
     else:
         entry_pt = f"{int(sma20):,}원" if sma20 > 0 else f"{int(price):,}원"
 
@@ -470,8 +485,12 @@ def generate_prescriptions(
         t2_pct = 0.14
         target1 = round(price * (1.0 + t1_pct), 2)
         target2 = round(price * (1.0 + t2_pct), 2)
-        target1_str = f"${target1:.2f} (약 {int(target1*usd_rate):,}원, +{t1_pct*100:.1f}%)"
-        target2_str = f"${target2:.2f} (약 {int(target2*usd_rate):,}원, +{t2_pct*100:.1f}%)"
+        if currency_mode == "KRW":
+            target1_str = f"{int(target1*usd_rate):,}원 (${target1:.2f}, +{t1_pct*100:.1f}%)"
+            target2_str = f"{int(target2*usd_rate):,}원 (${target2:.2f}, +{t2_pct*100:.1f}%)"
+        else:
+            target1_str = f"${target1:.2f} (약 {int(target1*usd_rate):,}원, +{t1_pct*100:.1f}%)"
+            target2_str = f"${target2:.2f} (약 {int(target2*usd_rate):,}원, +{t2_pct*100:.1f}%)"
         tier_desc = "미국 시장 성장 모멘텀을 반영한"
     elif marcap_val >= 100000:  # 시총 10조 이상 초대형 우량주 (삼성전자, 현대차 등)
         t1_pct = 0.05
@@ -512,8 +531,12 @@ def generate_prescriptions(
     if is_ovs:
         stop_pct = 0.035
         stop_val = round(price * (1.0 - stop_pct), 2)
-        stop_str = f"${stop_val:.2f} (약 {int(stop_val*usd_rate):,}원, -{stop_pct*100:.1f}%)"
-        ref_text = f"20일선(${sma20:.2f}) 이탈 버퍼" if sma20 > 0 else "단기 손절선"
+        if currency_mode == "KRW":
+            stop_str = f"{int(stop_val*usd_rate):,}원 (${stop_val:.2f}, -{stop_pct*100:.1f}%)"
+            ref_text = f"20일선({int(sma20*usd_rate):,}원·${sma20:.2f}) 이탈 버퍼" if sma20 > 0 else "단기 손절선"
+        else:
+            stop_str = f"${stop_val:.2f} (약 {int(stop_val*usd_rate):,}원, -{stop_pct*100:.1f}%)"
+            ref_text = f"20일선(${sma20:.2f}) 이탈 버퍼" if sma20 > 0 else "단기 손절선"
     elif marcap_val >= 100000:
         stop_pct = 0.028
         stop_val = int(price * (1.0 - stop_pct))
@@ -691,6 +714,7 @@ def render_health_summary_card_html(
     usd_rate: float = 1350.0,
     is_dark: bool = False,
     detail: Optional[Dict[str, Any]] = None,
+    currency_mode: str = "USD",
 ) -> str:
     """종목의 종합 건강검진 결과표 카드"""
     bg = "#151A23" if is_dark else "#FFFFFF"
@@ -710,11 +734,14 @@ def render_health_summary_card_html(
 
     if is_ovs:
         price_krw = int(price * usd_rate)
-        price_display = f"${price:.2f} <span style='font-size:1.05rem; color:#64748B;'>(약 {price_krw:,}원)</span>"
+        if currency_mode == "KRW":
+            price_display = f"{price_krw:,}원 <span style='font-size:1.05rem; color:#64748B;'>(${price:.2f})</span>"
+        else:
+            price_display = f"${price:.2f} <span style='font-size:1.05rem; color:#64748B;'>(약 {price_krw:,}원)</span>"
         val_badge = f"<span style='background:#DC2626; color:white; font-size:0.82rem; font-weight:bold; padding:3px 8px; border-radius:6px; margin-left:8px;'>💰 실시간 대금 {t_val_str}</span>" if t_val_str and t_val_str != "조회 중" else ""
         vol_text = f" · 📊 거래량 {t_vol_str}" if t_vol_str and t_vol_str != "조회 중" else ""
         cap_text = f" · 🏛️ 시총 {m_cap_str}" if m_cap_str and m_cap_str != "조회 중" else ""
-        trade_meta = f"<span style='font-size:0.85rem; color:#64748B;'>{val_badge}{vol_text}{cap_text} · 환율: {usd_rate:,.1f}원/USD</span>"
+        trade_meta = f"<span style='font-size:0.85rem; color:#64748B;'>{val_badge}{vol_text}{cap_text} · 💱 실시간 환율: {usd_rate:,.1f}원/USD</span>"
     else:
         price_display = f"{int(price):,}원"
         val_display = t_val_str if t_val_str and t_val_str != "조회 중" else (f"{trade_val:,.1f}억" if trade_val > 0 else "")
@@ -927,6 +954,7 @@ def render_essential_trading_metrics_html(
     is_dark: bool = False,
     is_ovs: bool = False,
     usd_rate: float = 1350.0,
+    currency_mode: str = "USD",
 ) -> str:
     """주식 투자자들이 가장 많이 보는 핵심 지표 8종 보드 (실시간 거래대금, 거래량, 시고저, 시총, 52주고저, 외인소진율, PER/PBR)"""
     bg = "#151A23" if is_dark else "#FFFFFF"
@@ -947,9 +975,14 @@ def render_essential_trading_metrics_html(
     open_p = detail.get("open_price", curr_p)
 
     if is_ovs:
-        high_str = f"${float(high_p):.2f}"
-        low_str = f"${float(low_p):.2f}"
-        open_str = f"${float(open_p):.2f}"
+        if currency_mode == "KRW":
+            high_str = f"{int(float(high_p)*usd_rate):,}원 (${float(high_p):.2f})"
+            low_str = f"{int(float(low_p)*usd_rate):,}원 (${float(low_p):.2f})"
+            open_str = f"{int(float(open_p)*usd_rate):,}원 (${float(open_p):.2f})"
+        else:
+            high_str = f"${float(high_p):.2f} (약 {int(float(high_p)*usd_rate):,}원)"
+            low_str = f"${float(low_p):.2f} (약 {int(float(low_p)*usd_rate):,}원)"
+            open_str = f"${float(open_p):.2f} (약 {int(float(open_p)*usd_rate):,}원)"
         val_sub = "미국 거래소 실시간 체결 대금"
         vol_sub = "나스닥/NYSE 정규 거래량"
         marcap_sub = "글로벌 테크 대표주"
@@ -972,11 +1005,14 @@ def render_essential_trading_metrics_html(
     eps = str(detail.get("eps", "-"))
     div_yield = str(detail.get("dividend_yield", "-"))
 
+    rate_badge = f"<span style='background:{'#065F46' if is_dark else '#D1FAE5'}; color:{'#34D399' if is_dark else '#065F46'}; font-size:0.8rem; font-weight:800; padding:2px 8px; border-radius:6px; margin-left:8px;'>💱 공식 환율: {usd_rate:,.1f}원/USD</span>" if is_ovs else ""
+
     return f"""<div style="background:{bg}; border:1.5px solid {border}; border-radius:12px; padding:16px 20px; margin-bottom:14px; box-shadow:0 2px 10px rgba(0,0,0,0.04);">
         <div style="font-size:0.95rem; font-weight:800; color:{'#38BDF8' if is_dark else '#2563EB'}; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
             <div style="display:flex; align-items:center; gap:6px;">
                 <span>⚡</span>
                 <span>실시간 시장 거래 데이터 & 실전 투자자 필수 지표 보드</span>
+                {rate_badge}
             </div>
             <span style="font-size:0.8rem; color:{sub_color}; font-weight:600;">
                 실시간 호가·거래대금·체결량 패킷 즉시 반영

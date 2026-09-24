@@ -1985,6 +1985,28 @@ def render_stock_detailed_section(code: str, name: str, is_dark: bool, in_modal:
     signals = analyze_stock_signals(ohlcv_ind)
 
     usd_rate = get_usd_krw_rate()
+    curr_mode = "💵 달러 ($)"
+    if is_ovs:
+        col_curr1, col_curr2 = st.columns([3.2, 1.8])
+        with col_curr1:
+            st.html(f"""<div style="display:inline-flex; align-items:center; gap:8px; background:{'#1E293B' if is_dark else '#F0FDF4'}; border:1px solid {'#059669' if is_dark else '#10B981'}; border-radius:8px; padding:6px 14px; font-size:0.88rem; font-weight:700; color:{'#34D399' if is_dark else '#065F46'}; margin-bottom:8px;">
+                <span>💱</span>
+                <span>실시간 공식 환율: <b>{usd_rate:,.1f}원/USD</b> (서울 외환시장/네이버 금융 고시 기준)</span>
+            </div>""")
+        with col_curr2:
+            curr_sel = st.segmented_control(
+                "통화 표기 선택",
+                options=["💵 달러 ($) 기준", "₩ 원화 (KRW) 기준"],
+                default=st.session_state.get("ovs_currency_pref", "💵 달러 ($) 기준"),
+                key=f"ovs_curr_sel_{key_prefix}_{code}",
+                label_visibility="collapsed",
+            )
+            if curr_sel:
+                st.session_state["ovs_currency_pref"] = curr_sel
+                curr_mode = curr_sel
+
+    ovs_mode_code = "KRW" if "원화" in curr_mode else "USD"
+
     if is_ovs:
         curr_price_usd = float(detail.get("price", ohlcv["close"].iloc[-1])) if detail else float(ohlcv["close"].iloc[-1])
         curr_price_krw = int(detail.get("price_krw", curr_price_usd * usd_rate)) if detail else int(curr_price_usd * usd_rate)
@@ -2035,7 +2057,10 @@ def render_stock_detailed_section(code: str, name: str, is_dark: bool, in_modal:
         tv_str = detail.get("trade_value_str", "") if detail else ""
         tv_badge = f"<span style='background:{'#374151' if is_dark else '#FEE2E2'}; color:{'#FCA5A5' if is_dark else '#DC2626'}; padding:2px 8px; border-radius:6px; font-weight:800; font-size:0.85rem; margin-right:6px;'>💰 실시간 대금: {tv_str}</span>" if tv_str else ""
         trade_meta = f"<span style='margin-left:8px; font-size:0.85rem; color:#64748B;'>{tv_badge}{marcap_str} · 환율: {usd_rate:,.1f}원/USD</span>"
-        price_tag = f"${curr_price_usd:.2f} <span style='font-size:1.05rem; color:{'#CBD5E1' if is_dark else '#64748B'};'>(약 {curr_price_krw:,}원)</span>"
+        if ovs_mode_code == "KRW":
+            price_tag = f"{curr_price_krw:,}원 <span style='font-size:1.05rem; color:{'#CBD5E1' if is_dark else '#64748B'};'>(${curr_price_usd:.2f})</span>"
+        else:
+            price_tag = f"${curr_price_usd:.2f} <span style='font-size:1.05rem; color:{'#CBD5E1' if is_dark else '#64748B'};'>(약 {curr_price_krw:,}원)</span>"
     else:
         tv_str = detail.get("trade_value_str") if (detail and detail.get("trade_value_str")) else (f"{trade_val:,.0f}억" if trade_val > 0 else "")
         tv_badge = f"<span style='background:{'#374151' if is_dark else '#FEE2E2'}; color:{'#FCA5A5' if is_dark else '#DC2626'}; padding:2px 8px; border-radius:6px; font-weight:800; font-size:0.85rem; margin-right:6px;'>💰 실시간 대금: {tv_str}</span>" if tv_str else ""
@@ -2072,14 +2097,24 @@ def render_stock_detailed_section(code: str, name: str, is_dark: bool, in_modal:
     # 2. 이동평균선(5일, 20일, 60일) 직접 비교 메트릭 카드
     m1, m2, m3, m4 = st.columns(4)
     if is_ovs:
-        with m1:
-            st.metric("현재가", f"${curr_price_usd:.2f}", f"{change_rate:+.2f}% (약 {curr_price_krw:,}원)")
-        with m2:
-            st.metric("5일선 (단기 탄력)", f"${sma5:.2f}", f"이격도 {d5:+.1f}% (약 {int(sma5*usd_rate):,}원)", delta_color="normal" if d5 > 0 else "inverse")
-        with m3:
-            st.metric("20일선 (생명선/추세)", f"${sma20:.2f}", f"이격도 {d20:+.1f}% (약 {int(sma20*usd_rate):,}원)", delta_color="normal" if d20 > 0 else "inverse")
-        with m4:
-            st.metric("60일선 (중기 수급)", f"${sma60:.2f}", f"이격도 {d60:+.1f}% (약 {int(sma60*usd_rate):,}원)", delta_color="normal" if d60 > 0 else "inverse")
+        if ovs_mode_code == "KRW":
+            with m1:
+                st.metric("현재가", f"{curr_price_krw:,}원", f"{change_rate:+.2f}% (${curr_price_usd:.2f})")
+            with m2:
+                st.metric("5일선 (단기 탄력)", f"{int(sma5*usd_rate):,}원", f"이격도 {d5:+.1f}% (${sma5:.2f})", delta_color="normal" if d5 > 0 else "inverse")
+            with m3:
+                st.metric("20일선 (생명선/추세)", f"{int(sma20*usd_rate):,}원", f"이격도 {d20:+.1f}% (${sma20:.2f})", delta_color="normal" if d20 > 0 else "inverse")
+            with m4:
+                st.metric("60일선 (중기 수급)", f"{int(sma60*usd_rate):,}원", f"이격도 {d60:+.1f}% (${sma60:.2f})", delta_color="normal" if d60 > 0 else "inverse")
+        else:
+            with m1:
+                st.metric("현재가", f"${curr_price_usd:.2f}", f"{change_rate:+.2f}% (약 {curr_price_krw:,}원)")
+            with m2:
+                st.metric("5일선 (단기 탄력)", f"${sma5:.2f}", f"이격도 {d5:+.1f}% (약 {int(sma5*usd_rate):,}원)", delta_color="normal" if d5 > 0 else "inverse")
+            with m3:
+                st.metric("20일선 (생명선/추세)", f"${sma20:.2f}", f"이격도 {d20:+.1f}% (약 {int(sma20*usd_rate):,}원)", delta_color="normal" if d20 > 0 else "inverse")
+            with m4:
+                st.metric("60일선 (중기 수급)", f"${sma60:.2f}", f"이격도 {d60:+.1f}% (약 {int(sma60*usd_rate):,}원)", delta_color="normal" if d60 > 0 else "inverse")
     else:
         with m1:
             st.metric("현재가", f"{curr_price:,}원", f"{change_rate:+.2f}%")
@@ -2092,7 +2127,7 @@ def render_stock_detailed_section(code: str, name: str, is_dark: bool, in_modal:
 
     # 2-1. 투자자 8대 필수 핵심 실시간 지표 보드 (거래대금, 거래량, 시고저 밴드, 시총, 52주 고저, 외인소진율, PER/PBR, EPS/배당)
     if detail and not key_prefix.startswith("tab4_diag"):
-        st.html(render_essential_trading_metrics_html(detail, is_dark=is_dark, is_ovs=is_ovs, usd_rate=usd_rate))
+        st.html(render_essential_trading_metrics_html(detail, is_dark=is_dark, is_ovs=is_ovs, usd_rate=usd_rate, currency_mode=ovs_mode_code))
 
     # 2-2. 캔들 차트 주기 선택 (1분, 5분, 1시간, 24시간, 1주일, 1달, 1년)
     tf_c1, tf_c2 = st.columns([1.5, 4.5])
@@ -3203,7 +3238,7 @@ def render_performance_tab_fragment(is_dark_mode: bool):
     # 2. 핵심 4대 성과 메트릭 바
     m_c1, m_c2, m_c3, m_c4 = st.columns(4)
     with m_c1:
-        st.metric("🎯 AI 검증 적중률", f"{metrics['hit_rate']}%", f"{metrics['hit_count']}승 {metrics['miss_count']}패 (개장일 기준)", delta_color="normal")
+        st.metric("🎯 AI 검증 적중률", f"{metrics['hit_rate']}%", f"{metrics['hit_count']}승 {metrics['miss_count']}패 (누적 {metrics['total_count']}건 검증)", delta_color="normal")
     with m_c2:
         st.metric("🚀 평균 최고 수익률", f"+{metrics['avg_return']}%", "손익 상계 평균", delta_color="normal")
     with m_c3:
@@ -3213,11 +3248,19 @@ def render_performance_tab_fragment(is_dark_mode: bool):
 
     st.markdown("---")
 
-    # 3. 2대 핵심 섹션: [상승 적중 종목] vs [하락/조정 종목 AI 실전 복기]
-    tab_hits, tab_misses = st.tabs([
+    # 3. 핵심 섹션: [상승 적중 종목] vs [하락/조정 종목 AI 실전 복기] (+ 당일 실시간 추적)
+    tabs_to_create = [
         f"🎯 AI 상승 적중 성공 사례 ({metrics['hit_count']}건)",
         f"⚠️ 하락/조정 종목 AI 심층 복기 & 실전 대응 ({metrics['miss_count']}건)",
-    ])
+    ]
+    tracking_records = metrics.get("tracking_records", [])
+    if tracking_records:
+        tabs_to_create.append(f"⏳ 당일 실시간 추적 진행 중 ({len(tracking_records)}건)")
+
+    tab_results = st.tabs(tabs_to_create)
+    tab_hits = tab_results[0]
+    tab_misses = tab_results[1]
+    tab_tracking = tab_results[2] if len(tab_results) > 2 else None
 
     with tab_hits:
         st.html(
@@ -3331,6 +3374,58 @@ def render_performance_tab_fragment(is_dark_mode: bool):
                             show_stock_chart_dialog(r_code, r_name, is_dark_mode)
         else:
             st.info("해당 기간의 손절/조정 내역이 없습니다. (모든 종목 목표가 달성)")
+
+    if tab_tracking:
+        with tab_tracking:
+            st.html(
+                f"""<div style="font-size:0.92rem; color:{'#94A3B8' if is_dark_mode else '#475569'}; margin-bottom:12px;">
+                    💡 <b>당일 실시간 추적 안내:</b> 오늘 Stock Radar AI가 추천하여 장중 실시간으로 목표가(+6%) 달성 여부 및 주가 변동을 추적 중인 종목들입니다. 장 마감 후 정규 검증 데이터로 자동 승격·합산됩니다.
+                </div>"""
+            )
+            for idx, r in enumerate(tracking_records):
+                r_code = r.get("code", "")
+                r_name = r.get("name", "")
+                r_rec = r.get("recommend_price", 0)
+                r_close = r.get("close_price", r_rec)
+                r_ret = r.get("return_rate", 0.0)
+                r_target = r.get("target_price", int(r_rec * 1.06))
+                r_stop = r.get("stop_price", int(r_rec * 0.97))
+                r_date = r.get("date_display") or f"{r.get('date', '')} (정규 개장일)"
+                r_sig = r.get("signals", "AI 정밀 수급 및 단기 탄력 포착")
+
+                with st.container():
+                    st.html(
+                        f"""<div style="background:{'#1E293B' if is_dark_mode else '#F0F9FF'}; border:1.5px solid {'#0284C7' if is_dark_mode else '#0284C7'}; border-radius:12px; padding:16px 20px; margin-bottom:12px; box-shadow:0 2px 8px rgba(2,132,199,0.08);">
+                            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                                <div>
+                                    <span style="font-size:1.15rem; font-weight:900; color:{'#FFFFFF' if is_dark_mode else '#0369A1'};">#{idx+1} {r_name}</span>
+                                    <span style="font-size:0.9rem; color:#64748B; margin-left:6px;">({r_code} · {r.get('market', '')})</span>
+                                    <span style="margin-left:8px; font-size:0.82rem; color:{'#94A3B8' if is_dark_mode else '#0284C7'};">추천일: {r_date}</span>
+                                </div>
+                                <div style="display:flex; gap:6px; align-items:center;">
+                                    <span style="background:{'#075985' if is_dark_mode else '#E0F2FE'}; color:{'#38BDF8' if is_dark_mode else '#0369A1'}; font-weight:800; font-size:0.85rem; padding:4px 10px; border-radius:6px;">
+                                        ⏳ 실시간 추적 중
+                                    </span>
+                                    <span style="background:{'#EF4444' if r_ret > 0 else '#3B82F6' if r_ret < 0 else '#64748B'}; color:white; font-weight:900; font-size:0.95rem; padding:4px 12px; border-radius:6px;">
+                                        현재 변동률 {r_ret:+.1f}%
+                                    </span>
+                                </div>
+                            </div>
+                            <div style="margin-top:10px; display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; font-size:0.88rem; background:{'#0F172A' if is_dark_mode else '#FFFFFF'}; padding:10px 14px; border-radius:8px; border:1px solid {'#334155' if is_dark_mode else '#BAE6FD'};">
+                                <div><span style="color:#64748B;">추천 당시 가격:</span> <b>{r_rec:,}원</b></div>
+                                <div><span style="color:#64748B;">1차 목표가(+6%):</span> <b style="color:#EF4444;">{r_target:,}원</b></div>
+                                <div><span style="color:#64748B;">현재 실시간 주가:</span> <b>{r_close:,}원</b></div>
+                                <div><span style="color:#64748B;">방어 손절선(-3%):</span> <b style="color:#3B82F6;">{r_stop:,}원</b></div>
+                            </div>
+                            <div style="margin-top:8px; font-size:0.86rem; color:{'#CBD5E1' if is_dark_mode else '#475569'};">
+                                📌 <b>당시 AI 포착 신호:</b> {r_sig}
+                            </div>
+                        </div>"""
+                    )
+                    col_tc1, col_tc2 = st.columns([4, 1])
+                    with col_tc2:
+                        if st.button(f"📊 '{r_name}' 실시간 차트", key=f"btn_track_chart_{r_code}_{idx}_{perf_period}", use_container_width=True):
+                            show_stock_chart_dialog(r_code, r_name, is_dark_mode)
 
 
 with tab_perf:
@@ -3578,6 +3673,26 @@ with tab_chart:
             usd_rate=usd_rate,
         )
 
+        ovs_mode_code = "USD"
+        if is_ovs:
+            col_ovs_b1, col_ovs_b2 = st.columns([3.2, 1.8])
+            with col_ovs_b1:
+                st.html(f"""<div style="display:inline-flex; align-items:center; gap:8px; background:{'#1E293B' if is_dark else '#F0FDF4'}; border:1px solid {'#059669' if is_dark else '#10B981'}; border-radius:8px; padding:6px 14px; font-size:0.88rem; font-weight:700; color:{'#34D399' if is_dark else '#065F46'}; margin-bottom:8px;">
+                    <span>💱</span>
+                    <span>실시간 공식 환율: <b>{usd_rate:,.1f}원/USD</b> (서울 외환시장/네이버 금융 고시 기준)</span>
+                </div>""")
+            with col_ovs_b2:
+                curr_sel = st.segmented_control(
+                    "통화 표기 단위",
+                    options=["💵 달러 ($) 기준", "₩ 원화 (KRW) 기준"],
+                    default=st.session_state.get("ovs_currency_pref", "💵 달러 ($) 기준"),
+                    key=f"ovs_diag_curr_sel_{target_code}",
+                    label_visibility="collapsed",
+                )
+                if curr_sel:
+                    st.session_state["ovs_currency_pref"] = curr_sel
+                    ovs_mode_code = "KRW" if "원화" in curr_sel else "USD"
+
         briefing = generate_doctor_clinical_briefing(
             name=target_name,
             code=target_code,
@@ -3588,6 +3703,7 @@ with tab_chart:
             is_ovs=is_ovs,
             usd_rate=usd_rate,
             detail=detail,
+            currency_mode=ovs_mode_code,
         )
 
         prescriptions = generate_prescriptions(
@@ -3600,6 +3716,7 @@ with tab_chart:
             market=mkt_name,
             detail=detail,
             active_theme=active_theme,
+            currency_mode=ovs_mode_code,
         )
 
         # 6. [AI 1초 정밀 진단 결과 렌더링]
@@ -3617,6 +3734,7 @@ with tab_chart:
             usd_rate=usd_rate,
             is_dark=is_dark,
             detail=detail,
+            currency_mode=ovs_mode_code,
         ))
 
         # 6-2. AI 전담 주치의 1초 심층 임상 소견서 (자연어 심층 브리핑)
@@ -3631,7 +3749,7 @@ with tab_chart:
 
         # 6-3. 투자자 8대 필수 핵심 실시간 지표 보드 (실시간 거래대금, 거래량, 시고저 밴드, 시총, 52주 고저, 외인소진율, PER/PBR, EPS/배당)
         if detail:
-            st.html(render_essential_trading_metrics_html(detail, is_dark=is_dark, is_ovs=is_ovs, usd_rate=usd_rate))
+            st.html(render_essential_trading_metrics_html(detail, is_dark=is_dark, is_ovs=is_ovs, usd_rate=usd_rate, currency_mode=ovs_mode_code))
 
         # 6-4. 5대 핵심 생체 바이탈 사인 정밀 검진표
         st.html(render_vital_signs_html(vitals_data, is_dark=is_dark))
