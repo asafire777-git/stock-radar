@@ -2127,7 +2127,15 @@ def render_stock_detailed_section(code: str, name: str, is_dark: bool, in_modal:
 
     # 2-1. 투자자 8대 필수 핵심 실시간 지표 보드 (거래대금, 거래량, 시고저 밴드, 시총, 52주 고저, 외인소진율, PER/PBR, EPS/배당)
     if detail and not key_prefix.startswith("tab4_diag"):
-        st.html(render_essential_trading_metrics_html(detail, is_dark=is_dark, is_ovs=is_ovs, usd_rate=usd_rate, currency_mode=ovs_mode_code))
+        try:
+            st.html(render_essential_trading_metrics_html(detail, is_dark=is_dark, is_ovs=is_ovs, usd_rate=usd_rate, currency_mode=ovs_mode_code))
+        except TypeError:
+            try:
+                st.html(render_essential_trading_metrics_html(detail, is_dark=is_dark, is_ovs=is_ovs, usd_rate=usd_rate))
+            except Exception:
+                pass
+        except Exception as e:
+            print(f"[Warn] render_essential_trading_metrics_html failed: {e}")
 
     # 2-2. 캔들 차트 주기 선택 (1분, 5분, 1시간, 24시간, 1주일, 1달, 1년)
     tf_c1, tf_c2 = st.columns([1.5, 4.5])
@@ -3749,7 +3757,15 @@ with tab_chart:
 
         # 6-3. 투자자 8대 필수 핵심 실시간 지표 보드 (실시간 거래대금, 거래량, 시고저 밴드, 시총, 52주 고저, 외인소진율, PER/PBR, EPS/배당)
         if detail:
-            st.html(render_essential_trading_metrics_html(detail, is_dark=is_dark, is_ovs=is_ovs, usd_rate=usd_rate, currency_mode=ovs_mode_code))
+            try:
+                st.html(render_essential_trading_metrics_html(detail, is_dark=is_dark, is_ovs=is_ovs, usd_rate=usd_rate, currency_mode=ovs_mode_code))
+            except TypeError:
+                try:
+                    st.html(render_essential_trading_metrics_html(detail, is_dark=is_dark, is_ovs=is_ovs, usd_rate=usd_rate))
+                except Exception:
+                    pass
+            except Exception as e:
+                print(f"[Warn] Tab 5 render_essential_trading_metrics_html failed: {e}")
 
         # 6-4. 5대 핵심 생체 바이탈 사인 정밀 검진표
         st.html(render_vital_signs_html(vitals_data, is_dark=is_dark))

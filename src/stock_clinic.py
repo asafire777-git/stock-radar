@@ -294,6 +294,8 @@ def generate_doctor_clinical_briefing(
     usd_rate: float = 1350.0,
     detail: Optional[Dict[str, Any]] = None,
     currency_mode: str = "USD",
+    *args,
+    **kwargs,
 ) -> Dict[str, str]:
     """
     전문 AI 주치의의 4단 심층 임상 소견서 (자연어 심층 브리핑) 생성
@@ -390,6 +392,8 @@ def generate_prescriptions(
     detail: Optional[Dict[str, Any]] = None,
     active_theme: Optional[Dict[str, Any]] = None,
     currency_mode: str = "USD",
+    *args,
+    **kwargs,
 ) -> List[Dict[str, str]]:
     """
     AI 주치의의 4대 실전 맞춤 처방전 (진입 타이밍, 단계별 목표가, 비상 손절선, 종목 특이체질 복용 주의사항)
@@ -715,6 +719,8 @@ def render_health_summary_card_html(
     is_dark: bool = False,
     detail: Optional[Dict[str, Any]] = None,
     currency_mode: str = "USD",
+    *args,
+    **kwargs,
 ) -> str:
     """종목의 종합 건강검진 결과표 카드"""
     bg = "#151A23" if is_dark else "#FFFFFF"
@@ -949,14 +955,29 @@ def render_prescriptions_html(prescriptions: List[Dict[str, str]], is_dark: bool
     return "".join(html_parts)
 
 
+def _safe_float(val: Any, fallback: float = 0.0) -> float:
+    if val is None:
+        return fallback
+    try:
+        clean = str(val).replace(",", "").replace("$", "").replace("원", "").strip()
+        return float(clean) if clean else fallback
+    except (ValueError, TypeError):
+        return fallback
+
+
 def render_essential_trading_metrics_html(
-    detail: Dict[str, Any],
+    detail: Optional[Dict[str, Any]],
     is_dark: bool = False,
     is_ovs: bool = False,
     usd_rate: float = 1350.0,
     currency_mode: str = "USD",
+    *args,
+    **kwargs,
 ) -> str:
     """주식 투자자들이 가장 많이 보는 핵심 지표 8종 보드 (실시간 거래대금, 거래량, 시고저, 시총, 52주고저, 외인소진율, PER/PBR)"""
+    if not detail or not isinstance(detail, dict):
+        return ""
+
     bg = "#151A23" if is_dark else "#FFFFFF"
     border = "#334155" if is_dark else "#E2E8F0"
     card_bg = "#1E293B" if is_dark else "#F8FAFC"
@@ -965,24 +986,24 @@ def render_essential_trading_metrics_html(
     sub_color = "#94A3B8" if is_dark else "#64748B"
 
     # 값 추출
-    trade_val_str = detail.get("trade_value_str") or (f"{detail.get('trade_value_억', 0):,.1f}억" if detail.get("trade_value_억") else "조회 중")
-    trade_vol_str = detail.get("trade_volume_str") or (f"{detail.get('trade_volume', 0):,}주" if detail.get("trade_volume") else "조회 중")
-    marcap_str = detail.get("marcap_str") or (f"{detail.get('marcap_억', 0):,.1f}억" if detail.get("marcap_억") else "조회 중")
+    trade_val_str = str(detail.get("trade_value_str") or (f"{detail.get('trade_value_억', 0):,.1f}억" if detail.get("trade_value_억") else "조회 중"))
+    trade_vol_str = str(detail.get("trade_volume_str") or (f"{detail.get('trade_volume', 0):,}주" if detail.get("trade_volume") else "조회 중"))
+    marcap_str = str(detail.get("marcap_str") or (f"{detail.get('marcap_억', 0):,.1f}억" if detail.get("marcap_억") else "조회 중"))
 
-    curr_p = detail.get("price", 0)
-    high_p = detail.get("high_price", curr_p)
-    low_p = detail.get("low_price", curr_p)
-    open_p = detail.get("open_price", curr_p)
+    curr_p = _safe_float(detail.get("price"), 0.0)
+    high_p = _safe_float(detail.get("high_price"), curr_p)
+    low_p = _safe_float(detail.get("low_price"), curr_p)
+    open_p = _safe_float(detail.get("open_price"), curr_p)
 
     if is_ovs:
         if currency_mode == "KRW":
-            high_str = f"{int(float(high_p)*usd_rate):,}원 (${float(high_p):.2f})"
-            low_str = f"{int(float(low_p)*usd_rate):,}원 (${float(low_p):.2f})"
-            open_str = f"{int(float(open_p)*usd_rate):,}원 (${float(open_p):.2f})"
+            high_str = f"{int(high_p * usd_rate):,}원 (${high_p:.2f})"
+            low_str = f"{int(low_p * usd_rate):,}원 (${low_p:.2f})"
+            open_str = f"{int(open_p * usd_rate):,}원 (${open_p:.2f})"
         else:
-            high_str = f"${float(high_p):.2f} (약 {int(float(high_p)*usd_rate):,}원)"
-            low_str = f"${float(low_p):.2f} (약 {int(float(low_p)*usd_rate):,}원)"
-            open_str = f"${float(open_p):.2f} (약 {int(float(open_p)*usd_rate):,}원)"
+            high_str = f"${high_p:.2f} (약 {int(high_p * usd_rate):,}원)"
+            low_str = f"${low_p:.2f} (약 {int(low_p * usd_rate):,}원)"
+            open_str = f"${open_p:.2f} (약 {int(open_p * usd_rate):,}원)"
         val_sub = "미국 거래소 실시간 체결 대금"
         vol_sub = "나스닥/NYSE 정규 거래량"
         marcap_sub = "글로벌 테크 대표주"
@@ -994,7 +1015,7 @@ def render_essential_trading_metrics_html(
         open_str = f"{int(open_p):,}원"
         val_sub = "당일 정규장 누적 거래대금"
         vol_sub = "체결 회전율 활성"
-        marcap_sub = detail.get("market", "KRX 정규상장")
+        marcap_sub = str(detail.get("market", "KRX 정규상장"))
         foreign_label = "외인 소진율"
         foreign_val = str(detail.get("foreign_ratio", "-"))
 
