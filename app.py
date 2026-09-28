@@ -244,6 +244,68 @@ div[data-testid="stDialog"] > div[role="dialog"] {
     from { transform: scale(0.97); opacity: 0; }
     to { transform: scale(1); opacity: 1; }
 }
+
+/* ====================================================
+   사이드바 LNB 내비게이션 전용 모던 카드형 라디오 UI
+   ==================================================== */
+div[class*="st-key-sb_nav_menu_radio"] div[data-testid="stRadio"] > div {
+    gap: 8px !important;
+}
+div[class*="st-key-sb_nav_menu_radio"] div[data-testid="stRadio"] label {
+    background: rgba(255, 255, 255, 0.04) !important;
+    border: 1.2px solid rgba(255, 255, 255, 0.10) !important;
+    border-radius: 12px !important;
+    padding: 11px 14px !important;
+    cursor: pointer !important;
+    transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    display: flex !important;
+    align-items: center !important;
+    margin: 0 !important;
+    width: 100% !important;
+}
+div[class*="st-key-sb_nav_menu_radio"] div[data-testid="stRadio"] label:hover {
+    background: rgba(37, 99, 235, 0.15) !important;
+    border-color: rgba(59, 130, 246, 0.5) !important;
+    transform: translateX(4px) !important;
+}
+div[class*="st-key-sb_nav_menu_radio"] div[data-testid="stRadio"] label:has(input:checked) {
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.28) 0%, rgba(30, 58, 138, 0.35) 100%) !important;
+    border: 1.5px solid #3B82F6 !important;
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25) !important;
+    transform: translateX(4px) !important;
+}
+div[class*="st-key-sb_nav_menu_radio"] div[data-testid="stRadio"] label:has(input:checked) p,
+div[class*="st-key-sb_nav_menu_radio"] div[data-testid="stRadio"] label:has(input:checked) span {
+    color: #60A5FA !important;
+    font-weight: 900 !important;
+}
+.stApp:not(.dark-theme) div[class*="st-key-sb_nav_menu_radio"] div[data-testid="stRadio"] label,
+body:not(.dark-theme) div[class*="st-key-sb_nav_menu_radio"] div[data-testid="stRadio"] label {
+    background: #FFFFFF !important;
+    border: 1.2px solid #E2E8F0 !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.03) !important;
+}
+.stApp:not(.dark-theme) div[class*="st-key-sb_nav_menu_radio"] div[data-testid="stRadio"] label:hover,
+body:not(.dark-theme) div[class*="st-key-sb_nav_menu_radio"] div[data-testid="stRadio"] label:hover {
+    background: #EFF6FF !important;
+    border-color: #93C5FD !important;
+}
+.stApp:not(.dark-theme) div[class*="st-key-sb_nav_menu_radio"] div[data-testid="stRadio"] label:has(input:checked),
+body:not(.dark-theme) div[class*="st-key-sb_nav_menu_radio"] div[data-testid="stRadio"] label:has(input:checked) {
+    background: #EFF6FF !important;
+    border: 1.5px solid #2563EB !important;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.12) !important;
+}
+.stApp:not(.dark-theme) div[class*="st-key-sb_nav_menu_radio"] div[data-testid="stRadio"] label:has(input:checked) p,
+body:not(.dark-theme) div[class*="st-key-sb_nav_menu_radio"] div[data-testid="stRadio"] label:has(input:checked) span {
+    color: #1D4ED8 !important;
+    font-weight: 900 !important;
+}
+div[class*="st-key-sb_nav_menu_radio"] div[data-testid="stRadio"] input[type="radio"],
+div[class*="st-key-sb_nav_menu_radio"] div[data-testid="stRadio"] div[data-testid="stRadioCircle"],
+div[class*="st-key-sb_nav_menu_radio"] div[data-testid="stRadio"] div[class*="st-"] > div:first-child:not(:last-child) {
+    display: none !important;
+}
 </style>
 <script>
 (function() {
@@ -428,6 +490,37 @@ if st.session_state["current_page"] == "dashboard":
                     st.rerun()
             st.markdown("---")
 
+        # ----------------------------------------------------
+        # 🎯 사이드바 핵심 LNB 관제 메뉴 (Navigation Bar)
+        # ----------------------------------------------------
+        st.markdown("### 📌 레이더 관제 메뉴")
+
+        is_admin_active = st.session_state.get("is_admin_mode", False)
+        nav_options = [
+            "🎯 오늘의 AI 추천주 (원픽 TOP 20)",
+            "⚡ 실시간 급등 순위 (TOP 100)",
+            "🚀 신규 상장주 모니터링",
+            "🩺 1초 종목 종합 정밀 진단실",
+            "🏆 AI 성과 검증실 (적중률)",
+            "📚 주식 실전 지식 아카이브 (16편)",
+        ]
+        if is_admin_active:
+            nav_options.append("👑 마스터 관리자 상세 통계실")
+
+        if "active_nav_menu" not in st.session_state or st.session_state["active_nav_menu"] not in nav_options:
+            st.session_state["active_nav_menu"] = nav_options[0]
+
+        nav_idx = nav_options.index(st.session_state["active_nav_menu"])
+        selected_menu = st.radio(
+            "관제 메뉴 선택",
+            nav_options,
+            index=nav_idx,
+            key="sb_nav_menu_radio",
+            label_visibility="collapsed"
+        )
+        st.session_state["active_nav_menu"] = selected_menu
+        st.markdown("---")
+
         st.markdown("### 🎨 화면 테마")
         theme_idx = 1 if is_dark else 0
         theme_sel = st.radio(
@@ -518,7 +611,8 @@ if st.session_state["current_page"] == "dashboard":
         col_sb_k1, col_sb_k2 = st.columns(2)
         with col_sb_k1:
             if st.button("📚 16편 칼럼", key="sb_btn_column", use_container_width=True):
-                st.toast("💡 아래 탭 메뉴에서 '📚 실전 주식 투자 지식 아카이브 (16편)'을 클릭하시면 전체 칼럼을 보실 수 있습니다!", icon="📚")
+                st.session_state["active_nav_menu"] = "📚 주식 실전 지식 아카이브 (16편)"
+                st.rerun()
         with col_sb_k2:
             render_sidebar_policy_button(is_dark)
 
@@ -532,7 +626,7 @@ if st.session_state["current_page"] == "dashboard":
                     👑 MASTER ADMIN 활성화됨
                 </div>
             """)
-            st.caption("우측 탭 메뉴 맨 끝에 **'👑 마스터 관리자 상세 통계실'**이 열렸습니다.")
+            st.caption("좌측 관제 메뉴 맨 끝에 **'👑 마스터 관리자 상세 통계실'**이 활성화되었습니다.")
             if st.button("🔒 관리자 모드 종료", key="btn_admin_lock", use_container_width=True):
                 st.session_state["is_admin_mode"] = False
                 st.rerun()
@@ -560,6 +654,7 @@ else:
     min_change_rate = 3.0
     new_listing_months = 12
     analysis_period = "⚡ 당일 실시간 주도주 (장중 급등 탄력형)"
+    selected_menu = "🎯 오늘의 AI 추천주 (원픽 TOP 20)"
 
 
 # ----------------------------------------------------
@@ -2717,11 +2812,16 @@ with c4:
     top_vol_val = df_volume.iloc[0].get("trade_value_억", 0) if not df_volume.empty else 0
     st.metric("거래대금 1위", top_vol_stock, delta=f"{top_vol_val:,} 억원")
 
-is_adm_now = st.session_state.get("is_admin_mode", False)
+selected_menu = st.session_state.get("active_nav_menu", "🎯 오늘의 AI 추천주 (원픽 TOP 20)")
 st.html(
-    f"""<div style="background:{'#1E293B' if is_dark else '#F0F9FF'}; border:1.5px solid {'#38BDF8' if is_dark else '#0284C7'}; border-radius:12px; padding:12px 18px; margin: 10px 0 16px 0; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-        <div style="font-size:0.90rem; color:{'#E2E8F0' if is_dark else '#0F172A'}; font-weight:700;">
-            🧭 <b>하단 핵심 메뉴 탭 안내</b>: 화면을 아래로 스크롤하시면 <b>⭐AI 추천주</b> · <b>🔥실시간 급등</b> · <b>🚀신규상장</b> · <b>🏆성과검증</b> · <b>🩺1초 정밀진단</b> · <b style="color:#2563EB;">📚주식 투자 칼럼(16편)</b>{' · <b style="color:#F59E0B;">👑마스터 관리자 상세 통계실</b>' if is_adm_now else ''} 탭을 편리하게 이용하실 수 있습니다.
+    f"""<div style="background:{'#151A23' if is_dark else '#F8FAFC'}; border:1.5px solid {'rgba(59,130,246,0.35)' if is_dark else '#CBD5E1'}; border-radius:12px; padding:12px 20px; margin: 10px 0 16px 0; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; box-shadow:0 3px 10px rgba(0,0,0,0.03);">
+        <div style="font-size:0.95rem; color:{'#F8FAFC' if is_dark else '#0F172A'}; font-weight:800; display:flex; align-items:center; gap:8px;">
+            <span style="display:inline-block; width:9px; height:9px; border-radius:50%; background:#22C55E; box-shadow:0 0 8px #22C55E;"></span>
+            <span>현재 관제 화면:</span>
+            <span style="color:#2563EB; font-weight:900;">{selected_menu}</span>
+        </div>
+        <div style="font-size:0.82rem; color:{'#94A3B8' if is_dark else '#64748B'};">
+            ⚡ 좌측 사이드바 <b>[📌 레이더 관제 메뉴]</b>에서 원하는 분석 화면으로 즉각 전환할 수 있습니다.
         </div>
     </div>"""
 )
@@ -2850,109 +2950,12 @@ st.markdown("---")
 
 
 
-# ----------------------------------------------------
-# 6. 메인 탭 구성
-# ----------------------------------------------------
-st.html("""
-<style>
-[data-testid="stTabs"] [data-testid="stTab"]:nth-of-type(4),
-[data-testid="stTabs"] [data-testid="stTab"]:nth-child(4),
-[data-testid="stTabs"] [role="tab"]:nth-child(4),
-[data-testid="stTabs"] [role="tab"]:nth-of-type(4),
-[data-testid="stTabs"] .react-aria-Tab:nth-child(4),
-[data-testid="stTab"][id="3"],
-[role="tab"][id="3"] {
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-}
-[data-testid="stTabs"] [data-testid="stTab"]:nth-of-type(4) *,
-[data-testid="stTabs"] [data-testid="stTab"]:nth-child(4) *,
-[data-testid="stTabs"] [role="tab"]:nth-child(4) *,
-[data-testid="stTabs"] [role="tab"]:nth-of-type(4) *,
-[data-testid="stTabs"] .react-aria-Tab:nth-child(4) *,
-[data-testid="stTab"][id="3"] *,
-[role="tab"][id="3"] * {
-    color: #EF4444 !important;
-    font-weight: 800 !important;
-    font-size: inherit !important;
-}
-[data-testid="stTabs"] [data-testid="stTab"]:nth-of-type(4)[aria-selected="true"],
-[data-testid="stTabs"] [data-testid="stTab"]:nth-child(4)[aria-selected="true"],
-[data-testid="stTab"][id="3"][aria-selected="true"],
-[role="tab"][id="3"][aria-selected="true"] {
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-}
-[data-testid="stTabs"] [data-testid="stTab"]:nth-of-type(4)[aria-selected="true"] *,
-[data-testid="stTabs"] [data-testid="stTab"]:nth-child(4)[aria-selected="true"] *,
-[data-testid="stTab"][id="3"][aria-selected="true"] *,
-[role="tab"][id="3"][aria-selected="true"] * {
-    color: #DC2626 !important;
-    font-weight: 800 !important;
-    font-size: inherit !important;
-}
-</style>
-<img src="data:image/svg+xml;utf8,<svg></svg>" style="display:none;" onerror="
-(function(){
-    function runHighlight(){
-        const tabs = document.querySelectorAll('[data-testid=\\'stTab\\'], [role=\\'tab\\'], .react-aria-Tab, button[data-baseweb=\\'tab\\']');
-        tabs.forEach(t => {
-            if(t.textContent && (t.textContent.includes('성과 검증실') || t.textContent.includes('AI 성과'))){
-                t.classList.add('highlight-perf-tab');
-                t.style.removeProperty('background');
-                t.style.removeProperty('border');
-                t.style.removeProperty('border-radius');
-                t.style.removeProperty('box-shadow');
-                t.style.removeProperty('padding');
-                t.style.setProperty('background', 'transparent', 'important');
-                t.style.setProperty('border', 'none', 'important');
-                t.style.setProperty('box-shadow', 'none', 'important');
-                t.querySelectorAll('*').forEach(c => {
-                    c.style.setProperty('color', '#EF4444', 'important');
-                    c.style.setProperty('font-weight', '800', 'important');
-                    c.style.removeProperty('font-size');
-                });
-            }
-        });
-    }
-    runHighlight();
-    setTimeout(runHighlight, 100);
-    setTimeout(runHighlight, 500);
-    setTimeout(runHighlight, 1200);
-    setInterval(runHighlight, 800);
-})();
-"/>
-""")
-
-is_admin_active = st.session_state.get("is_admin_mode", False)
-
-if is_admin_active:
-    tab_ai, tab_rising, tab_new, tab_perf, tab_chart, tab_knowledge, tab_admin = st.tabs([
-        "⭐ AI 오늘 추천주 (초보자 강추)",
-        "🔥 실시간 급등 순위 (TOP 100)",
-        "🚀 신규 상장주 모니터링",
-        "🔥 🏆 AI 성과 검증실 & 실전 복기",
-        "🩺 1초 종목 종합 정밀 진단실",
-        "📚 실전 주식 투자 지식 아카이브 (16편)",
-        "👑 마스터 관리자 상세 통계실",
-    ])
-else:
-    tab_ai, tab_rising, tab_new, tab_perf, tab_chart, tab_knowledge = st.tabs([
-        "⭐ AI 오늘 추천주 (초보자 강추)",
-        "🔥 실시간 급등 순위 (TOP 100)",
-        "🚀 신규 상장주 모니터링",
-        "🔥 🏆 AI 성과 검증실 & 실전 복기",
-        "🩺 1초 종목 종합 정밀 진단실",
-        "📚 실전 주식 투자 지식 아카이브 (16편)",
-    ])
-
-
 # ====================================================
-# TAB 1: AI 퀀트 추천 TOP 20
+# TAB 1: AI 퀀트 추천 TOP 20 렌더러 함수
 # ====================================================
-with tab_ai:
+def render_ai_picks_tab(candidates, preset_style, is_dark):
+    st.subheader(f"🎯 [{preset_style}] AI 퀀트 추천 TOP 20 (원픽 & 상승 유망주)")
+    st.caption("AI가 거래대금, 큰손 수급, 차트 정배열, 기술 지표를 종합 분석해 엄선한 오늘의 핵심 주도주 포트폴리오입니다.")
     if candidates:
         df_ai = pd.DataFrame(candidates)
         df_ai = df_ai.sort_values(by=["total_score", "upside_prob"], ascending=False).reset_index(drop=True).head(20)
@@ -3240,7 +3243,7 @@ def render_rising_tab_fragment(disp_df: pd.DataFrame, is_dark_mode: bool):
         st.session_state["last_rising_row"] = None
 
 
-with tab_rising:
+def render_rising_tab_view(df_rising_filtered, is_dark):
     st.subheader("🔥 실시간 급등주 순위 (국내 & 나스닥/미국)")
     st.caption("오늘 시장에서 가장 강력하게 상승 중인 주도주들입니다. 상단 스위처로 국내와 미국 나스닥을 넘나들며 종목을 클릭하시면 즉시 정밀 캔들 차트와 기술 지표가 검색됩니다.")
 
@@ -3382,8 +3385,8 @@ def render_new_listings_tab_fragment(new_disp: pd.DataFrame, is_dark_mode: bool)
         st.session_state["last_new_row"] = None
 
 
-with tab_new:
-    st.subheader(f"🚀 신규 상장주 모니터링 (국내 & 나스닥 슈퍼 IPO)")
+def render_new_listings_tab_view(df_new, is_dark):
+    st.subheader("🚀 신규 상장주 모니터링 (국내 & 나스닥 슈퍼 IPO)")
     st.caption("신규 상장주는 상장 초기 매물 소화 후 바닥을 다지고 반등할 때 가장 폭발적인 시세를 냅니다. 상단 스위처로 국내 및 미국 나스닥 대형 상장주를 선택하여 확인해 보세요.")
 
     if not df_new.empty:
@@ -3655,7 +3658,7 @@ def render_performance_tab_fragment(is_dark_mode: bool):
                             show_stock_chart_dialog(r_code, r_name, is_dark_mode)
 
 
-with tab_perf:
+def render_performance_tab_view(is_dark):
     st.subheader("🏆 AI 예측 성과 검증실 (실제 적중률 & 하락 종목 실전 복기)")
     st.caption("AI가 추천했던 종목들이 실제로 상승했는지, 하락했는지를 투명하게 검증합니다. 적중한 종목의 실제 최고 수익률과, 하락/조정 종목에 대한 AI 심층 원인 진단 및 실전 대응 수칙을 확인하세요.")
     render_performance_tab_fragment(is_dark)
@@ -3664,7 +3667,7 @@ with tab_perf:
 # ====================================================
 # TAB 5: AI 1초 종합 정밀 진단실 (임상 소견 및 실전 처방전)
 # ====================================================
-with tab_chart:
+def render_diagnosis_tab_view(all_stocks_df, code_map, is_dark):
     @st.fragment
     def render_quick_diagnosis_tab(all_stocks_df, code_map, is_dark):
         # 0. AI 종합 진단실 프리미엄 안내 배너
@@ -4039,14 +4042,34 @@ with tab_chart:
     render_quick_diagnosis_tab(all_stocks_df, code_map, is_dark)
 
 # ====================================================
-# TAB: 실전 주식 투자 지식 아카이브 (16편 칼럼 - Google AdSense & YMYL 준수)
+# 6. 관제 메뉴별 화면 단독 렌더링 (초고속 성능 최적화)
 # ====================================================
-with tab_knowledge:
+selected_menu = st.session_state.get("active_nav_menu", "🎯 오늘의 AI 추천주 (원픽 TOP 20)")
+is_admin_active = st.session_state.get("is_admin_mode", False)
+
+if "오늘의 AI 추천주" in selected_menu:
+    render_ai_picks_tab(candidates, preset_style, is_dark)
+
+elif "실시간 급등" in selected_menu:
+    render_rising_tab_view(df_rising_filtered, is_dark)
+
+elif "신규 상장주" in selected_menu:
+    render_new_listings_tab_view(df_new, is_dark)
+
+elif "1초 종목" in selected_menu:
+    render_diagnosis_tab_view(all_stocks_df, code_map, is_dark)
+
+elif "AI 성과 검증실" in selected_menu:
+    render_performance_tab_view(is_dark)
+
+elif "지식 아카이브" in selected_menu or "16편" in selected_menu:
     render_stock_knowledge_tab(is_dark=is_dark)
 
-if is_admin_active:
-    with tab_admin:
-        render_admin_dashboard(is_dark=is_dark)
+elif is_admin_active and "마스터 관리자" in selected_menu:
+    render_admin_dashboard(is_dark=is_dark)
+
+else:
+    render_ai_picks_tab(candidates, preset_style, is_dark)
 
 # ====================================================
 # FOOTER: 법적 면책 고지, 개인정보처리방침, 이용약관 (Google AdSense 준수)
