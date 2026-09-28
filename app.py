@@ -83,6 +83,7 @@ try:
         show_disclaimer_dialog,
         show_privacy_dialog,
         show_terms_dialog,
+        render_sidebar_policy_button,
     )
     from src.stock_knowledge_hub import render_stock_knowledge_tab
 except ImportError:
@@ -148,6 +149,7 @@ except ImportError:
         show_disclaimer_dialog,
         show_privacy_dialog,
         show_terms_dialog,
+        render_sidebar_policy_button,
     )
     from stock_knowledge_hub import render_stock_knowledge_tab
 
@@ -497,8 +499,7 @@ if st.session_state["current_page"] == "dashboard":
             if st.button("📚 16편 칼럼", key="sb_btn_column", use_container_width=True):
                 st.toast("💡 아래 탭 메뉴에서 '📚 실전 주식 투자 지식 아카이브 (16편)'을 클릭하시면 전체 칼럼을 보실 수 있습니다!", icon="📚")
         with col_sb_k2:
-            if st.button("📜 정책·면책", key="sb_btn_policies", use_container_width=True):
-                show_disclaimer_dialog(is_dark)
+            render_sidebar_policy_button(is_dark)
 
         # ----------------------------------------------------
         # 사이드바: 관리자 상태 제어 (보안 인증)

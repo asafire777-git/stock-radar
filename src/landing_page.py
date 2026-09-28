@@ -534,7 +534,7 @@ def render_landing_page(is_dark: bool):
             <a href="#section-strategy" class="nav-anchor-btn" style="background: {btn_bg} !important; color: {btn_color} !important; border: {btn_border} !important;">🎯 3대 매매 전략</a>
             <a href="#section-quant" class="nav-anchor-btn" style="background: {btn_bg} !important; color: {btn_color} !important; border: {btn_border} !important;">⚡ 100점 배점표</a>
             <a href="#section-knowledge" class="nav-anchor-btn" style="background: rgba(37,99,235,0.12) !important; color: #2563EB !important; border: 1.5px solid rgba(37,99,235,0.35) !important; font-weight: 800 !important;">📚 투자 칼럼(16편)</a>
-            <a href="#section-policies" class="nav-anchor-btn" style="background: {btn_bg} !important; color: {btn_color} !important; border: {btn_border} !important;">📜 정책·면책</a>
+            <a href="#section-policies" onclick="if(window.openLegalModal){{window.openLegalModal('disclaimer'); return false;}}" class="nav-anchor-btn" style="background: {btn_bg} !important; color: {btn_color} !important; border: {btn_border} !important;">📜 정책·면책</a>
             <a href="#section-cta" class="nav-anchor-btn" style="background: #2563EB !important; color: #FFFFFF !important; border: none !important; font-weight: 800 !important;">🚀 바로 입장</a>
         </div>
         <div id="section-hero" class="anchor-marker"></div>
