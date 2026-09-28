@@ -535,7 +535,6 @@ def render_landing_page(is_dark: bool):
             <a href="#section-quant" class="nav-anchor-btn" style="background: {btn_bg} !important; color: {btn_color} !important; border: {btn_border} !important;">⚡ 100점 배점표</a>
             <a href="#section-knowledge" class="nav-anchor-btn" style="background: rgba(37,99,235,0.12) !important; color: #2563EB !important; border: 1.5px solid rgba(37,99,235,0.35) !important; font-weight: 800 !important;">📚 투자 칼럼(16편)</a>
             <a href="#section-policies" class="nav-anchor-btn" style="background: {btn_bg} !important; color: {btn_color} !important; border: {btn_border} !important;">📜 정책·면책</a>
-            <a href="#section-admin" class="nav-anchor-btn" style="background: rgba(245,158,11,0.12) !important; color: #D97706 !important; border: 1.5px solid rgba(245,158,11,0.35) !important; font-weight: 800 !important;">👑 관리자</a>
             <a href="#section-cta" class="nav-anchor-btn" style="background: #2563EB !important; color: #FFFFFF !important; border: none !important; font-weight: 800 !important;">🚀 바로 입장</a>
         </div>
         <div id="section-hero" class="anchor-marker"></div>
@@ -1179,34 +1178,44 @@ def render_landing_page(is_dark: bool):
     render_stock_knowledge_tab(is_dark=is_dark)
 
     # ----------------------------------------------------
-    # 9. 마스터 관리자 관제실 빠른 입장 게이트
+    # 9. 관리자 전용 파라미터(?admin=true) 호출 시 인증 다이얼로그
     # ----------------------------------------------------
-    st.markdown("<div id='section-admin' class='anchor-marker'></div>", unsafe_allow_html=True)
-    st.markdown("<div style='height: 24px;'></div>", unsafe_allow_html=True)
-    with st.expander("👑 마스터 관리자 전용 관제실 (Admin Mode Login)", expanded=False):
-        st.write("시스템 운영자 전용 페이지입니다. 관리자 PIN 번호를 입력하시면 실시간 사용자 행동 및 검색 통계 관제실로 즉시 이동합니다.")
-        col_adm_i, col_adm_b = st.columns([3, 1])
-        with col_adm_i:
-            adm_pin = st.text_input("마스터 PIN / 암호", type="password", key="intro_admin_pin_input", placeholder="기본 PIN: 7777")
-        with col_adm_b:
-            st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
-            if st.button("👑 관리자 입장", key="intro_btn_admin_submit", use_container_width=True):
-                if adm_pin in ["7777", "asafire777", "admin", "master"]:
-                    st.session_state["is_authenticated"] = True
-                    st.session_state["user_info"] = {
-                        "name": "마스터 관리자",
-                        "email": "admin@stockradar.ai",
-                        "provider": "Master",
-                        "badge": "👑 MASTER",
-                    }
-                    st.session_state["is_admin_mode"] = True
-                    st.session_state["current_page"] = "dashboard"
-                    if hasattr(st, "query_params"):
-                        st.query_params["admin"] = "true"
+    if hasattr(st, "query_params") and str(st.query_params.get("admin", "")).lower() in ["true", "1", "master", "login"]:
+        @st.dialog("👑 마스터 관리자 인증", width="small")
+        def _open_landing_admin_dialog():
+            st.write("운영자 전용 관제실 인증입니다.")
+            pin = st.text_input("관리자 비밀번호", type="password", key="dlg_lp_admin_pwd", placeholder="비밀번호 입력")
+            c1, c2 = st.columns(2)
+            with c1:
+                if st.button("인증 확인", key="dlg_lp_btn_auth", use_container_width=True):
+                    secret_pwd = None
+                    try:
+                        if hasattr(st, "secrets"):
+                            secret_pwd = st.secrets.get("ADMIN_PASSWORD") or st.secrets.get("ADMIN_PIN")
+                    except Exception:
+                        pass
+                    valid_pwds = ["asafire777!", "asafire777", "admin7777!"]
+                    if secret_pwd:
+                        valid_pwds.append(str(secret_pwd).strip())
+                    if pin.strip() in valid_pwds:
+                        st.session_state["is_authenticated"] = True
+                        st.session_state["user_info"] = {
+                            "name": "마스터 관리자",
+                            "email": "admin@stockradar.ai",
+                            "provider": "Master",
+                            "badge": "👑 MASTER",
+                        }
+                        st.session_state["is_admin_mode"] = True
+                        st.session_state["current_page"] = "dashboard"
                         st.query_params["page"] = "dashboard"
+                        st.rerun()
+                    else:
+                        st.error("비밀번호가 올바르지 않습니다.")
+            with c2:
+                if st.button("취소", key="dlg_lp_btn_cancel", use_container_width=True):
+                    st.query_params.clear()
                     st.rerun()
-                else:
-                    st.error("PIN 번호가 일치하지 않습니다.")
+        _open_landing_admin_dialog()
 
     # ----------------------------------------------------
     # 10. 법적 면책 고지 및 개인정보 정책 바 (Google AdSense 준수)

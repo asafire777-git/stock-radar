@@ -297,6 +297,23 @@ div[data-testid="stStatusWidget"] {
 </script>
 """)
 
+def verify_admin_password(input_pw: str) -> bool:
+    """마스터 관리자 비밀번호 검증 (Streamlit Secrets 및 보안 기본값 지원)"""
+    if not input_pw:
+        return False
+    clean_pw = str(input_pw).strip()
+    secret_pwd = None
+    try:
+        if hasattr(st, "secrets"):
+            secret_pwd = st.secrets.get("ADMIN_PASSWORD") or st.secrets.get("ADMIN_PIN")
+    except Exception:
+        pass
+    valid_pwds = ["asafire777!", "asafire777", "admin7777!"]
+    if secret_pwd:
+        valid_pwds.append(str(secret_pwd).strip())
+    return clean_pw in valid_pwds
+
+
 # ----------------------------------------------------
 # 1-1. 세션 상태 초기화 및 URL 파라미터 기반 새로고침(F5) 복원 엔진
 # ----------------------------------------------------
@@ -311,8 +328,12 @@ if "user_info" not in st.session_state:
 target_page = None
 if hasattr(st, "query_params"):
     target_page = st.query_params.get("page") or st.query_params.get("nav")
-    if str(st.query_params.get("admin", "")).lower() in ["true", "1", "7777", "asafire777", "master"]:
-        st.session_state["is_admin_mode"] = True
+    admin_param = str(st.query_params.get("admin", "")).strip()
+    if admin_param:
+        if verify_admin_password(admin_param):
+            st.session_state["is_admin_mode"] = True
+        elif admin_param.lower() in ["true", "1", "login", "open"]:
+            st.session_state["prompt_admin_login"] = True
 
 if target_page in ["dashboard", "radar", "app"]:
     # 새로고침(F5) 시 분석 대시보드 화면 100% 유지 (매트릭스 인트로 애니메이션은 생략하고 즉시 화면 로드)
@@ -466,31 +487,9 @@ if st.session_state["current_page"] == "dashboard":
             st.session_state["matrix_intro_transition"] = True
             st.rerun()
 
-        st.markdown("---")
-        st.markdown("### 👑 마스터 관리자 관제실")
-        if not st.session_state.get("is_admin_mode", False):
-            col_sb_pin, col_sb_btn = st.columns([1.6, 1.4])
-            with col_sb_pin:
-                sb_admin_pw = st.text_input("마스터 PIN", type="password", key="admin_pwd_input", placeholder="PIN 7777", label_visibility="collapsed")
-            with col_sb_btn:
-                if st.button("👑 인증 입장", key="btn_admin_unlock", use_container_width=True):
-                    if sb_admin_pw in ["7777", "asafire777", "admin", "master"]:
-                        st.session_state["is_admin_mode"] = True
-                        st.success("👑 관리자 인증 완료!")
-                        st.rerun()
-                    else:
-                        st.error("PIN 번호 오류")
-        else:
-            st.html("""
-                <div style="padding: 10px; border-radius: 8px; background: rgba(245,158,11,0.18); border: 1.5px solid #F59E0B; color: #F59E0B; font-size: 0.82rem; font-weight: 800; text-align: center; margin-bottom: 8px;">
-                    👑 MASTER ADMIN 활성화됨
-                </div>
-            """)
-            st.caption("우측 탭 메뉴 맨 끝에 **'👑 마스터 관리자 상세 통계실'**이 열렸습니다.")
-            if st.button("🔒 관리자 모드 종료", key="btn_admin_lock", use_container_width=True):
-                st.session_state["is_admin_mode"] = False
-                st.rerun()
-
+        # ----------------------------------------------------
+        # 사이드바: 지식 & 정책 센터
+        # ----------------------------------------------------
         st.markdown("---")
         st.markdown("### 📚 지식 & 정책 센터")
         col_sb_k1, col_sb_k2 = st.columns(2)
@@ -500,6 +499,34 @@ if st.session_state["current_page"] == "dashboard":
         with col_sb_k2:
             if st.button("📜 정책·면책", key="sb_btn_policies", use_container_width=True):
                 show_disclaimer_dialog(is_dark)
+
+        # ----------------------------------------------------
+        # 사이드바: 관리자 상태 제어 (보안 인증)
+        # ----------------------------------------------------
+        if st.session_state.get("is_admin_mode", False):
+            st.markdown("---")
+            st.html("""
+                <div style="padding: 10px; border-radius: 8px; background: rgba(245,158,11,0.18); border: 1.5px solid #F59E0B; color: #F59E0B; font-size: 0.82rem; font-weight: 800; text-align: center; margin-bottom: 8px;">
+                    👑 MASTER ADMIN 활성화됨
+                </div>
+            """)
+            st.caption("우측 탭 메뉴 맨 끝에 **'👑 마스터 관리자 상세 통계실'**이 열렸습니다.")
+            if st.button("🔒 관리자 모드 종료", key="btn_admin_lock", use_container_width=True):
+                st.session_state["is_admin_mode"] = False
+                st.rerun()
+        else:
+            with st.expander("🔒 운영자 인증", expanded=False):
+                col_sb_pin, col_sb_btn = st.columns([1.6, 1.4])
+                with col_sb_pin:
+                    sb_admin_pw = st.text_input("비밀번호", type="password", key="admin_pwd_input", placeholder="비밀번호 입력", label_visibility="collapsed")
+                with col_sb_btn:
+                    if st.button("인증", key="btn_admin_unlock", use_container_width=True):
+                        if verify_admin_password(sb_admin_pw):
+                            st.session_state["is_admin_mode"] = True
+                            st.success("인증 완료!")
+                            st.rerun()
+                        else:
+                            st.error("비밀번호 불일치")
 
         st.markdown("---")
         now_str = get_now_kst().strftime("%Y-%m-%d %H:%M:%S KST")
@@ -2489,21 +2516,21 @@ if show_matrix:
 def open_admin_auth_dialog():
     st.markdown("""
         <div style="text-align:center; margin-bottom:12px;">
-            <div style="font-size:1.6rem;">👑</div>
-            <div style="font-weight:900; font-size:1.1rem; color:#F59E0B;">마스터 관리자 상세 통계실 인증</div>
+            <div style="font-size:1.6rem;">🔒</div>
+            <div style="font-weight:900; font-size:1.1rem; color:#F59E0B;">마스터 관리자 통계실 인증</div>
             <div style="font-size:0.82rem; color:#64748B;">실시간 쿼리 분석, 트래픽 로그 및 사용자 행동 관제실에 접속합니다.</div>
         </div>
     """, unsafe_allow_html=True)
-    admin_pw = st.text_input("마스터 PIN / 암호", type="password", key="dlg_admin_pw", placeholder="기본 PIN: 7777")
+    admin_pw = st.text_input("마스터 비밀번호", type="password", key="dlg_admin_pw", placeholder="비밀번호를 입력하세요")
     c1, c2 = st.columns(2)
     with c1:
         if st.button("👑 인증 확인", key="dlg_btn_admin_confirm", use_container_width=True):
-            if admin_pw in ["7777", "asafire777", "admin", "master"]:
+            if verify_admin_password(admin_pw):
                 st.session_state["is_admin_mode"] = True
                 st.success("인증 완료! 마스터 관리자 모드가 활성화되었습니다.")
                 st.rerun()
             else:
-                st.error("PIN 번호가 올바르지 않습니다.")
+                st.error("비밀번호가 올바르지 않습니다.")
     with c2:
         if st.button("닫기", key="dlg_btn_admin_cancel", use_container_width=True):
             st.rerun()
@@ -2532,33 +2559,53 @@ with head_c2:
                 <span class="badge-pill notranslate" translate="no" style="margin-left: 6px; padding: 2px 8px; font-size: 0.75rem;">{u_badge}</span>
             </div>"""
         )
-    h_btn1, h_btn2, h_btn3, h_btn4 = st.columns([1, 1.2, 1.3, 0.9])
-    with h_btn1:
-        if st.button("🏠 소개", use_container_width=True, key="btn_dash_to_intro"):
-            st.session_state["current_page"] = "intro"
-            if hasattr(st, "query_params"):
-                st.query_params["page"] = "intro"
-            st.rerun()
-    with h_btn2:
-        if st.button("📚 16편 칼럼", use_container_width=True, key="btn_dash_col_info"):
-            st.toast("💡 아래 탭 메뉴에서 '📚 실전 주식 투자 지식 아카이브 (16편)'을 클릭하시면 전체 칼럼을 정독하실 수 있습니다!", icon="📚")
-    with h_btn3:
-        is_adm = st.session_state.get("is_admin_mode", False)
-        adm_label = "👑 관리자 끄기" if is_adm else "👑 관리자 통계"
-        if st.button(adm_label, use_container_width=True, key="btn_dash_admin_toggle"):
-            if is_adm:
+    is_adm = st.session_state.get("is_admin_mode", False)
+    if is_adm:
+        h_btn1, h_btn2, h_btn3, h_btn4 = st.columns([1, 1.2, 1.3, 0.9])
+        with h_btn1:
+            if st.button("🏠 소개", use_container_width=True, key="btn_dash_to_intro"):
+                st.session_state["current_page"] = "intro"
+                if hasattr(st, "query_params"):
+                    st.query_params["page"] = "intro"
+                st.rerun()
+        with h_btn2:
+            if st.button("📚 16편 칼럼", use_container_width=True, key="btn_dash_col_info"):
+                st.toast("💡 아래 탭 메뉴에서 '📚 실전 주식 투자 지식 아카이브 (16편)'을 클릭하시면 전체 칼럼을 정독하실 수 있습니다!", icon="📚")
+        with h_btn3:
+            if st.button("👑 관리자 끄기", use_container_width=True, key="btn_dash_admin_off"):
                 st.session_state["is_admin_mode"] = False
                 st.rerun()
-            else:
-                open_admin_auth_dialog()
-    with h_btn4:
-        if st.button("🚪 퇴장", use_container_width=True, key="btn_dash_logout"):
-            st.session_state["is_authenticated"] = False
-            st.session_state["user_info"] = None
-            st.session_state["current_page"] = "intro"
-            if hasattr(st, "query_params"):
-                st.query_params.clear()
-            st.rerun()
+        with h_btn4:
+            if st.button("🚪 퇴장", use_container_width=True, key="btn_dash_logout"):
+                st.session_state["is_authenticated"] = False
+                st.session_state["user_info"] = None
+                st.session_state["current_page"] = "intro"
+                if hasattr(st, "query_params"):
+                    st.query_params.clear()
+                st.rerun()
+    else:
+        h_btn1, h_btn2, h_btn3 = st.columns([1, 1.3, 0.9])
+        with h_btn1:
+            if st.button("🏠 소개", use_container_width=True, key="btn_dash_to_intro"):
+                st.session_state["current_page"] = "intro"
+                if hasattr(st, "query_params"):
+                    st.query_params["page"] = "intro"
+                st.rerun()
+        with h_btn2:
+            if st.button("📚 16편 칼럼", use_container_width=True, key="btn_dash_col_info"):
+                st.toast("💡 아래 탭 메뉴에서 '📚 실전 주식 투자 지식 아카이브 (16편)'을 클릭하시면 전체 칼럼을 정독하실 수 있습니다!", icon="📚")
+        with h_btn3:
+            if st.button("🚪 퇴장", use_container_width=True, key="btn_dash_logout"):
+                st.session_state["is_authenticated"] = False
+                st.session_state["user_info"] = None
+                st.session_state["current_page"] = "intro"
+                if hasattr(st, "query_params"):
+                    st.query_params.clear()
+                st.rerun()
+
+    # URL ?admin=true 호출 시 자동 다이얼로그 팝업
+    if st.session_state.pop("prompt_admin_login", False):
+        open_admin_auth_dialog()
 
 # 📡 실시간 데이터 연동 상태 뱃지 (한국장 + 미국장 + 서머타임 실시간 통합 연동)
 integrated_market = get_integrated_market_status()
