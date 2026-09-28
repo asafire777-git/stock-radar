@@ -7,15 +7,25 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from src.analytics_tracker import (
-    get_analytics_metrics,
-    get_ai_prediction_audit_metrics,
-    load_all_search_logs
-)
+try:
+    from src.analytics_tracker import (
+        get_analytics_metrics,
+        get_ai_prediction_audit_metrics,
+        load_all_search_logs,
+        reset_analytics_logs
+    )
+except ImportError:
+    from analytics_tracker import (
+        get_analytics_metrics,
+        get_ai_prediction_audit_metrics,
+        load_all_search_logs,
+        reset_analytics_logs
+    )
 
 
+@st.fragment
 def render_admin_dashboard(is_dark: bool = False):
-    """마스터 관리자 상세 통계실 렌더링"""
+    """마스터 관리자 상세 통계실 렌더링 (초고속 프래그먼트 격리 & 무지연 조회)"""
     card_bg = "#151A23" if is_dark else "#FFFFFF"
     border_color = "rgba(255, 255, 255, 0.12)" if is_dark else "#E2E8F0"
     text_primary = "#F8FAFC" if is_dark else "#0F172A"
@@ -48,35 +58,51 @@ def render_admin_dashboard(is_dark: bool = False):
     </div>
     """)
 
-    # 컨트롤 바 (기간 선택 + 새로고침)
-    col_ctrl1, col_ctrl2 = st.columns([3, 1])
+    # 컨트롤 바 (기간 선택 + 실시간 동기화 + 데이터 초기화)
+    col_ctrl1, col_ctrl2, col_ctrl3 = st.columns([3.2, 1, 1.2])
     with col_ctrl1:
-        current_period = st.session_state["admin_period_filter"]
-        btn_cols = st.columns(4)
-        period_options = [
-            ("all", "🔥 전체 누적"),
-            ("today", "⚡ 오늘 실시간"),
-            ("7d", "📅 최근 7일"),
-            ("30d", "📊 최근 30일")
-        ]
-        for idx, (p_key, p_label) in enumerate(period_options):
-            with btn_cols[idx]:
-                is_active = (current_period == p_key)
-                if st.button(
-                    f"{'✓ ' if is_active else ''}{p_label}",
-                    key=f"btn_p_{p_key}",
-                    use_container_width=True,
-                    type="primary" if is_active else "secondary"
-                ):
-                    st.session_state["admin_period_filter"] = p_key
-                    st.rerun()
+        period_map = {
+            "🔥 전체 누적": "all",
+            "⚡ 오늘 실시간": "today",
+            "📅 최근 7일": "7d",
+            "📊 최근 30일": "30d"
+        }
+        current_period = st.session_state.get("admin_period_filter", "all")
+        current_idx = 0
+        for i, val in enumerate(period_map.values()):
+            if val == current_period:
+                current_idx = i
+                break
+
+        selected_label = st.radio(
+            "조회 기간 선택",
+            list(period_map.keys()),
+            index=current_idx,
+            horizontal=True,
+            label_visibility="collapsed",
+            key="admin_period_radio_selector"
+        )
+        selected_period = period_map[selected_label]
+        st.session_state["admin_period_filter"] = selected_period
 
     with col_ctrl2:
-        if st.button("🔄 실시간 동기화", key="admin_sync_btn", use_container_width=True):
-            st.rerun()
+        if st.button("🔄 즉시 동기화", key="admin_sync_btn", use_container_width=True):
+            st.rerun(scope="fragment")
 
-    # 데이터 로드
-    selected_period = st.session_state.get("admin_period_filter", "all")
+    with col_ctrl3:
+        if st.button("🧹 순수 실측 리셋", key="admin_reset_btn", use_container_width=True, help="초기 데모 샘플(448건)을 비우고, 실제 발생한 사용자 검색 로그만 0부터 다시 집계합니다."):
+            reset_analytics_logs()
+            st.toast("🧹 초기화 완료! 이제부터 실제 사용자 검색 로그만 순수 집계됩니다.", icon="✅")
+            st.rerun(scope="fragment")
+
+    # 데이터 성격 안내 배너
+    st.html(f"""
+    <div style="background:{'#1E293B' if is_dark else '#F8FAFC'}; border:1px solid {'#334155' if is_dark else '#E2E8F0'}; border-radius:10px; padding:8px 14px; margin: 4px 0 16px 0; font-size:0.80rem; color:{'#94A3B8' if is_dark else '#64748B'}; display:flex; justify-content:space-between; align-items:center;">
+        <span>💡 <b>데이터 안내</b>: 현재 통계는 대시보드 시각화용 베이스라인 샘플과 실제 검색 로그가 함께 집계되어 있습니다. 실제 방문자 검색만 0부터 측정하시려면 우측 상단 <b>'🧹 순수 실측 리셋'</b>을 클릭하세요.</span>
+    </div>
+    """)
+
+    # 데이터 로드 (밀리초 단위 계산)
     metrics = get_analytics_metrics(selected_period)
     audit = get_ai_prediction_audit_metrics()
 

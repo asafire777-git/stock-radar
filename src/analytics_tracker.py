@@ -115,6 +115,18 @@ def log_search_event(query: str, stock_name: str = "", stock_code: str = "", mar
         print(f"[Analytics] Log error: {e}")
 
 
+def reset_analytics_logs():
+    """분석 로그 초기화 (데모 데이터 삭제 및 순수 실측 사용자 로그 모드로 전환)"""
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        with open(SEARCH_LOG_FILE, "w", encoding="utf-8") as f:
+            json.dump([], f, ensure_ascii=False, indent=2)
+        return True
+    except Exception as e:
+        print(f"[Analytics] Reset error: {e}")
+        return False
+
+
 def load_all_search_logs():
     """전체 검색 및 진단 로그 로드"""
     if not os.path.exists(SEARCH_LOG_FILE):
@@ -125,7 +137,7 @@ def load_all_search_logs():
             logs = json.load(f)
             return logs if isinstance(logs, list) else []
     except Exception:
-        return _init_default_analytics_data()
+        return []
 
 
 def get_analytics_metrics(period_filter: str = "all"):
