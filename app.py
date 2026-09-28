@@ -1,3 +1,4 @@
+import concurrent.futures
 import datetime
 import os
 import sys
@@ -1551,19 +1552,26 @@ def load_overseas_detail(symbol: str, reuters_code: str = ""):
 
 
 
-@st.cache_data(ttl=600)
-def evaluate_candidates(pool_records: list, strategy_key: str) -> list:
-    """선정된 종목 풀에 대해 기술적 지표, 퀀트 점수, 상승 확률을 일괄 평가 (캐싱 적용)"""
-    results = []
-    for row in pool_records:
-        code = str(row.get("code", ""))
-        name = str(row.get("name", ""))
-        if not code:
-            continue
+def load_all_market_base_data(months: int = 12):
+    """급등주, 거래량급증주, 신규상장주 3대 기초 데이터를 멀티스레드 병렬로 동시 수집 (수집 시간 대폭 단축)"""
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+        f_rising = executor.submit(load_rising_data)
+        f_volume = executor.submit(load_volume_data)
+        f_new = executor.submit(load_new_listings, months)
+        return f_rising.result(), f_volume.result(), f_new.result()
 
+
+def _evaluate_single_candidate(row: dict, strategy_key: str):
+    """단일 종목 기술적 지표, 퀀트 점수, 상승 확률 안전 연산 (스레드 독립적)"""
+    code = str(row.get("code", ""))
+    name = str(row.get("name", ""))
+    if not code:
+        return None
+
+    try:
         ohlcv = get_stock_ohlcv(code, days=60)
         if ohlcv.empty or len(ohlcv) < 20:
-            continue
+            return None
 
         ohlcv_ind = compute_technical_indicators(ohlcv)
         signals = analyze_stock_signals(ohlcv_ind)
@@ -1578,7 +1586,7 @@ def evaluate_candidates(pool_records: list, strategy_key: str) -> list:
         quant_res = calculate_quant_score(item_dict, signals, investor_df, strategy=strategy_key)
         pred_res = predictor.predict_probability(ohlcv_ind, quant_score=quant_res["total_score"])
 
-        results.append({
+        return {
             "code": code,
             "name": name,
             "market": row.get("market", ""),
@@ -1590,7 +1598,28 @@ def evaluate_candidates(pool_records: list, strategy_key: str) -> list:
             "direction": pred_res["direction"],
             "signals": ", ".join(signals["signals"][:3]) if signals["signals"] else "기본 상승 탄력 유지",
             "reasons": quant_res["key_reasons"],
-        })
+        }
+    except Exception:
+        return None
+
+
+@st.cache_data(ttl=600)
+def evaluate_candidates(pool_records: list, strategy_key: str) -> list:
+    """선정된 종목 풀에 대해 기술적 지표, 퀀트 점수, 상승 확률을 멀티스레드 병렬로 초고속 일괄 평가 (캐싱 적용)"""
+    if not pool_records:
+        return []
+    
+    results = []
+    max_workers = min(8, len(pool_records))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [executor.submit(_evaluate_single_candidate, row, strategy_key) for row in pool_records]
+        for f in futures:
+            try:
+                res = f.result(timeout=15)
+                if res:
+                    results.append(res)
+            except Exception:
+                pass
     return results
 
 
@@ -2461,16 +2490,12 @@ if show_matrix:
     matrix_holder.html(render_matrix_loader(is_dark))
     matrix_start_time = time.time()
 
-# 메인 데이터 로드 (매트릭스 로더 화면 뒤에서 사전 수행)
+# 메인 데이터 병렬 로드 (급등주 + 거래량주 + 신규상장주 동시 수집)
 if not show_matrix:
-    with st.spinner("최신 주식 시장 데이터를 수집 및 분석 중입니다..."):
-        df_rising = load_rising_data()
-        df_volume = load_volume_data()
-        df_new = load_new_listings(months=new_listing_months)
+    with st.spinner("최신 주식 시장 데이터를 초고속 병렬 수집 및 분석 중입니다..."):
+        df_rising, df_volume, df_new = load_all_market_base_data(months=new_listing_months)
 else:
-    df_rising = load_rising_data()
-    df_volume = load_volume_data()
-    df_new = load_new_listings(months=new_listing_months)
+    df_rising, df_volume, df_new = load_all_market_base_data(months=new_listing_months)
 
 # 필터 적용
 if not df_rising.empty and market_filter != "전체 (KOSPI + KOSDAQ)":
@@ -2521,11 +2546,11 @@ if not candidates and not pool.empty:
         except Exception:
             pass
 
-# 매트릭스 디지털 레인 애니메이션 최소 2.2초 연출 보장 후 짠~ 하고 해제
+# 매트릭스 디지털 레인 애니메이션 최소 0.75초 임팩트 연출 후 즉시 해제 (기존 2.2초 -> 0.75초로 대폭 단축)
 if show_matrix:
     elapsed = time.time() - matrix_start_time
-    if elapsed < 2.2:
-        time.sleep(2.2 - elapsed)
+    if elapsed < 0.75:
+        time.sleep(0.75 - elapsed)
     matrix_holder.empty()
     st.session_state["matrix_intro_transition"] = False
 
