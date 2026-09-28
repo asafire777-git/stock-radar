@@ -76,6 +76,15 @@ try:
         render_prescriptions_html,
         render_essential_trading_metrics_html,
     )
+    from src.analytics_tracker import log_search_event
+    from src.admin_dashboard import render_admin_dashboard
+    from src.stock_legal_policies import (
+        render_footer_legal_bar,
+        show_disclaimer_dialog,
+        show_privacy_dialog,
+        show_terms_dialog,
+    )
+    from src.stock_knowledge_hub import render_stock_knowledge_tab
 except ImportError:
     from krx_collector import (
         get_investor_net_purchases,
@@ -132,6 +141,15 @@ except ImportError:
         render_prescriptions_html,
         render_essential_trading_metrics_html,
     )
+    from analytics_tracker import log_search_event
+    from admin_dashboard import render_admin_dashboard
+    from stock_legal_policies import (
+        render_footer_legal_bar,
+        show_disclaimer_dialog,
+        show_privacy_dialog,
+        show_terms_dialog,
+    )
+    from stock_knowledge_hub import render_stock_knowledge_tab
 
 
 
@@ -293,6 +311,8 @@ if "user_info" not in st.session_state:
 target_page = None
 if hasattr(st, "query_params"):
     target_page = st.query_params.get("page") or st.query_params.get("nav")
+    if str(st.query_params.get("admin", "")).lower() in ["true", "1", "7777", "asafire777", "master"]:
+        st.session_state["is_admin_mode"] = True
 
 if target_page in ["dashboard", "radar", "app"]:
     # 새로고침(F5) 시 분석 대시보드 화면 100% 유지 (매트릭스 인트로 애니메이션은 생략하고 즉시 화면 로드)
@@ -445,6 +465,41 @@ if st.session_state["current_page"] == "dashboard":
                     del st.session_state[k]
             st.session_state["matrix_intro_transition"] = True
             st.rerun()
+
+        st.markdown("---")
+        st.markdown("### 👑 마스터 관리자 관제실")
+        if not st.session_state.get("is_admin_mode", False):
+            col_sb_pin, col_sb_btn = st.columns([1.6, 1.4])
+            with col_sb_pin:
+                sb_admin_pw = st.text_input("마스터 PIN", type="password", key="admin_pwd_input", placeholder="PIN 7777", label_visibility="collapsed")
+            with col_sb_btn:
+                if st.button("👑 인증 입장", key="btn_admin_unlock", use_container_width=True):
+                    if sb_admin_pw in ["7777", "asafire777", "admin", "master"]:
+                        st.session_state["is_admin_mode"] = True
+                        st.success("👑 관리자 인증 완료!")
+                        st.rerun()
+                    else:
+                        st.error("PIN 번호 오류")
+        else:
+            st.html("""
+                <div style="padding: 10px; border-radius: 8px; background: rgba(245,158,11,0.18); border: 1.5px solid #F59E0B; color: #F59E0B; font-size: 0.82rem; font-weight: 800; text-align: center; margin-bottom: 8px;">
+                    👑 MASTER ADMIN 활성화됨
+                </div>
+            """)
+            st.caption("우측 탭 메뉴 맨 끝에 **'👑 마스터 관리자 상세 통계실'**이 열렸습니다.")
+            if st.button("🔒 관리자 모드 종료", key="btn_admin_lock", use_container_width=True):
+                st.session_state["is_admin_mode"] = False
+                st.rerun()
+
+        st.markdown("---")
+        st.markdown("### 📚 지식 & 정책 센터")
+        col_sb_k1, col_sb_k2 = st.columns(2)
+        with col_sb_k1:
+            if st.button("📚 16편 칼럼", key="sb_btn_column", use_container_width=True):
+                st.toast("💡 아래 탭 메뉴에서 '📚 실전 주식 투자 지식 아카이브 (16편)'을 클릭하시면 전체 칼럼을 보실 수 있습니다!", icon="📚")
+        with col_sb_k2:
+            if st.button("📜 정책·면책", key="sb_btn_policies", use_container_width=True):
+                show_disclaimer_dialog(is_dark)
 
         st.markdown("---")
         now_str = get_now_kst().strftime("%Y-%m-%d %H:%M:%S KST")
@@ -2430,9 +2485,34 @@ if show_matrix:
     st.session_state["matrix_intro_transition"] = False
 
 # ----------------------------------------------------
+@st.dialog("👑 마스터 관리자 인증 관제실", width="small")
+def open_admin_auth_dialog():
+    st.markdown("""
+        <div style="text-align:center; margin-bottom:12px;">
+            <div style="font-size:1.6rem;">👑</div>
+            <div style="font-weight:900; font-size:1.1rem; color:#F59E0B;">마스터 관리자 상세 통계실 인증</div>
+            <div style="font-size:0.82rem; color:#64748B;">실시간 쿼리 분석, 트래픽 로그 및 사용자 행동 관제실에 접속합니다.</div>
+        </div>
+    """, unsafe_allow_html=True)
+    admin_pw = st.text_input("마스터 PIN / 암호", type="password", key="dlg_admin_pw", placeholder="기본 PIN: 7777")
+    c1, c2 = st.columns(2)
+    with c1:
+        if st.button("👑 인증 확인", key="dlg_btn_admin_confirm", use_container_width=True):
+            if admin_pw in ["7777", "asafire777", "admin", "master"]:
+                st.session_state["is_admin_mode"] = True
+                st.success("인증 완료! 마스터 관리자 모드가 활성화되었습니다.")
+                st.rerun()
+            else:
+                st.error("PIN 번호가 올바르지 않습니다.")
+    with c2:
+        if st.button("닫기", key="dlg_btn_admin_cancel", use_container_width=True):
+            st.rerun()
+
+
+# ----------------------------------------------------
 # [대시보드] 상단 헤더 및 회원 상태 바
 # ----------------------------------------------------
-head_c1, head_c2 = st.columns([5, 3.2])
+head_c1, head_c2 = st.columns([5, 3.4])
 with head_c1:
     st.html(
         """<div style="display:flex; align-items:center; gap:10px; margin-bottom:0.2rem;">
@@ -2452,15 +2532,27 @@ with head_c2:
                 <span class="badge-pill notranslate" translate="no" style="margin-left: 6px; padding: 2px 8px; font-size: 0.75rem;">{u_badge}</span>
             </div>"""
         )
-    h_btn1, h_btn2 = st.columns(2)
+    h_btn1, h_btn2, h_btn3, h_btn4 = st.columns([1, 1.2, 1.3, 0.9])
     with h_btn1:
-        if st.button("🏠 서비스 소개", use_container_width=True, key="btn_dash_to_intro"):
+        if st.button("🏠 소개", use_container_width=True, key="btn_dash_to_intro"):
             st.session_state["current_page"] = "intro"
             if hasattr(st, "query_params"):
                 st.query_params["page"] = "intro"
             st.rerun()
     with h_btn2:
-        if st.button("🚪 로그아웃", use_container_width=True, key="btn_dash_logout"):
+        if st.button("📚 16편 칼럼", use_container_width=True, key="btn_dash_col_info"):
+            st.toast("💡 아래 탭 메뉴에서 '📚 실전 주식 투자 지식 아카이브 (16편)'을 클릭하시면 전체 칼럼을 정독하실 수 있습니다!", icon="📚")
+    with h_btn3:
+        is_adm = st.session_state.get("is_admin_mode", False)
+        adm_label = "👑 관리자 끄기" if is_adm else "👑 관리자 통계"
+        if st.button(adm_label, use_container_width=True, key="btn_dash_admin_toggle"):
+            if is_adm:
+                st.session_state["is_admin_mode"] = False
+                st.rerun()
+            else:
+                open_admin_auth_dialog()
+    with h_btn4:
+        if st.button("🚪 퇴장", use_container_width=True, key="btn_dash_logout"):
             st.session_state["is_authenticated"] = False
             st.session_state["user_info"] = None
             st.session_state["current_page"] = "intro"
@@ -2535,6 +2627,15 @@ with c4:
     top_vol_val = df_volume.iloc[0].get("trade_value_억", 0) if not df_volume.empty else 0
     st.metric("거래대금 1위", top_vol_stock, delta=f"{top_vol_val:,} 억원")
 
+is_adm_now = st.session_state.get("is_admin_mode", False)
+st.html(
+    f"""<div style="background:{'#1E293B' if is_dark else '#F0F9FF'}; border:1.5px solid {'#38BDF8' if is_dark else '#0284C7'}; border-radius:12px; padding:12px 18px; margin: 10px 0 16px 0; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+        <div style="font-size:0.90rem; color:{'#E2E8F0' if is_dark else '#0F172A'}; font-weight:700;">
+            🧭 <b>하단 핵심 메뉴 탭 안내</b>: 화면을 아래로 스크롤하시면 <b>⭐AI 추천주</b> · <b>🔥실시간 급등</b> · <b>🚀신규상장</b> · <b>🏆성과검증</b> · <b>🩺1초 정밀진단</b> · <b style="color:#2563EB;">📚주식 투자 칼럼(16편)</b>{' · <b style="color:#F59E0B;">👑마스터 관리자 상세 통계실</b>' if is_adm_now else ''} 탭을 편리하게 이용하실 수 있습니다.
+        </div>
+    </div>"""
+)
+
 st.markdown("---")
 
 # ----------------------------------------------------
@@ -2586,7 +2687,16 @@ def render_search_section_fragment(all_stocks_df, code_map, is_dark):
             st.session_state["diagnosed_stock"] = matches[0]
             st.session_state["related_search_matches"] = matches[1:7]
             st.session_state["search_query_buffer"] = query_text
+            try:
+                m0 = matches[0]
+                log_search_event(query_text, m0.get("name", query_text), m0.get("code", ""), m0.get("market", "KOSPI"), "search_bar")
+            except Exception:
+                pass
         else:
+            try:
+                log_search_event(query_text, query_text, "", "UNKNOWN", "search_bar")
+            except Exception:
+                pass
             st.warning(f"'{query_text}'에 해당하는 상장 종목을 찾지 못했습니다. 국내 종목명, 6자리 코드 또는 미국 주식 티커/한글명을 확인해 주세요.")
 
     # 인기 검색어 칩 (국내 핵심 주도주 + 해외 대표 슈퍼스타)
@@ -2600,6 +2710,11 @@ def render_search_section_fragment(all_stocks_df, code_map, is_dark):
                     st.session_state["diagnosed_stock"] = matches[0]
                     st.session_state["related_search_matches"] = matches[1:7]
                     st.session_state["search_query_buffer"] = chip
+                    try:
+                        m0 = matches[0]
+                        log_search_event(chip, m0.get("name", chip), m0.get("code", ""), m0.get("market", "KOSPI"), "quick_chip")
+                    except Exception:
+                        pass
                     st.rerun(scope="fragment")
 
     # 연관 종목 바로가기 칩 (복수 매칭 시)
@@ -2721,13 +2836,27 @@ st.html("""
 "/>
 """)
 
-tab_ai, tab_rising, tab_new, tab_perf, tab_chart = st.tabs([
-    "⭐ AI 오늘 추천주 (초보자 강추)",
-    "🔥 실시간 급등 순위 (TOP 100)",
-    "🚀 신규 상장주 모니터링",
-    "🔥 🏆 AI 성과 검증실 & 실전 복기",
-    "🩺 1초 종목 종합 정밀 진단실",
-])
+is_admin_active = st.session_state.get("is_admin_mode", False)
+
+if is_admin_active:
+    tab_ai, tab_rising, tab_new, tab_perf, tab_chart, tab_knowledge, tab_admin = st.tabs([
+        "⭐ AI 오늘 추천주 (초보자 강추)",
+        "🔥 실시간 급등 순위 (TOP 100)",
+        "🚀 신규 상장주 모니터링",
+        "🔥 🏆 AI 성과 검증실 & 실전 복기",
+        "🩺 1초 종목 종합 정밀 진단실",
+        "📚 실전 주식 투자 지식 아카이브 (16편)",
+        "👑 마스터 관리자 상세 통계실",
+    ])
+else:
+    tab_ai, tab_rising, tab_new, tab_perf, tab_chart, tab_knowledge = st.tabs([
+        "⭐ AI 오늘 추천주 (초보자 강추)",
+        "🔥 실시간 급등 순위 (TOP 100)",
+        "🚀 신규 상장주 모니터링",
+        "🔥 🏆 AI 성과 검증실 & 실전 복기",
+        "🩺 1초 종목 종합 정밀 진단실",
+        "📚 실전 주식 투자 지식 아카이브 (16편)",
+    ])
 
 
 # ====================================================
@@ -3504,6 +3633,10 @@ with tab_chart:
                     st.session_state["t4_diagnosed_stock"] = {"code": theme_stocks[0]["code"], "name": theme_stocks[0]["name"], "market": theme_stocks[0].get("market", "KRX")}
                     st.session_state["t4_related_matches"] = theme_stocks[1:]
                 st.session_state["t4_search_buffer"] = t4_q
+                try:
+                    log_search_event(t4_q, f"{t4_q} (테마)", "THEME", "THEME", "1sec_diagnosis")
+                except Exception:
+                    pass
                 st.rerun(scope="fragment")
             elif matches:
                 # 개별 종목 검색 매칭 성공 (예: '삼천당제약' 입력 시 삼천당제약 확정!)
@@ -3513,8 +3646,17 @@ with tab_chart:
                 # 해당 종목이 속한 주도 테마가 있다면 대장주 매트릭스도 함께 연동
                 _, stock_theme = find_theme_of_stock(matches[0]["code"], matches[0]["name"])
                 st.session_state["t4_active_theme"] = stock_theme
+                try:
+                    m0 = matches[0]
+                    log_search_event(t4_q, m0.get("name", t4_q), m0.get("code", ""), m0.get("market", "KOSPI"), "1sec_diagnosis")
+                except Exception:
+                    pass
                 st.rerun(scope="fragment")
             else:
+                try:
+                    log_search_event(t4_q, t4_q, "", "UNKNOWN", "1sec_diagnosis")
+                except Exception:
+                    pass
                 st.warning(f"'{t4_q}'에 해당하는 상장 종목 또는 업종/테마를 찾지 못했습니다. '2차전지', '반도체', '원전', '로봇', '방산' 등의 업종명 또는 종목명을 확인해 주세요.")
 
         # 2. 10대 핵심 주도 섹터 퀵 필터 칩 (원클릭 레이더)
@@ -3805,4 +3947,19 @@ with tab_chart:
             )
 
     render_quick_diagnosis_tab(all_stocks_df, code_map, is_dark)
+
+# ====================================================
+# TAB: 실전 주식 투자 지식 아카이브 (16편 칼럼 - Google AdSense & YMYL 준수)
+# ====================================================
+with tab_knowledge:
+    render_stock_knowledge_tab(is_dark=is_dark)
+
+if is_admin_active:
+    with tab_admin:
+        render_admin_dashboard(is_dark=is_dark)
+
+# ====================================================
+# FOOTER: 법적 면책 고지, 개인정보처리방침, 이용약관 (Google AdSense 준수)
+# ====================================================
+render_footer_legal_bar(is_dark=is_dark)
 

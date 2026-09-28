@@ -3,6 +3,13 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import streamlit as st
 
+try:
+    from src.stock_legal_policies import render_footer_legal_bar, show_disclaimer_dialog, show_privacy_dialog, show_terms_dialog
+    from src.stock_knowledge_hub import render_stock_knowledge_tab
+except ImportError:
+    from stock_legal_policies import render_footer_legal_bar, show_disclaimer_dialog, show_privacy_dialog, show_terms_dialog
+    from stock_knowledge_hub import render_stock_knowledge_tab
+
 
 def create_showcase_figure(pattern_type: str = "breakout", is_dark: bool = True):
     """
@@ -526,7 +533,10 @@ def render_landing_page(is_dark: bool):
             <a href="#section-guide" class="nav-anchor-btn" style="background: {btn_bg} !important; color: {btn_color} !important; border: {btn_border} !important;">🔰 실전 가이드</a>
             <a href="#section-strategy" class="nav-anchor-btn" style="background: {btn_bg} !important; color: {btn_color} !important; border: {btn_border} !important;">🎯 3대 매매 전략</a>
             <a href="#section-quant" class="nav-anchor-btn" style="background: {btn_bg} !important; color: {btn_color} !important; border: {btn_border} !important;">⚡ 100점 배점표</a>
-            <a href="#section-cta" class="nav-anchor-btn" style="background: {btn_bg} !important; color: {btn_color} !important; border: {btn_border} !important;">🚀 바로 입장</a>
+            <a href="#section-knowledge" class="nav-anchor-btn" style="background: rgba(37,99,235,0.12) !important; color: #2563EB !important; border: 1.5px solid rgba(37,99,235,0.35) !important; font-weight: 800 !important;">📚 투자 칼럼(16편)</a>
+            <a href="#section-policies" class="nav-anchor-btn" style="background: {btn_bg} !important; color: {btn_color} !important; border: {btn_border} !important;">📜 정책·면책</a>
+            <a href="#section-admin" class="nav-anchor-btn" style="background: rgba(245,158,11,0.12) !important; color: #D97706 !important; border: 1.5px solid rgba(245,158,11,0.35) !important; font-weight: 800 !important;">👑 관리자</a>
+            <a href="#section-cta" class="nav-anchor-btn" style="background: #2563EB !important; color: #FFFFFF !important; border: none !important; font-weight: 800 !important;">🚀 바로 입장</a>
         </div>
         <div id="section-hero" class="anchor-marker"></div>
         """,
@@ -1161,4 +1171,46 @@ def render_landing_page(is_dark: bool):
                     st.query_params["page"] = "dashboard"
                 st.rerun()
 
-    st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True)
+    # ----------------------------------------------------
+    # 8. 주식 실전 지식 아카이브 (16편 칼럼 - Google AdSense & E-E-A-T 검증 전용)
+    # ----------------------------------------------------
+    st.markdown("<div id='section-knowledge' class='anchor-marker'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height: 36px;'></div>", unsafe_allow_html=True)
+    render_stock_knowledge_tab(is_dark=is_dark)
+
+    # ----------------------------------------------------
+    # 9. 마스터 관리자 관제실 빠른 입장 게이트
+    # ----------------------------------------------------
+    st.markdown("<div id='section-admin' class='anchor-marker'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height: 24px;'></div>", unsafe_allow_html=True)
+    with st.expander("👑 마스터 관리자 전용 관제실 (Admin Mode Login)", expanded=False):
+        st.write("시스템 운영자 전용 페이지입니다. 관리자 PIN 번호를 입력하시면 실시간 사용자 행동 및 검색 통계 관제실로 즉시 이동합니다.")
+        col_adm_i, col_adm_b = st.columns([3, 1])
+        with col_adm_i:
+            adm_pin = st.text_input("마스터 PIN / 암호", type="password", key="intro_admin_pin_input", placeholder="기본 PIN: 7777")
+        with col_adm_b:
+            st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+            if st.button("👑 관리자 입장", key="intro_btn_admin_submit", use_container_width=True):
+                if adm_pin in ["7777", "asafire777", "admin", "master"]:
+                    st.session_state["is_authenticated"] = True
+                    st.session_state["user_info"] = {
+                        "name": "마스터 관리자",
+                        "email": "admin@stockradar.ai",
+                        "provider": "Master",
+                        "badge": "👑 MASTER",
+                    }
+                    st.session_state["is_admin_mode"] = True
+                    st.session_state["current_page"] = "dashboard"
+                    if hasattr(st, "query_params"):
+                        st.query_params["admin"] = "true"
+                        st.query_params["page"] = "dashboard"
+                    st.rerun()
+                else:
+                    st.error("PIN 번호가 일치하지 않습니다.")
+
+    # ----------------------------------------------------
+    # 10. 법적 면책 고지 및 개인정보 정책 바 (Google AdSense 준수)
+    # ----------------------------------------------------
+    st.markdown("<div id='section-policies' class='anchor-marker'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height: 30px;'></div>", unsafe_allow_html=True)
+    render_footer_legal_bar(is_dark=is_dark)
