@@ -223,6 +223,26 @@ div[data-testid="stStatusWidget"] {
     display: none !important;
     visibility: hidden !important;
 }
+
+/* 모달 다이얼로그 즉시 렌더링 & 하드웨어 가속 최적화 */
+div[data-testid="stDialog"] {
+    animation: fastDialogFadeIn 0.1s ease-out !important;
+    transition: opacity 0.1s ease !important;
+}
+div[data-testid="stDialog"] > div[role="dialog"] {
+    animation: fastDialogScaleIn 0.12s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    border-radius: 18px !important;
+    overflow: hidden !important;
+    will-change: transform, opacity !important;
+}
+@keyframes fastDialogFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+@keyframes fastDialogScaleIn {
+    from { transform: scale(0.97); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
 </style>
 <script>
 (function() {
@@ -2045,7 +2065,8 @@ def render_stock_detailed_section(code: str, name: str, is_dark: bool, in_modal:
             detail = load_stock_realtime_detail(code)
             inv_df = load_stock_investors(code)
 
-    st.html(render_quantum_radar_loader(name, code, is_ovs, is_dark))
+    if not in_modal:
+        st.html(render_quantum_radar_loader(name, code, is_ovs, is_dark))
 
     is_ipo_day1 = False
     if ohlcv is None or ohlcv.empty or len(ohlcv) < 2:
@@ -2405,9 +2426,7 @@ def render_stock_detailed_section(code: str, name: str, is_dark: bool, in_modal:
 @st.dialog("📊 종목 정밀 진단 및 캔들 차트", width="large")
 def show_stock_chart_dialog(code: str, name: str, is_dark: bool):
     is_ovs = (len(code) <= 5 and code.isalpha()) or any(s["symbol"] == code for s in POPULAR_US_STOCKS)
-    loader_ph = st.empty()
-    loader_ph.html(render_quantum_radar_loader(name, code, is_ovs, is_dark))
-    # 데이터 사전 로드 (로더가 떠 있는 동안 고속 실행)
+    # 데이터 사전 로드 (캐시 우선 고속 로드)
     if is_ovs:
         ohlcv = load_overseas_stock_chart(code, timeframe="1달")
         detail = load_overseas_detail(code)
@@ -2421,8 +2440,6 @@ def show_stock_chart_dialog(code: str, name: str, is_dark: bool):
         detail = load_stock_realtime_detail(code)
         inv_df = load_stock_investors(code)
 
-    time.sleep(0.18)
-    loader_ph.empty()
     render_stock_detailed_section(code, name, is_dark, in_modal=True, key_prefix="modal_dialog", preloaded_data=(ohlcv, detail, inv_df))
 
 

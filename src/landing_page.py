@@ -11,6 +11,7 @@ except ImportError:
     from stock_knowledge_hub import render_stock_knowledge_tab
 
 
+@st.cache_data
 def create_showcase_figure(pattern_type: str = "breakout", is_dark: bool = True):
     """
     서비스 소개 페이지용 인터랙티브 실전 AI 차트 시뮬레이션 생성 함수
@@ -442,7 +443,24 @@ def render_landing_page(is_dark: bool):
             font-weight: 500 !important;
             color: #A7F3D0 !important;
             opacity: 0.96 !important;
-            letter-spacing: -0.2px !important;
+        /* 모달 다이얼로그 즉시 렌더링 & 하드웨어 가속 최적화 */
+        div[data-testid="stDialog"] {{
+            animation: fastDialogFadeIn 0.1s ease-out !important;
+            transition: opacity 0.1s ease !important;
+        }}
+        div[data-testid="stDialog"] > div[role="dialog"] {{
+            animation: fastDialogScaleIn 0.12s cubic-bezier(0.16, 1, 0.3, 1) !important;
+            border-radius: 18px !important;
+            overflow: hidden !important;
+            will-change: transform, opacity !important;
+        }}
+        @keyframes fastDialogFadeIn {{
+            from {{ opacity: 0; }}
+            to {{ opacity: 1; }}
+        }}
+        @keyframes fastDialogScaleIn {{
+            from {{ transform: scale(0.97); opacity: 0; }}
+            to {{ transform: scale(1); opacity: 1; }}
         }}
         </style>
         <script>

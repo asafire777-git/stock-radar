@@ -3,6 +3,7 @@ Stock Radar - Stock Knowledge Hub & Educational Columns (E-E-A-T Compliant)
 구글 애드센스 YMYL 심사 통과용 전문 주식 교육 칼럼 16편 및 인터랙티브 허브 렌더러
 """
 
+import re
 import streamlit as st
 
 STOCK_COLUMNS = [
@@ -339,41 +340,306 @@ Stock Radar의 퀀트 스코어링 엔진은 수천 개 종목의 실시간 데�
 ]
 
 
-@st.dialog("📖 주식 전문 칼럼 정독", width="large")
-def show_column_detail_dialog(column: dict, is_dark: bool = False):
-    """칼럼 본문 읽기 팝업 모달"""
+def _format_markdown_for_modal(md_text: str, is_dark: bool) -> str:
+    """칼럼 마크다운 본문을 브라우저 0ms 즉시 렌더링용 고품질 HTML로 변환"""
+    lines = md_text.strip().split("\n")
+    out = []
+    in_ul = False
+    in_ol = False
+    
+    text_color = "#E2E8F0" if is_dark else "#334155"
+    h_color = "#60A5FA" if is_dark else "#2563EB"
+    code_bg = "rgba(59,130,246,0.18)" if is_dark else "rgba(59,130,246,0.1)"
+    code_color = "#93C5FD" if is_dark else "#1D4ED8"
+
+    for line in lines:
+        s = line.strip()
+        if not s:
+            if in_ul:
+                out.append("</ul>")
+                in_ul = False
+            if in_ol:
+                out.append("</ol>")
+                in_ol = False
+            continue
+            
+        # bold & inline code
+        s = re.sub(r"\*\*(.*?)\*\*", r"<strong>\1</strong>", s)
+        s = re.sub(r"`(.*?)`", rf'<code style="background:{code_bg}; color:{code_color}; padding:2px 6px; border-radius:4px; font-weight:700; font-size:0.88rem;">\1</code>', s)
+        
+        # heading 3
+        if s.startswith("### "):
+            if in_ul:
+                out.append("</ul>")
+                in_ul = False
+            if in_ol:
+                out.append("</ol>")
+                in_ol = False
+            title = s[4:].strip()
+            out.append(f'<h4 style="margin:22px 0 10px 0; color:{h_color}; font-size:1.1rem; font-weight:800; border-bottom:1.5px solid rgba(59,130,246,0.25); padding-bottom:6px;">{title}</h4>')
+        elif s.startswith("- "):
+            if not in_ul:
+                if in_ol:
+                    out.append("</ol>")
+                    in_ol = False
+                out.append(f'<ul style="margin:6px 0 12px 20px; padding:0; color:{text_color}; line-height:1.68;">')
+                in_ul = True
+            out.append(f'<li style="margin-bottom:6px;">{s[2:].strip()}</li>')
+        elif re.match(r"^\d+\.\s", s):
+            if not in_ol:
+                if in_ul:
+                    out.append("</ul>")
+                    in_ul = False
+                out.append(f'<ol style="margin:6px 0 12px 20px; padding:0; color:{text_color}; line-height:1.68;">')
+                in_ol = True
+            content = re.sub(r"^\d+\.\s", "", s).strip()
+            out.append(f'<li style="margin-bottom:6px;">{content}</li>')
+        else:
+            if in_ul:
+                out.append("</ul>")
+                in_ul = False
+            if in_ol:
+                out.append("</ol>")
+                in_ol = False
+            out.append(f'<p style="margin:0 0 12px 0; line-height:1.72; color:{text_color}; font-size:0.95rem;">{s}</p>')
+            
+    if in_ul:
+        out.append("</ul>")
+    if in_ol:
+        out.append("</ol>")
+    return "\n".join(out)
+
+
+def _get_column_modals_html(columns: list, is_dark: bool = False) -> str:
+    """모든 칼럼의 0.00ms 무(無)지연 클라이언트 팝업 HTML 및 제어 스크립트 생성"""
     card_bg = "#151A23" if is_dark else "#FFFFFF"
+    header_bg = "#111620" if is_dark else "#F8FAFC"
+    border_color = "rgba(255, 255, 255, 0.16)" if is_dark else "#CBD5E1"
+    divider_color = "rgba(255, 255, 255, 0.10)" if is_dark else "#E2E8F0"
     text_primary = "#F8FAFC" if is_dark else "#0F172A"
     text_secondary = "#94A3B8" if is_dark else "#64748B"
+    footer_bg = "#111620" if is_dark else "#F8FAFC"
 
-    st.html(f"""
-    <div style="background:{card_bg}; padding:10px 0; border-bottom:1.5px solid rgba(59,130,246,0.3); margin-bottom:16px;">
-        <div style="display:inline-block; background:rgba(59,130,246,0.15); color:#3B82F6; font-size:0.75rem; font-weight:800; padding:3px 10px; border-radius:6px; margin-bottom:8px;">
-            {column['category']} · ⏱️ {column['read_time']} 읽기
+    modal_items_html = []
+    for col in columns:
+        col_id = col["id"]
+        category = col["category"]
+        read_time = col["read_time"]
+        title = col["title"]
+        summary = col["summary"]
+        body_html = _format_markdown_for_modal(col["content"], is_dark)
+
+        modal_items_html.append(f"""
+        <!-- 칼럼 모달: {col_id} -->
+        <div id="col-modal-{col_id}" class="col-modal-overlay" onclick="if(event.target===this) window.closeColModal('{col_id}')">
+            <div class="col-modal-box">
+                <div class="col-modal-header">
+                    <div class="col-modal-title-area">
+                        <div style="display:inline-block; background:rgba(59,130,246,0.18); color:#3B82F6; font-size:0.75rem; font-weight:800; padding:3px 10px; border-radius:6px; margin-bottom:8px;">
+                            {category} · ⏱️ {read_time} 정독
+                        </div>
+                        <h2 style="font-size:1.32rem; font-weight:900; color:{text_primary}; margin:0 0 6px 0; line-height:1.35;">
+                            {title}
+                        </h2>
+                        <p style="font-size:0.86rem; color:{text_secondary}; margin:0; line-height:1.5;">
+                            {summary}
+                        </p>
+                    </div>
+                    <button type="button" class="col-modal-close-icon" onclick="window.closeColModal('{col_id}')" title="닫기 (ESC)">✕</button>
+                </div>
+                <div class="col-modal-body">
+                    {body_html}
+                    <div style="background:rgba(239,68,68,0.08); border-left:4px solid #EF4444; border-radius:8px; padding:12px 16px; margin-top:24px; font-size:0.84rem; color:{text_secondary}; line-height:1.5;">
+                        ⚠️ <strong>교육 및 참고용 고지</strong>: 본 칼럼은 주식 초보 투자자의 기술적 분석 역량 향상을 위해 통계적 기법을 정리한 정보성 콘텐츠이며, 특정 종목에 대한 투자 권유나 추천이 아닙니다.
+                    </div>
+                </div>
+                <div class="col-modal-footer">
+                    <button type="button" class="col-modal-confirm-btn" onclick="window.closeColModal('{col_id}')">확인 및 닫기</button>
+                </div>
+            </div>
         </div>
-        <h2 style="font-size:1.45rem; font-weight:900; color:{text_primary}; margin:0 0 6px 0; line-height:1.35;">
-            {column['title']}
-        </h2>
-        <p style="font-size:0.88rem; color:{text_secondary}; margin:0; line-height:1.5;">
-            {column['summary']}
-        </p>
-    </div>
-    """)
+        """)
 
-    st.markdown(column["content"])
+    modals_html_joined = "\n".join(modal_items_html)
 
-    st.html(f"""
-    <div style="background:rgba(239,68,68,0.08); border-left:4px solid #EF4444; border-radius:8px; padding:12px 16px; margin-top:24px; font-size:0.82rem; color:{text_secondary}; line-height:1.5;">
-        ⚠️ <strong>교육 및 참고용 고지</strong>: 본 칼럼은 주식 초보 투자자의 기술적 분석 역량 향상을 위해 통계적 기법을 정리한 정보성 콘텐츠이며, 특정 종목에 대한 투자 권유나 추천이 아닙니다.
-    </div>
-    """)
+    return f"""
+    <style>
+    .col-modal-overlay {{
+        display: none;
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        width: 100vw; height: 100vh;
+        background: rgba(15, 23, 42, 0.78);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        z-index: 9999999 !important;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.15s ease-out;
+    }}
+    .col-modal-overlay.is-open {{
+        display: flex !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+    }}
+    .col-modal-box {{
+        background: {card_bg};
+        border: 1.5px solid {border_color};
+        border-radius: 18px;
+        width: 90%;
+        max-width: 820px;
+        max-height: 86vh;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 25px 60px -12px rgba(0, 0, 0, 0.65);
+        transform: scale(0.96);
+        transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+        overflow: hidden;
+    }}
+    .col-modal-overlay.is-open .col-modal-box {{
+        transform: scale(1);
+    }}
+    .col-modal-header {{
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        padding: 20px 24px 16px 24px;
+        border-bottom: 1.5px solid {divider_color};
+        background: {header_bg};
+    }}
+    .col-modal-title-area {{
+        flex: 1;
+        padding-right: 16px;
+    }}
+    .col-modal-close-icon {{
+        background: transparent;
+        border: none;
+        font-size: 1.35rem;
+        font-weight: 700;
+        color: {text_secondary};
+        cursor: pointer;
+        line-height: 1;
+        padding: 6px 10px;
+        border-radius: 8px;
+        transition: all 0.15s ease;
+    }}
+    .col-modal-close-icon:hover {{
+        background: rgba(239, 68, 68, 0.15);
+        color: #EF4444;
+    }}
+    .col-modal-body {{
+        padding: 22px 26px;
+        overflow-y: auto;
+        font-size: 0.94rem;
+        line-height: 1.72;
+        color: {text_primary};
+    }}
+    .col-modal-body::-webkit-scrollbar {{
+        width: 6px;
+    }}
+    .col-modal-body::-webkit-scrollbar-thumb {{
+        background: rgba(148, 163, 184, 0.3);
+        border-radius: 10px;
+    }}
+    .col-modal-footer {{
+        display: flex;
+        justify-content: flex-end;
+        padding: 14px 24px;
+        border-top: 1px solid {divider_color};
+        background: {footer_bg};
+    }}
+    .col-modal-confirm-btn {{
+        background: #2563EB;
+        color: #FFFFFF;
+        border: none;
+        border-radius: 8px;
+        padding: 9px 24px;
+        font-size: 0.88rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+    }}
+    .col-modal-confirm-btn:hover {{
+        background: #1D4ED8;
+        transform: translateY(-1px);
+        box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
+    }}
+    .instant-col-read-btn {{
+        display: block;
+        width: 100%;
+        background: {'rgba(255,255,255,0.06)' if is_dark else '#F1F5F9'};
+        color: {'#E2E8F0' if is_dark else '#1E293B'};
+        border: 1px solid {'rgba(255,255,255,0.12)' if is_dark else '#CBD5E1'};
+        border-radius: 10px;
+        padding: 9px 12px;
+        font-size: 0.86rem;
+        font-weight: 800;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        margin-top: 8px;
+    }}
+    .instant-col-read-btn:hover {{
+        background: #2563EB !important;
+        color: #FFFFFF !important;
+        border-color: #2563EB !important;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+    }}
+    </style>
 
-    if st.button("닫기", key=f"btn_close_col_{column['id']}", use_container_width=True):
-        st.rerun()
+    {modals_html_joined}
+
+    <script>
+    (function() {{
+        window.openColModal = function(id) {{
+            try {{
+                var m = document.getElementById('col-modal-' + id);
+                if(m) {{
+                    m.classList.add('is-open');
+                    document.body.style.overflow = 'hidden';
+                }}
+            }} catch(e) {{ console.error(e); }}
+        }};
+        window.closeColModal = function(id) {{
+            try {{
+                if(id) {{
+                    var m = document.getElementById('col-modal-' + id);
+                    if(m) m.classList.remove('is-open');
+                }} else {{
+                    document.querySelectorAll('.col-modal-overlay.is-open').forEach(function(el) {{
+                        el.classList.remove('is-open');
+                    }});
+                }}
+                document.body.style.overflow = '';
+            }} catch(e) {{ console.error(e); }}
+        }};
+        if (!window._colEscHandlerAttached) {{
+            window._colEscHandlerAttached = true;
+            document.addEventListener('keydown', function(e) {{
+                if (e.key === 'Escape') {{
+                    window.closeColModal();
+                }}
+            }});
+        }}
+    }})();
+    </script>
+    """
+
+
+# 호환성 유지용 폴백 (외부 호출 시 대비)
+@st.dialog("📖 주식 전문 칼럼 정독", width="large")
+def show_column_detail_dialog(column: dict, is_dark: bool = False):
+    """칼럼 본문 읽기 팝업 모달 (폴백)"""
+    st.html(_get_column_modals_html([column], is_dark))
+    st.html(f"<script>if(window.openColModal) window.openColModal('{column['id']}');</script>")
 
 
 def render_stock_knowledge_tab(is_dark: bool = False):
-    """지식 아카이브 탭 렌더러"""
+    """지식 아카이브 탭 렌더러 (0ms 클라이언트 모달 적용)"""
     card_bg = "#151A23" if is_dark else "#FFFFFF"
     border_color = "rgba(255, 255, 255, 0.12)" if is_dark else "#E2E8F0"
     text_primary = "#F8FAFC" if is_dark else "#0F172A"
@@ -434,9 +700,9 @@ def render_stock_knowledge_tab(is_dark: bool = False):
                             border:1px solid {border_color};
                             border-radius:14px;
                             padding:18px 18px 14px 18px;
-                            margin-bottom:10px;
+                            margin-bottom:12px;
                             box-shadow:0 4px 12px rgba(0,0,0,0.03);
-                            height:210px;
+                            height:225px;
                             display:flex;
                             flex-direction:column;
                             justify-content:space-between;
@@ -457,7 +723,11 @@ def render_stock_knowledge_tab(is_dark: bool = False):
                                     {col_item['summary']}
                                 </p>
                             </div>
+                            <button type="button" class="instant-col-read-btn" onclick="if(window.openColModal)window.openColModal('{col_item['id']}'); return false;">
+                                📖 칼럼 전문 정독하기
+                            </button>
                         </div>
                         """)
-                        if st.button("📖 칼럼 전문 정독하기", key=f"btn_read_{col_item['id']}", use_container_width=True):
-                            show_column_detail_dialog(col_item, is_dark)
+
+    # 16개 전체 칼럼의 0.00ms 클라이언트 모달 렌더링
+    st.html(_get_column_modals_html(STOCK_COLUMNS, is_dark))
