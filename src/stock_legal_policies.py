@@ -317,8 +317,8 @@ def render_footer_legal_bar(is_dark: bool = False):
     
     with col_links:
         st.html("""
-        <div style="display:flex; gap:8px; justify-content:flex-end; align-items:center;">
-            <button onclick="if(window.openLegalModal)window.openLegalModal('disclaimer');" class="instant-legal-btn">📜 투자유의사항</button>
+        <div style="display:flex; gap:8px; justify-content:flex-end; align-items:center; flex-wrap:wrap;">
+            <button onclick="if(window.openLegalModal)window.openLegalModal('disclaimer');" class="instant-legal-btn">📜 정책·면책</button>
             <button onclick="if(window.openLegalModal)window.openLegalModal('privacy');" class="instant-legal-btn">🔒 개인정보처리</button>
             <button onclick="if(window.openLegalModal)window.openLegalModal('terms');" class="instant-legal-btn">📄 이용약관</button>
         </div>

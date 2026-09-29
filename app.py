@@ -246,65 +246,106 @@ div[data-testid="stDialog"] > div[role="dialog"] {
 }
 
 /* ====================================================
-   사이드바 LNB 내비게이션 전용 모던 카드형 라디오 UI
+   사이드바 LNB 내비게이션 전용 모던 카드형 라디오 UI (크기 일관화 & 정밀 세련미)
    ==================================================== */
 div[class*="st-key-sb_nav_menu_radio"] div[data-testid="stRadio"] > div {
-    gap: 8px !important;
+    gap: 7px !important;
 }
 div[class*="st-key-sb_nav_menu_radio"] div[data-testid="stRadio"] label {
+    box-sizing: border-box !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+    width: 100% !important;
     background: rgba(255, 255, 255, 0.04) !important;
-    border: 1.2px solid rgba(255, 255, 255, 0.10) !important;
-    border-radius: 12px !important;
-    padding: 11px 14px !important;
+    border: 1px solid rgba(255, 255, 255, 0.10) !important;
+    border-radius: 10px !important;
+    padding: 0 14px !important;
     cursor: pointer !important;
-    transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    transition: all 0.16s ease-in-out !important;
     display: flex !important;
     align-items: center !important;
+    justify-content: flex-start !important;
     margin: 0 !important;
-    width: 100% !important;
+    overflow: hidden !important;
+}
+div[class*="st-key-sb_nav_menu_radio"] div[data-testid="stRadio"] label p,
+div[class*="st-key-sb_nav_menu_radio"] div[data-testid="stRadio"] label span,
+div[class*="st-key-sb_nav_menu_radio"] div[data-testid="stRadio"] label div {
+    font-size: 0.86rem !important;
+    font-weight: 600 !important;
+    letter-spacing: -0.3px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    line-height: 1 !important;
 }
 div[class*="st-key-sb_nav_menu_radio"] div[data-testid="stRadio"] label:hover {
-    background: rgba(37, 99, 235, 0.15) !important;
-    border-color: rgba(59, 130, 246, 0.5) !important;
-    transform: translateX(4px) !important;
+    background: rgba(37, 99, 235, 0.14) !important;
+    border-color: rgba(59, 130, 246, 0.45) !important;
+    transform: translateX(3px) !important;
 }
 div[class*="st-key-sb_nav_menu_radio"] div[data-testid="stRadio"] label:has(input:checked) {
-    background: linear-gradient(135deg, rgba(37, 99, 235, 0.28) 0%, rgba(30, 58, 138, 0.35) 100%) !important;
+    background: linear-gradient(90deg, rgba(37, 99, 235, 0.28) 0%, rgba(30, 58, 138, 0.20) 100%) !important;
     border: 1.5px solid #3B82F6 !important;
-    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25) !important;
-    transform: translateX(4px) !important;
+    border-left: 4.5px solid #38BDF8 !important;
+    box-shadow: 0 2px 10px rgba(37, 99, 235, 0.22) !important;
+    transform: translateX(3px) !important;
 }
 div[class*="st-key-sb_nav_menu_radio"] div[data-testid="stRadio"] label:has(input:checked) p,
 div[class*="st-key-sb_nav_menu_radio"] div[data-testid="stRadio"] label:has(input:checked) span {
     color: #60A5FA !important;
-    font-weight: 900 !important;
+    font-weight: 800 !important;
 }
+
+/* 라이트 테마 LNB 메뉴 스타일 */
 .stApp:not(.dark-theme) div[class*="st-key-sb_nav_menu_radio"] div[data-testid="stRadio"] label,
 body:not(.dark-theme) div[class*="st-key-sb_nav_menu_radio"] div[data-testid="stRadio"] label {
     background: #FFFFFF !important;
-    border: 1.2px solid #E2E8F0 !important;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.03) !important;
+    border: 1px solid #E2E8F0 !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03) !important;
+}
+.stApp:not(.dark-theme) div[class*="st-key-sb_nav_menu_radio"] div[data-testid="stRadio"] label p,
+body:not(.dark-theme) div[class*="st-key-sb_nav_menu_radio"] div[data-testid="stRadio"] label p {
+    color: #334155 !important;
 }
 .stApp:not(.dark-theme) div[class*="st-key-sb_nav_menu_radio"] div[data-testid="stRadio"] label:hover,
 body:not(.dark-theme) div[class*="st-key-sb_nav_menu_radio"] div[data-testid="stRadio"] label:hover {
-    background: #EFF6FF !important;
+    background: #F8FAFC !important;
     border-color: #93C5FD !important;
 }
 .stApp:not(.dark-theme) div[class*="st-key-sb_nav_menu_radio"] div[data-testid="stRadio"] label:has(input:checked),
 body:not(.dark-theme) div[class*="st-key-sb_nav_menu_radio"] div[data-testid="stRadio"] label:has(input:checked) {
-    background: #EFF6FF !important;
+    background: linear-gradient(90deg, #EFF6FF 0%, #FFFFFF 100%) !important;
     border: 1.5px solid #2563EB !important;
-    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.12) !important;
+    border-left: 4.5px solid #2563EB !important;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.12) !important;
 }
 .stApp:not(.dark-theme) div[class*="st-key-sb_nav_menu_radio"] div[data-testid="stRadio"] label:has(input:checked) p,
 body:not(.dark-theme) div[class*="st-key-sb_nav_menu_radio"] div[data-testid="stRadio"] label:has(input:checked) span {
     color: #1D4ED8 !important;
-    font-weight: 900 !important;
+    font-weight: 800 !important;
 }
 div[class*="st-key-sb_nav_menu_radio"] div[data-testid="stRadio"] input[type="radio"],
 div[class*="st-key-sb_nav_menu_radio"] div[data-testid="stRadio"] div[data-testid="stRadioCircle"],
 div[class*="st-key-sb_nav_menu_radio"] div[data-testid="stRadio"] div[class*="st-"] > div:first-child:not(:last-child) {
     display: none !important;
+}
+
+/* 테마 선택 라디오 버튼 스타일 */
+div[class*="st-key-sb_theme_radio"] div[data-testid="stRadio"] > div {
+    gap: 8px !important;
+}
+div[class*="st-key-sb_theme_radio"] div[data-testid="stRadio"] label {
+    box-sizing: border-box !important;
+    height: 36px !important;
+    min-height: 36px !important;
+    border-radius: 8px !important;
+    padding: 0 10px !important;
+    font-size: 0.82rem !important;
+    justify-content: center !important;
 }
 </style>
 <script>
@@ -521,21 +562,6 @@ if st.session_state["current_page"] == "dashboard":
         st.session_state["active_nav_menu"] = selected_menu
         st.markdown("---")
 
-        st.markdown("### 🎨 화면 테마")
-        theme_idx = 1 if is_dark else 0
-        theme_sel = st.radio(
-            "테마 모드 선택",
-            ["☀️ 낮 모드 (화이트)", "🌙 밤 모드 (다크)"],
-            index=theme_idx,
-            horizontal=True,
-            key="sb_theme_radio",
-        )
-        new_theme = "dark" if "밤 모드" in theme_sel else "light"
-        if new_theme != st.session_state["theme_mode"]:
-            st.session_state["theme_mode"] = new_theme
-            st.rerun()
-
-        st.markdown("---")
         st.markdown("### 🎯 나의 투자 스타일 (초보자 원클릭)")
         preset_style = st.radio(
             "원하는 투자 방식을 골라보세요",
@@ -604,17 +630,23 @@ if st.session_state["current_page"] == "dashboard":
             st.rerun()
 
         # ----------------------------------------------------
-        # 사이드바: 지식 & 정책 센터
+        # 사이드바 하단: 화면 테마 (낮/밤 모드)
         # ----------------------------------------------------
         st.markdown("---")
-        st.markdown("### 📚 지식 & 정책 센터")
-        col_sb_k1, col_sb_k2 = st.columns(2)
-        with col_sb_k1:
-            if st.button("📚 16편 칼럼", key="sb_btn_column", use_container_width=True):
-                st.session_state["active_nav_menu"] = "📚 주식 실전 지식 아카이브 (16편)"
-                st.rerun()
-        with col_sb_k2:
-            render_sidebar_policy_button(is_dark)
+        st.markdown("### 🎨 화면 테마")
+        theme_idx = 1 if is_dark else 0
+        theme_sel = st.radio(
+            "테마 모드 선택",
+            ["☀️ 낮 모드", "🌙 밤 모드"],
+            index=theme_idx,
+            horizontal=True,
+            key="sb_theme_radio",
+            label_visibility="collapsed",
+        )
+        new_theme = "dark" if "밤 모드" in theme_sel else "light"
+        if new_theme != st.session_state["theme_mode"]:
+            st.session_state["theme_mode"] = new_theme
+            st.rerun()
 
         # ----------------------------------------------------
         # 사이드바: 관리자 상태 제어 (보안 인증)
@@ -2708,7 +2740,8 @@ with head_c2:
                 st.rerun()
         with h_btn2:
             if st.button("📚 16편 칼럼", use_container_width=True, key="btn_dash_col_info"):
-                st.toast("💡 아래 탭 메뉴에서 '📚 실전 주식 투자 지식 아카이브 (16편)'을 클릭하시면 전체 칼럼을 정독하실 수 있습니다!", icon="📚")
+                st.session_state["active_nav_menu"] = "📚 주식 실전 지식 아카이브 (16편)"
+                st.rerun()
         with h_btn3:
             if st.button("👑 관리자 끄기", use_container_width=True, key="btn_dash_admin_off"):
                 st.session_state["is_admin_mode"] = False
@@ -2731,7 +2764,8 @@ with head_c2:
                 st.rerun()
         with h_btn2:
             if st.button("📚 16편 칼럼", use_container_width=True, key="btn_dash_col_info"):
-                st.toast("💡 아래 탭 메뉴에서 '📚 실전 주식 투자 지식 아카이브 (16편)'을 클릭하시면 전체 칼럼을 정독하실 수 있습니다!", icon="📚")
+                st.session_state["active_nav_menu"] = "📚 주식 실전 지식 아카이브 (16편)"
+                st.rerun()
         with h_btn3:
             if st.button("🚪 퇴장", use_container_width=True, key="btn_dash_logout"):
                 st.session_state["is_authenticated"] = False
@@ -2745,91 +2779,8 @@ with head_c2:
     if st.session_state.pop("prompt_admin_login", False):
         open_admin_auth_dialog()
 
-# 📡 실시간 데이터 연동 상태 뱃지 (한국장 + 미국장 + 서머타임 실시간 통합 연동)
-integrated_market = get_integrated_market_status()
-krx_st = integrated_market["krx"]
-us_st = integrated_market["us"]
-
-krx_badge_bg = "#064E3B" if (is_dark and krx_st["is_open"]) else ("#1E293B" if is_dark else krx_st["badge_bg"])
-krx_badge_color = "#4ADE80" if (is_dark and krx_st["is_open"]) else krx_st["badge_color"]
-
-us_badge_bg = "#064E3B" if (is_dark and us_st["is_open"]) else ("#1E293B" if is_dark else us_st["badge_bg"])
-us_badge_color = "#4ADE80" if (is_dark and us_st["is_open"]) else us_st["badge_color"]
-
-banner_bg = "#0F172A" if is_dark else "#F8FAFC"
-banner_border = "#334155" if is_dark else "#CBD5E1"
-
-st.html(
-    f"""<div style="background:{banner_bg}; border:1.5px solid {banner_border}; border-radius:12px; padding:12px 18px; margin-bottom:14px; box-shadow:0 3px 12px rgba(0,0,0,0.06);">
-        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-            <div style="display:flex; align-items:center; flex-wrap:wrap; gap:10px;">
-                <div style="display:inline-flex; align-items:center; gap:6px; background:{krx_badge_bg}; padding:6px 12px; border-radius:8px; border:1.5px solid {krx_st['badge_border']};">
-                    <span style="font-size:1.05rem;">🇰🇷</span>
-                    <span style="font-weight:900; font-size:0.88rem; color:{krx_badge_color};">한국장: {krx_st['title']}</span>
-                </div>
-                <div style="display:inline-flex; align-items:center; gap:6px; background:{us_badge_bg}; padding:6px 12px; border-radius:8px; border:1.5px solid {us_st['badge_border']};">
-                    <span style="font-size:1.05rem;">🇺🇸</span>
-                    <span style="font-weight:900; font-size:0.88rem; color:{us_badge_color};">미국장: {us_st['title']}</span>
-                    <span style="background:{'#059669' if us_st['dst_active'] else '#2563EB'}; color:white; font-size:0.75rem; font-weight:700; padding:2px 7px; border-radius:4px; margin-left:3px;">{us_st['dst_badge']}</span>
-                </div>
-            </div>
-            <div style="font-size:0.82rem; color:{'#CBD5E1' if is_dark else '#475569'}; text-align:right; line-height:1.45;">
-                <div>⏰ <b>KST (한국):</b> <span style="font-weight:bold; color:{'#38BDF8' if is_dark else '#0284C7'};">{integrated_market['kst_full_str']}</span></div>
-                <div style="font-size:0.78rem; color:{'#94A3B8' if is_dark else '#64748B'};">🗽 <b>NY (미국동부):</b> {integrated_market['us_full_str']} (정규장 개장: 한국 {us_st['kst_open_str']})</div>
-            </div>
-        </div>
-        <div style="margin-top:8px; padding-top:8px; border-top:1px dashed {'#334155' if is_dark else '#E2E8F0'}; font-size:0.82rem; color:{'#94A3B8' if is_dark else '#64748B'}; display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px;">
-            <div>• <b>국내 증시:</b> {krx_st['desc']}</div>
-            <div>• <b>해외 증시:</b> {us_st['desc']}</div>
-        </div>
-    </div>"""
-)
-
-# 초보자 3초 투자 가이드 배너
-with st.expander("🔰 초보자를 위한 3초 투자 가이드 (처음 오셨다면 꼭 읽어보세요!)", expanded=False):
-    st.markdown(
-        """
-        1. **1단계 (종목 확인)**: 아래 **`🏆 오늘의 AI 강력 추천 1위 (원픽)`** 또는 **`TOP 5 추천 목록`**에서 **S등급** 또는 **A등급** 종목을 확인합니다.
-        2. **2단계 (이유 확인)**: 추천 이유에 **'외인·기관 동시 매수'**나 **'상승 궤도 안착'** 신호가 켜져 있는지 봅니다.
-        3. **3단계 (매매 가이드)**: 욕심부리지 말고 AI가 제안하는 **목표 수익률(+5% ~ +8%)**에 도달하면 분할 매도하고, **-3% 손절 기준**을 지키면 가장 안전합니다!
-        """
-    )
-
-# 상단 요약 지표 카드
-c1, c2, c3, c4 = st.columns(4)
-with c1:
-    count_rise = len(df_rising_filtered) if not df_rising_filtered.empty else 0
-    st.metric("포착 급등주", f"{count_rise} 개", delta=f"+{min_change_rate}% 이상")
-with c2:
-    count_new = len(df_new) if not df_new.empty else 0
-    st.metric("신규상장주", f"{count_new} 개", delta=f"최근 {new_listing_months}개월")
-with c3:
-    max_stock = df_rising.iloc[0]["name"] if not df_rising.empty else "-"
-    max_rate = df_rising.iloc[0]["change_rate"] if not df_rising.empty else 0.0
-    st.metric("당일 최고 급등주", max_stock, delta=f"+{max_rate:.2f}%")
-with c4:
-    top_vol_stock = df_volume.iloc[0]["name"] if not df_volume.empty else "-"
-    top_vol_val = df_volume.iloc[0].get("trade_value_억", 0) if not df_volume.empty else 0
-    st.metric("거래대금 1위", top_vol_stock, delta=f"{top_vol_val:,} 억원")
-
-selected_menu = st.session_state.get("active_nav_menu", "🎯 오늘의 AI 추천주 (원픽 TOP 20)")
-st.html(
-    f"""<div style="background:{'#151A23' if is_dark else '#F8FAFC'}; border:1.5px solid {'rgba(59,130,246,0.35)' if is_dark else '#CBD5E1'}; border-radius:12px; padding:12px 20px; margin: 10px 0 16px 0; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; box-shadow:0 3px 10px rgba(0,0,0,0.03);">
-        <div style="font-size:0.95rem; color:{'#F8FAFC' if is_dark else '#0F172A'}; font-weight:800; display:flex; align-items:center; gap:8px;">
-            <span style="display:inline-block; width:9px; height:9px; border-radius:50%; background:#22C55E; box-shadow:0 0 8px #22C55E;"></span>
-            <span>현재 관제 화면:</span>
-            <span style="color:#2563EB; font-weight:900;">{selected_menu}</span>
-        </div>
-        <div style="font-size:0.82rem; color:{'#94A3B8' if is_dark else '#64748B'};">
-            ⚡ 좌측 사이드바 <b>[📌 레이더 관제 메뉴]</b>에서 원하는 분석 화면으로 즉각 전환할 수 있습니다.
-        </div>
-    </div>"""
-)
-
-st.markdown("---")
-
 # ----------------------------------------------------
-# 🔍 국내·해외 통합 프리미엄 AI 즉시 검색기 (프래그먼트 격리 & 무(無)지연 로더)
+# 🔍 국내·해외 통합 프리미엄 AI 즉시 검색기 (상단 고정 배치)
 # ----------------------------------------------------
 all_options, code_map, all_stocks_df = load_all_stocks()
 
@@ -2945,8 +2896,91 @@ def render_search_section_fragment(all_stocks_df, code_map, is_dark):
 
 
 render_search_section_fragment(all_stocks_df, code_map, is_dark)
+st.markdown("---")
+
+# 📡 실시간 데이터 연동 상태 뱃지 (한국장 + 미국장 + 서머타임 실시간 통합 연동)
+integrated_market = get_integrated_market_status()
+krx_st = integrated_market["krx"]
+us_st = integrated_market["us"]
+
+krx_badge_bg = "#064E3B" if (is_dark and krx_st["is_open"]) else ("#1E293B" if is_dark else krx_st["badge_bg"])
+krx_badge_color = "#4ADE80" if (is_dark and krx_st["is_open"]) else krx_st["badge_color"]
+
+us_badge_bg = "#064E3B" if (is_dark and us_st["is_open"]) else ("#1E293B" if is_dark else us_st["badge_bg"])
+us_badge_color = "#4ADE80" if (is_dark and us_st["is_open"]) else us_st["badge_color"]
+
+banner_bg = "#0F172A" if is_dark else "#F8FAFC"
+banner_border = "#334155" if is_dark else "#CBD5E1"
+
+st.html(
+    f"""<div style="background:{banner_bg}; border:1.5px solid {banner_border}; border-radius:12px; padding:12px 18px; margin-bottom:14px; box-shadow:0 3px 12px rgba(0,0,0,0.06);">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <div style="display:flex; align-items:center; flex-wrap:wrap; gap:10px;">
+                <div style="display:inline-flex; align-items:center; gap:6px; background:{krx_badge_bg}; padding:6px 12px; border-radius:8px; border:1.5px solid {krx_st['badge_border']};">
+                    <span style="font-size:1.05rem;">🇰🇷</span>
+                    <span style="font-weight:900; font-size:0.88rem; color:{krx_badge_color};">한국장: {krx_st['title']}</span>
+                </div>
+                <div style="display:inline-flex; align-items:center; gap:6px; background:{us_badge_bg}; padding:6px 12px; border-radius:8px; border:1.5px solid {us_st['badge_border']};">
+                    <span style="font-size:1.05rem;">🇺🇸</span>
+                    <span style="font-weight:900; font-size:0.88rem; color:{us_badge_color};">미국장: {us_st['title']}</span>
+                    <span style="background:{'#059669' if us_st['dst_active'] else '#2563EB'}; color:white; font-size:0.75rem; font-weight:700; padding:2px 7px; border-radius:4px; margin-left:3px;">{us_st['dst_badge']}</span>
+                </div>
+            </div>
+            <div style="font-size:0.82rem; color:{'#CBD5E1' if is_dark else '#475569'}; text-align:right; line-height:1.45;">
+                <div>⏰ <b>KST (한국):</b> <span style="font-weight:bold; color:{'#38BDF8' if is_dark else '#0284C7'};">{integrated_market['kst_full_str']}</span></div>
+                <div style="font-size:0.78rem; color:{'#94A3B8' if is_dark else '#64748B'};">🗽 <b>NY (미국동부):</b> {integrated_market['us_full_str']} (정규장 개장: 한국 {us_st['kst_open_str']})</div>
+            </div>
+        </div>
+        <div style="margin-top:8px; padding-top:8px; border-top:1px dashed {'#334155' if is_dark else '#E2E8F0'}; font-size:0.82rem; color:{'#94A3B8' if is_dark else '#64748B'}; display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px;">
+            <div>• <b>국내 증시:</b> {krx_st['desc']}</div>
+            <div>• <b>해외 증시:</b> {us_st['desc']}</div>
+        </div>
+    </div>"""
+)
+
+# 초보자 3초 투자 가이드 배너
+with st.expander("🔰 초보자를 위한 3초 투자 가이드 (처음 오셨다면 꼭 읽어보세요!)", expanded=False):
+    st.markdown(
+        """
+        1. **1단계 (종목 확인)**: 아래 **`🏆 오늘의 AI 강력 추천 1위 (원픽)`** 또는 **`TOP 5 추천 목록`**에서 **S등급** 또는 **A등급** 종목을 확인합니다.
+        2. **2단계 (이유 확인)**: 추천 이유에 **'외인·기관 동시 매수'**나 **'상승 궤도 안착'** 신호가 켜져 있는지 봅니다.
+        3. **3단계 (매매 가이드)**: 욕심부리지 말고 AI가 제안하는 **목표 수익률(+5% ~ +8%)**에 도달하면 분할 매도하고, **-3% 손절 기준**을 지키면 가장 안전합니다!
+        """
+    )
+
+# 상단 요약 지표 카드
+c1, c2, c3, c4 = st.columns(4)
+with c1:
+    count_rise = len(df_rising_filtered) if not df_rising_filtered.empty else 0
+    st.metric("포착 급등주", f"{count_rise} 개", delta=f"+{min_change_rate}% 이상")
+with c2:
+    count_new = len(df_new) if not df_new.empty else 0
+    st.metric("신규상장주", f"{count_new} 개", delta=f"최근 {new_listing_months}개월")
+with c3:
+    max_stock = df_rising.iloc[0]["name"] if not df_rising.empty else "-"
+    max_rate = df_rising.iloc[0]["change_rate"] if not df_rising.empty else 0.0
+    st.metric("당일 최고 급등주", max_stock, delta=f"+{max_rate:.2f}%")
+with c4:
+    top_vol_stock = df_volume.iloc[0]["name"] if not df_volume.empty else "-"
+    top_vol_val = df_volume.iloc[0].get("trade_value_억", 0) if not df_volume.empty else 0
+    st.metric("거래대금 1위", top_vol_stock, delta=f"{top_vol_val:,} 억원")
+
+selected_menu = st.session_state.get("active_nav_menu", "🎯 오늘의 AI 추천주 (원픽 TOP 20)")
+st.html(
+    f"""<div style="background:{'#151A23' if is_dark else '#F8FAFC'}; border:1.5px solid {'rgba(59,130,246,0.35)' if is_dark else '#CBD5E1'}; border-radius:12px; padding:12px 20px; margin: 10px 0 16px 0; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; box-shadow:0 3px 10px rgba(0,0,0,0.03);">
+        <div style="font-size:0.95rem; color:{'#F8FAFC' if is_dark else '#0F172A'}; font-weight:800; display:flex; align-items:center; gap:8px;">
+            <span style="display:inline-block; width:9px; height:9px; border-radius:50%; background:#22C55E; box-shadow:0 0 8px #22C55E;"></span>
+            <span>현재 관제 화면:</span>
+            <span style="color:#2563EB; font-weight:900;">{selected_menu}</span>
+        </div>
+        <div style="font-size:0.82rem; color:{'#94A3B8' if is_dark else '#64748B'};">
+            ⚡ 좌측 사이드바 <b>[📌 레이더 관제 메뉴]</b>에서 원하는 분석 화면으로 즉각 전환할 수 있습니다.
+        </div>
+    </div>"""
+)
 
 st.markdown("---")
+
 
 
 
