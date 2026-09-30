@@ -246,127 +246,112 @@ div[data-testid="stDialog"] > div[role="dialog"] {
 }
 
 /* ====================================================
-   사이드바 LNB 내비게이션 전용 모던 카드형 라디오 UI (크기 일관화 & 정밀 세련미)
+   사이드바 LNB 내비게이션 전용 모던 카드형 버튼 UI
    ==================================================== */
-/* 1. 라디오 위젯 헤더 라벨(관제 메뉴 선택) 완전 숨김 */
-div[class*="st-key-sb_nav_menu_radio"] label[data-testid="stWidgetLabel"],
-div[class*="st-key-sb_nav_menu_radio"] > label,
-div[class*="st-key-sb_nav_menu_radio"] div[data-testid="stRadio"] > label {
-    display: none !important;
-    height: 0 !important;
-    margin: 0 !important;
-    padding: 0 !important;
+div[class*="st-key-lnb_btn_"] {
+    margin-bottom: 6px !important;
 }
 
-/* 2. radiogroup 컨테이너 및 각 옵션 래퍼: 전체 가로폭 100% 균등 강제 */
-div[class*="st-key-sb_nav_menu_radio"] div[role="radiogroup"] {
-    display: flex !important;
-    flex-direction: column !important;
-    width: 100% !important;
-    gap: 8px !important;
-}
-div[class*="st-key-sb_nav_menu_radio"] div[role="radiogroup"] > div {
-    display: flex !important;
-    width: 100% !important;
-    margin: 0 !important;
-    padding: 0 !important;
-}
-
-/* 3. 각 메뉴 카드 버튼 (label) - 100% 가로폭 일치 & 균일 높이(48px) */
-div[class*="st-key-sb_nav_menu_radio"] div[role="radiogroup"] label {
+div[class*="st-key-lnb_btn_"] button {
     box-sizing: border-box !important;
-    height: 48px !important;
-    min-height: 48px !important;
-    max-height: 48px !important;
+    height: 46px !important;
+    min-height: 46px !important;
+    max-height: 46px !important;
     width: 100% !important;
-    background: rgba(255, 255, 255, 0.04) !important;
-    border: 1px solid rgba(255, 255, 255, 0.10) !important;
     border-radius: 10px !important;
-    padding: 0 16px !important;
+    padding: 0 14px !important;
     cursor: pointer !important;
     transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
     display: flex !important;
     align-items: center !important;
     justify-content: flex-start !important;
-    margin: 0 !important;
-    overflow: hidden !important;
+    text-align: left !important;
 }
 
-/* 4. 라디오 내부 텍스트 컨테이너 */
-div[class*="st-key-sb_nav_menu_radio"] div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] {
-    width: 100% !important;
-    display: flex !important;
-    align-items: center !important;
-}
-div[class*="st-key-sb_nav_menu_radio"] div[role="radiogroup"] label p,
-div[class*="st-key-sb_nav_menu_radio"] div[role="radiogroup"] label span {
+div[class*="st-key-lnb_btn_"] button div,
+div[class*="st-key-lnb_btn_"] button p {
     font-size: 0.88rem !important;
-    font-weight: 600 !important;
     letter-spacing: -0.3px !important;
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
     margin: 0 !important;
     padding: 0 !important;
-    line-height: 1.2 !important;
+    text-align: left !important;
 }
 
-/* 5. 다크 테마 Hover 및 Active */
-div[class*="st-key-sb_nav_menu_radio"] div[role="radiogroup"] label:hover {
-    background: rgba(37, 99, 235, 0.16) !important;
+/* 1. 비활성 버튼 - 다크 테마 */
+div[class*="st-key-lnb_btn_"] button[kind="secondary"],
+div[class*="st-key-lnb_btn_"] button[data-testid="baseButton-secondary"] {
+    background: rgba(255, 255, 255, 0.04) !important;
+    border: 1.2px solid rgba(255, 255, 255, 0.10) !important;
+    color: #E2E8F0 !important;
+}
+div[class*="st-key-lnb_btn_"] button[kind="secondary"]:hover,
+div[class*="st-key-lnb_btn_"] button[data-testid="baseButton-secondary"]:hover {
+    background: rgba(37, 99, 235, 0.15) !important;
     border-color: rgba(59, 130, 246, 0.5) !important;
+    color: #93C5FD !important;
     transform: translateX(4px) !important;
 }
-div[class*="st-key-sb_nav_menu_radio"] div[role="radiogroup"] label:has(input:checked) {
-    background: linear-gradient(90deg, rgba(37, 99, 235, 0.28) 0%, rgba(30, 58, 138, 0.22) 100%) !important;
+
+/* 2. 활성(선택) 버튼 - 다크 테마 */
+div[class*="st-key-lnb_btn_"] button[kind="primary"],
+div[class*="st-key-lnb_btn_"] button[data-testid="baseButton-primary"] {
+    background: linear-gradient(90deg, rgba(37, 99, 235, 0.30) 0%, rgba(30, 58, 138, 0.22) 100%) !important;
     border: 1.5px solid #3B82F6 !important;
     border-left: 5px solid #38BDF8 !important;
     box-shadow: 0 3px 12px rgba(37, 99, 235, 0.25) !important;
+    color: #60A5FA !important;
+    font-weight: 800 !important;
     transform: translateX(4px) !important;
 }
-div[class*="st-key-sb_nav_menu_radio"] div[role="radiogroup"] label:has(input:checked) p,
-div[class*="st-key-sb_nav_menu_radio"] div[role="radiogroup"] label:has(input:checked) span {
+div[class*="st-key-lnb_btn_"] button[kind="primary"] p,
+div[class*="st-key-lnb_btn_"] button[data-testid="baseButton-primary"] p {
     color: #60A5FA !important;
     font-weight: 800 !important;
 }
 
-/* 6. 라이트 테마 (밝은 화면 환경) - 세련된 화이트 카드 및 블루 액센트 */
-.stApp:not(.dark-theme) div[class*="st-key-sb_nav_menu_radio"] div[role="radiogroup"] label,
-body:not(.dark-theme) div[class*="st-key-sb_nav_menu_radio"] div[role="radiogroup"] label {
+/* 3. 라이트 테마 (밝은 화면 환경) - 비활성 버튼 */
+.stApp:not(.dark-theme) div[class*="st-key-lnb_btn_"] button[kind="secondary"],
+body:not(.dark-theme) div[class*="st-key-lnb_btn_"] button[kind="secondary"],
+.stApp:not(.dark-theme) div[class*="st-key-lnb_btn_"] button[data-testid="baseButton-secondary"],
+body:not(.dark-theme) div[class*="st-key-lnb_btn_"] button[data-testid="baseButton-secondary"] {
     background: #FFFFFF !important;
     border: 1.2px solid #E2E8F0 !important;
+    color: #334155 !important;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
 }
-.stApp:not(.dark-theme) div[class*="st-key-sb_nav_menu_radio"] div[role="radiogroup"] label p,
-body:not(.dark-theme) div[class*="st-key-sb_nav_menu_radio"] div[role="radiogroup"] label p {
+.stApp:not(.dark-theme) div[class*="st-key-lnb_btn_"] button[kind="secondary"] p,
+body:not(.dark-theme) div[class*="st-key-lnb_btn_"] button[kind="secondary"] p {
     color: #334155 !important;
     font-weight: 600 !important;
 }
-.stApp:not(.dark-theme) div[class*="st-key-sb_nav_menu_radio"] div[role="radiogroup"] label:hover,
-body:not(.dark-theme) div[class*="st-key-sb_nav_menu_radio"] div[role="radiogroup"] label:hover {
+.stApp:not(.dark-theme) div[class*="st-key-lnb_btn_"] button[kind="secondary"]:hover,
+body:not(.dark-theme) div[class*="st-key-lnb_btn_"] button[kind="secondary"]:hover {
     background: #F8FAFC !important;
     border-color: #93C5FD !important;
+    color: #2563EB !important;
     transform: translateX(4px) !important;
 }
-.stApp:not(.dark-theme) div[class*="st-key-sb_nav_menu_radio"] div[role="radiogroup"] label:has(input:checked),
-body:not(.dark-theme) div[class*="st-key-sb_nav_menu_radio"] div[role="radiogroup"] label:has(input:checked) {
+
+/* 라이트 테마 - 활성(선택) 버튼 */
+.stApp:not(.dark-theme) div[class*="st-key-lnb_btn_"] button[kind="primary"],
+body:not(.dark-theme) div[class*="st-key-lnb_btn_"] button[kind="primary"],
+.stApp:not(.dark-theme) div[class*="st-key-lnb_btn_"] button[data-testid="baseButton-primary"],
+body:not(.dark-theme) div[class*="st-key-lnb_btn_"] button[data-testid="baseButton-primary"] {
     background: #EFF6FF !important;
     border: 1.5px solid #2563EB !important;
     border-left: 5px solid #2563EB !important;
     box-shadow: 0 2px 10px rgba(37, 99, 235, 0.15) !important;
-    transform: translateX(4px) !important;
-}
-.stApp:not(.dark-theme) div[class*="st-key-sb_nav_menu_radio"] div[role="radiogroup"] label:has(input:checked) p,
-body:not(.dark-theme) div[class*="st-key-sb_nav_menu_radio"] div[role="radiogroup"] label:has(input:checked) span {
     color: #1D4ED8 !important;
     font-weight: 800 !important;
+    transform: translateX(4px) !important;
 }
-
-/* 7. 라디오 동그라미 원형 및 인풋 제거 (라벨 내부의 불필요한 div만 정확히 은닉) */
-div[class*="st-key-sb_nav_menu_radio"] input[type="radio"],
-div[class*="st-key-sb_nav_menu_radio"] div[data-testid="stRadioCircle"],
-div[class*="st-key-sb_nav_menu_radio"] div[role="radiogroup"] label > div:not([data-testid="stMarkdownContainer"]) {
-    display: none !important;
+.stApp:not(.dark-theme) div[class*="st-key-lnb_btn_"] button[kind="primary"] p,
+body:not(.dark-theme) div[class*="st-key-lnb_btn_"] button[kind="primary"] p {
+    color: #1D4ED8 !important;
+    font-weight: 800 !important;
 }
 
 /* 테마 선택 라디오 버튼 스타일 */
@@ -586,15 +571,20 @@ if st.session_state["current_page"] == "dashboard":
         if "active_nav_menu" not in st.session_state or st.session_state["active_nav_menu"] not in nav_options:
             st.session_state["active_nav_menu"] = nav_options[0]
 
-        nav_idx = nav_options.index(st.session_state["active_nav_menu"])
-        selected_menu = st.radio(
-            "관제 메뉴 선택",
-            nav_options,
-            index=nav_idx,
-            key="sb_nav_menu_radio",
-            label_visibility="collapsed"
-        )
-        st.session_state["active_nav_menu"] = selected_menu
+        current_active = st.session_state["active_nav_menu"]
+        for idx, opt in enumerate(nav_options):
+            is_active = (opt == current_active)
+            if st.button(
+                opt,
+                key=f"lnb_btn_{idx}",
+                type="primary" if is_active else "secondary",
+                use_container_width=True,
+            ):
+                if st.session_state["active_nav_menu"] != opt:
+                    st.session_state["active_nav_menu"] = opt
+                    st.rerun()
+
+        selected_menu = st.session_state["active_nav_menu"]
         st.markdown("---")
 
         st.markdown("### 🎯 나의 투자 스타일 (초보자 원클릭)")
