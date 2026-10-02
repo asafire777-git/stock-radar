@@ -1051,6 +1051,18 @@ div[data-testid="stTextInput"] input {
     background-color: #FFFFFF !important;
     box-shadow: 0 2px 10px rgba(37, 99, 235, 0.15) !important;
 }
+div[data-testid="stTextInput"] input::placeholder {
+    color: #64748B !important;
+    -webkit-text-fill-color: #64748B !important;
+    opacity: 1 !important;
+    font-weight: 500 !important;
+}
+div[data-testid="stTextInput"] input::-webkit-input-placeholder {
+    color: #64748B !important;
+    -webkit-text-fill-color: #64748B !important;
+    opacity: 1 !important;
+    font-weight: 500 !important;
+}
 div[data-testid="stTextInput"] input:focus {
     border-color: #1D4ED8 !important;
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.3) !important;
@@ -1378,8 +1390,29 @@ div[data-testid="stTextInput"] input {
     font-size: 1.05rem !important;
     font-weight: 600 !important;
     color: #FFFFFF !important;
+    -webkit-text-fill-color: #FFFFFF !important;
     background-color: #151A23 !important;
     box-shadow: 0 2px 10px rgba(56, 189, 248, 0.2) !important;
+}
+div[data-testid="stTextInput"] input::placeholder {
+    color: #CBD5E1 !important;
+    -webkit-text-fill-color: #CBD5E1 !important;
+    opacity: 1 !important;
+    font-weight: 500 !important;
+    font-size: 0.96rem !important;
+}
+div[data-testid="stTextInput"] input::-webkit-input-placeholder {
+    color: #CBD5E1 !important;
+    -webkit-text-fill-color: #CBD5E1 !important;
+    opacity: 1 !important;
+    font-weight: 500 !important;
+    font-size: 0.96rem !important;
+}
+div[data-testid="stTextInput"] input::-moz-placeholder {
+    color: #CBD5E1 !important;
+    opacity: 1 !important;
+    font-weight: 500 !important;
+    font-size: 0.96rem !important;
 }
 div[data-testid="stTextInput"] input:focus {
     border-color: #0EA5E9 !important;
@@ -1647,9 +1680,12 @@ html {
 /* 1. 상단 액션 버튼, 초기화, 검색 칩, 다운로드 버튼 등 흰색/밝은 버튼 글씨 선명화 */
 button[kind="secondary"]:not([class*="st-key-lnb_btn_"]):not([key*="lnb_btn_"]),
 button[data-testid="baseButton-secondary"]:not([class*="st-key-lnb_btn_"]):not([key*="lnb_btn_"]),
+button[kind="secondaryFormSubmit"],
+button[data-testid="baseButton-secondaryFormSubmit"],
+div[data-testid="stFormSubmitButton"] button:not([kind*="primary"]):not([data-testid*="primary"]),
+form button:not([kind*="primary"]):not([data-testid*="primary"]),
 div:not([class*="st-key-lnb_btn_"]) > button[kind="secondary"],
 div:not([class*="st-key-lnb_btn_"]) > button[data-testid="baseButton-secondary"],
-div[data-testid="stFormSubmitButton"] button[kind="secondary"],
 div[data-testid="stDownloadButton"] button,
 div[class*="chip_btn_"] button,
 div[class*="btn_rel_"] button,
@@ -1667,9 +1703,12 @@ div.st-key-btn_admin_lock button {
 
 button[kind="secondary"]:not([class*="st-key-lnb_btn_"]):not([key*="lnb_btn_"]) *,
 button[data-testid="baseButton-secondary"]:not([class*="st-key-lnb_btn_"]):not([key*="lnb_btn_"]) *,
+button[kind="secondaryFormSubmit"] *,
+button[data-testid="baseButton-secondaryFormSubmit"] *,
+div[data-testid="stFormSubmitButton"] button:not([kind*="primary"]):not([data-testid*="primary"]) *,
+form button:not([kind*="primary"]):not([data-testid*="primary"]) *,
 div:not([class*="st-key-lnb_btn_"]) > button[kind="secondary"] *,
 div:not([class*="st-key-lnb_btn_"]) > button[data-testid="baseButton-secondary"] *,
-div[data-testid="stFormSubmitButton"] button[kind="secondary"] *,
 div[data-testid="stDownloadButton"] button *,
 div[class*="chip_btn_"] button *,
 div[class*="btn_rel_"] button *,
@@ -1688,7 +1727,10 @@ div.st-key-btn_admin_lock button * {
 /* 호버 시 */
 button[kind="secondary"]:not([class*="st-key-lnb_btn_"]):not([key*="lnb_btn_"]):hover,
 button[data-testid="baseButton-secondary"]:not([class*="st-key-lnb_btn_"]):not([key*="lnb_btn_"]):hover,
-div[data-testid="stFormSubmitButton"] button[kind="secondary"]:hover,
+button[kind="secondaryFormSubmit"]:hover,
+button[data-testid="baseButton-secondaryFormSubmit"]:hover,
+div[data-testid="stFormSubmitButton"] button:not([kind*="primary"]):not([data-testid*="primary"]):hover,
+form button:not([kind*="primary"]):not([data-testid*="primary"]):hover,
 div[data-testid="stDownloadButton"] button:hover,
 div[class*="chip_btn_"] button:hover,
 div[class*="btn_rel_"] button:hover,
@@ -1703,7 +1745,10 @@ div.st-key-sb_btn_logout button:hover {
 
 button[kind="secondary"]:not([class*="st-key-lnb_btn_"]):not([key*="lnb_btn_"]):hover *,
 button[data-testid="baseButton-secondary"]:not([class*="st-key-lnb_btn_"]):not([key*="lnb_btn_"]):hover *,
-div[data-testid="stFormSubmitButton"] button[kind="secondary"]:hover *,
+button[kind="secondaryFormSubmit"]:hover *,
+button[data-testid="baseButton-secondaryFormSubmit"]:hover *,
+div[data-testid="stFormSubmitButton"] button:not([kind*="primary"]):not([data-testid*="primary"]):hover *,
+form button:not([kind*="primary"]):not([data-testid*="primary"]):hover *,
 div[data-testid="stDownloadButton"] button:hover *,
 div[class*="chip_btn_"] button:hover *,
 div[class*="btn_rel_"] button:hover *,
@@ -1720,26 +1765,60 @@ div.st-key-sb_btn_logout button:hover * {
 .white-box,
 [style*="background: #FFFFFF"],
 [style*="background:#FFFFFF"],
+[style*="background: #ffffff"],
+[style*="background:#ffffff"],
+[style*="background: #FFF"],
+[style*="background:#FFF"],
+[style*="background: #fff"],
+[style*="background:#fff"],
 [style*="background: white"],
+[style*="background:white"],
 [style*="background-color: #FFFFFF"],
 [style*="background-color:#FFFFFF"],
+[style*="background-color: #ffffff"],
+[style*="background-color:#ffffff"],
+[style*="background-color: #FFF"],
+[style*="background-color:#FFF"],
+[style*="background-color: #fff"],
+[style*="background-color:#fff"],
 [style*="background-color: white"],
+[style*="background-color:white"],
 [style*="background: #F8FAFC"],
 [style*="background:#F8FAFC"],
-[style*="background-color: #F8FAFC"] {
+[style*="background-color: #F8FAFC"],
+[style*="background-color:#F8FAFC"],
+[style*="background: rgb(255, 255, 255)"],
+[style*="background-color: rgb(255, 255, 255)"] {
     color: #0F172A !important;
 }
 
 .white-box *,
 [style*="background: #FFFFFF"] *,
 [style*="background:#FFFFFF"] *,
+[style*="background: #ffffff"] *,
+[style*="background:#ffffff"] *,
+[style*="background: #FFF"] *,
+[style*="background:#FFF"] *,
+[style*="background: #fff"] *,
+[style*="background:#fff"] *,
 [style*="background: white"] *,
+[style*="background:white"] *,
 [style*="background-color: #FFFFFF"] *,
 [style*="background-color:#FFFFFF"] *,
+[style*="background-color: #ffffff"] *,
+[style*="background-color:#ffffff"] *,
+[style*="background-color: #FFF"] *,
+[style*="background-color:#FFF"] *,
+[style*="background-color: #fff"] *,
+[style*="background-color:#fff"] *,
 [style*="background-color: white"] *,
+[style*="background-color:white"] *,
 [style*="background: #F8FAFC"] *,
 [style*="background:#F8FAFC"] *,
-[style*="background-color: #F8FAFC"] * {
+[style*="background-color: #F8FAFC"] *,
+[style*="background-color:#F8FAFC"] *,
+[style*="background: rgb(255, 255, 255)"] *,
+[style*="background-color: rgb(255, 255, 255)"] * {
     color: #0F172A !important;
     -webkit-text-fill-color: #0F172A !important;
 }
@@ -2930,7 +3009,41 @@ all_options, code_map, all_stocks_df = load_all_stocks()
 @st.fragment
 def render_search_section_fragment(all_stocks_df, code_map, is_dark):
     st.html(
-        f"""<div style="background:{'#151A23' if is_dark else '#FFFFFF'}; border:2px solid {'#38BDF8' if is_dark else '#2563EB'}; border-radius:12px; padding:16px 20px; margin-bottom:14px; box-shadow:0 4px 14px rgba(37,99,235,0.12);">
+        f"""<style>
+div[data-testid="stTextInput"] input::placeholder {{
+    color: {'#CBD5E1' if is_dark else '#64748B'} !important;
+    -webkit-text-fill-color: {'#CBD5E1' if is_dark else '#64748B'} !important;
+    opacity: 1 !important;
+    font-weight: 500 !important;
+}}
+div[data-testid="stTextInput"] input::-webkit-input-placeholder {{
+    color: {'#CBD5E1' if is_dark else '#64748B'} !important;
+    -webkit-text-fill-color: {'#CBD5E1' if is_dark else '#64748B'} !important;
+    opacity: 1 !important;
+    font-weight: 500 !important;
+}}
+div[data-testid="stFormSubmitButton"] button:not([kind*="primary"]) {{
+    background-color: #FFFFFF !important;
+    border: 1.5px solid #CBD5E1 !important;
+    color: #0F172A !important;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18) !important;
+}}
+div[data-testid="stFormSubmitButton"] button:not([kind*="primary"]) * {{
+    color: #0F172A !important;
+    -webkit-text-fill-color: #0F172A !important;
+    font-weight: 800 !important;
+}}
+div[data-testid="stFormSubmitButton"] button:not([kind*="primary"]):hover {{
+    background-color: #F8FAFC !important;
+    border-color: #94A3B8 !important;
+}}
+div[data-testid="stFormSubmitButton"] button:not([kind*="primary"]):hover * {{
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
+    font-weight: 900 !important;
+}}
+</style>
+<div style="background:{'#151A23' if is_dark else '#FFFFFF'}; border:2px solid {'#38BDF8' if is_dark else '#2563EB'}; border-radius:12px; padding:16px 20px; margin-bottom:14px; box-shadow:0 4px 14px rgba(37,99,235,0.12);">
             <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
                 <div>
                     <span style="font-size:1.25rem; font-weight:900; color:{'#F8FAFC' if is_dark else '#0F172A'};">🔍 국내·해외 통합 프리미엄 AI 즉시 검색기</span>
