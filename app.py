@@ -1640,6 +1640,123 @@ html {
     border-top: 1px solid #242D3D !important;
     color: #CBD5E1 !important;
 }
+
+/* ====================================================
+   🌙 밤모드(다크 모드): 흰색 박스 및 버튼 텍스트 가독성 완전 선명화
+   ==================================================== */
+/* 1. 상단 액션 버튼, 초기화, 검색 칩, 다운로드 버튼 등 흰색/밝은 버튼 글씨 선명화 */
+button[kind="secondary"]:not([class*="st-key-lnb_btn_"]):not([key*="lnb_btn_"]),
+button[data-testid="baseButton-secondary"]:not([class*="st-key-lnb_btn_"]):not([key*="lnb_btn_"]),
+div:not([class*="st-key-lnb_btn_"]) > button[kind="secondary"],
+div:not([class*="st-key-lnb_btn_"]) > button[data-testid="baseButton-secondary"],
+div[data-testid="stFormSubmitButton"] button[kind="secondary"],
+div[data-testid="stDownloadButton"] button,
+div[class*="chip_btn_"] button,
+div[class*="btn_rel_"] button,
+div[class*="st-key-btn_dash_"] button,
+div[data-testid="stDialog"] button:not([kind="primary"]),
+div.st-key-sb_btn_home button,
+div.st-key-sb_btn_logout button,
+div.st-key-btn_admin_unlock button,
+div.st-key-btn_admin_lock button {
+    background-color: #FFFFFF !important;
+    border: 1.5px solid #CBD5E1 !important;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18) !important;
+    color: #0F172A !important;
+}
+
+button[kind="secondary"]:not([class*="st-key-lnb_btn_"]):not([key*="lnb_btn_"]) *,
+button[data-testid="baseButton-secondary"]:not([class*="st-key-lnb_btn_"]):not([key*="lnb_btn_"]) *,
+div:not([class*="st-key-lnb_btn_"]) > button[kind="secondary"] *,
+div:not([class*="st-key-lnb_btn_"]) > button[data-testid="baseButton-secondary"] *,
+div[data-testid="stFormSubmitButton"] button[kind="secondary"] *,
+div[data-testid="stDownloadButton"] button *,
+div[class*="chip_btn_"] button *,
+div[class*="btn_rel_"] button *,
+div[class*="st-key-btn_dash_"] button *,
+div[data-testid="stDialog"] button:not([kind="primary"]) *,
+div.st-key-sb_btn_home button *,
+div.st-key-sb_btn_logout button *,
+div.st-key-btn_admin_unlock button *,
+div.st-key-btn_admin_lock button * {
+    color: #0F172A !important;
+    font-weight: 800 !important;
+    opacity: 1 !important;
+    -webkit-text-fill-color: #0F172A !important;
+}
+
+/* 호버 시 */
+button[kind="secondary"]:not([class*="st-key-lnb_btn_"]):not([key*="lnb_btn_"]):hover,
+button[data-testid="baseButton-secondary"]:not([class*="st-key-lnb_btn_"]):not([key*="lnb_btn_"]):hover,
+div[data-testid="stFormSubmitButton"] button[kind="secondary"]:hover,
+div[data-testid="stDownloadButton"] button:hover,
+div[class*="chip_btn_"] button:hover,
+div[class*="btn_rel_"] button:hover,
+div[class*="st-key-btn_dash_"] button:hover,
+div[data-testid="stDialog"] button:not([kind="primary"]):hover,
+div.st-key-sb_btn_home button:hover,
+div.st-key-sb_btn_logout button:hover {
+    background-color: #F8FAFC !important;
+    border-color: #94A3B8 !important;
+    transform: translateY(-1px) !important;
+}
+
+button[kind="secondary"]:not([class*="st-key-lnb_btn_"]):not([key*="lnb_btn_"]):hover *,
+button[data-testid="baseButton-secondary"]:not([class*="st-key-lnb_btn_"]):not([key*="lnb_btn_"]):hover *,
+div[data-testid="stFormSubmitButton"] button[kind="secondary"]:hover *,
+div[data-testid="stDownloadButton"] button:hover *,
+div[class*="chip_btn_"] button:hover *,
+div[class*="btn_rel_"] button:hover *,
+div[class*="st-key-btn_dash_"] button:hover *,
+div[data-testid="stDialog"] button:not([kind="primary"]):hover *,
+div.st-key-sb_btn_home button:hover *,
+div.st-key-sb_btn_logout button:hover * {
+    color: #000000 !important;
+    font-weight: 900 !important;
+    -webkit-text-fill-color: #000000 !important;
+}
+
+/* 2. 임의의 흰색/밝은 배경 박스, 카드, 컨테이너 내부 글씨 짙은 흑색(#0F172A) 강제 */
+.white-box,
+[style*="background: #FFFFFF"],
+[style*="background:#FFFFFF"],
+[style*="background: white"],
+[style*="background-color: #FFFFFF"],
+[style*="background-color:#FFFFFF"],
+[style*="background-color: white"],
+[style*="background: #F8FAFC"],
+[style*="background:#F8FAFC"],
+[style*="background-color: #F8FAFC"] {
+    color: #0F172A !important;
+}
+
+.white-box *,
+[style*="background: #FFFFFF"] *,
+[style*="background:#FFFFFF"] *,
+[style*="background: white"] *,
+[style*="background-color: #FFFFFF"] *,
+[style*="background-color:#FFFFFF"] *,
+[style*="background-color: white"] *,
+[style*="background: #F8FAFC"] *,
+[style*="background:#F8FAFC"] *,
+[style*="background-color: #F8FAFC"] * {
+    color: #0F172A !important;
+    -webkit-text-fill-color: #0F172A !important;
+}
+
+/* 3. 테이블 및 데이터프레임 내부 텍스트 선명도 보장 */
+[data-testid="stDataFrame"],
+div[data-testid="stDataFrame"] * {
+    color: #0F172A !important;
+}
+table:not(.comparison-table),
+.stTable:not(.comparison-table) {
+    color: #0F172A !important;
+}
+table:not(.comparison-table) th,
+table:not(.comparison-table) td {
+    color: #0F172A !important;
+}
 """
 
 st.html(f"""<meta name="google" content="notranslate"><style>{common_css}\n{layout_css}\n{theme_css}</style>""")
