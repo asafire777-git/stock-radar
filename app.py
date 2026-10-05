@@ -177,7 +177,7 @@ st.html("""
 # [글로벌] Streamlit Cloud Manage app 버튼, 워터마크, 푸터 즉시 완전 박멸
 st.html("""
 <style>
-footer, footer *, [data-testid="stFooter"], #MainMenu, [data-testid="stDeployButton"], [data-testid="stDecoration"], [data-testid="stStatusWidget"], [data-testid="stStatusWidget"] *, [data-testid="stToolbarActions"], [data-testid="manage-app-button"], button[data-testid="manage-app-button"], div[class*="viewerBadge"], a[class*="viewerBadge"], span[class*="viewerBadge"], div[class*="manageApp"], button[class*="manageApp"], a[class*="manageApp"], div[class*="styles_viewerBadge"], div[class*="viewerBadge_container"], .viewerBadge_container__1QSob, .styles_viewerBadge__1A-45, .viewerBadge_link__1S137, div[class*="StatusWidget"], div[class*="FloatingBadge"], div[class*="floatingBadge"], div[class*="ProfileBadge"], div[class*="profileBadge"], div[class*="HostBadge"], div[class*="hostBadge"], div[class*="cloudBadge"], div[class*="CloudBadge"], div[class*="viewer_badge"], div[class*="manage_app"], div[class*="hostedWith"], div[class*="hosted_with"], div[data-testid="stBottom"], div[class*="stBottom"], .stApp ~ div, body > div[class*="viewerBadge"], body > div[class*="manageApp"], body > div:last-child[class*="container"] {
+footer, footer *, [data-testid="stFooter"], #MainMenu, [data-testid="stDeployButton"], [data-testid="stDecoration"], [data-testid="stStatusWidget"], [data-testid="stStatusWidget"] *, [data-testid="stToolbarActions"], [data-testid="manage-app-button"], button[data-testid="manage-app-button"], div[class*="viewerBadge"], a[class*="viewerBadge"], span[class*="viewerBadge"], div[class*="manageApp"], button[class*="manageApp"], a[class*="manageApp"], div[class*="styles_viewerBadge"], div[class*="viewerBadge_container"], .viewerBadge_container__1QSob, .styles_viewerBadge__1A-45, .viewerBadge_link__1S137, div[class*="StatusWidget"], div[class*="FloatingBadge"], div[class*="floatingBadge"], div[class*="ProfileBadge"], div[class*="profileBadge"], div[class*="HostBadge"], div[class*="hostBadge"], div[class*="cloudBadge"], div[class*="CloudBadge"], div[class*="viewer_badge"], div[class*="manage_app"], div[class*="hostedWith"], div[class*="hosted_with"], div[data-testid="stBottom"], div[class*="stBottom"], .stApp ~ div, body > div[class*="viewerBadge"], body > div[class*="manageApp"], body > div:last-child[class*="container"], button[title*="fullscreen"], button[title*="Fullscreen"], a[href*="utm_medium=oembed"], a[href*="streamlit.app"] {
     display: none !important;
     visibility: hidden !important;
     opacity: 0 !important;
@@ -192,7 +192,7 @@ footer, footer *, [data-testid="stFooter"], #MainMenu, [data-testid="stDeployBut
     top: -99999px !important;
     z-index: -999999 !important;
 }
-div:has(> a[href*="streamlit.io"]), div:has(> a[href*="share.streamlit"]), div:has(> button[aria-label*="Manage app"]), div:has(> button[aria-label*="manage app"]), div:has(> button[aria-label*="Manage"]), div:has(> a[class*="viewerBadge"]), div:has(> div[class*="viewerBadge"]), div:has(> div[class*="manageApp"]) {
+div:has(> a[href*="streamlit.io"]), div:has(> a[href*="share.streamlit"]), div:has(> button[aria-label*="Manage app"]), div:has(> button[aria-label*="manage app"]), div:has(> button[aria-label*="Manage"]), div:has(> a[class*="viewerBadge"]), div:has(> div[class*="viewerBadge"]), div:has(> div[class*="manageApp"]), div:has(> a[href*="utm_medium=oembed"]) {
     display: none !important;
     visibility: hidden !important;
     opacity: 0 !important;
