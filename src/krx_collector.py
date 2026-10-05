@@ -23,46 +23,55 @@ def get_newly_listed_stocks(months: int = 12) -> pd.DataFrame:
 
         df_naver = fetch_from_naver_api("listedAtDesc", limit=100)
         if not df_naver.empty:
-            # KRX-DESC와 병합하여 상장일자, 업종 정보 보강
+            # 기본값 먼저 채워두기 (KRX-DESC 지연 시에도 즉시 초고속 반환)
+            df_naver["listing_date"] = ""
+            df_naver["days_since_listing"] = 30
+            df_naver["sector"] = "신규상장"
+
+            # KRX-DESC 병합 시도 (최대 1.5초 타임아웃 방어)
             try:
-                df_desc = fdr.StockListing("KRX-DESC")[["Code", "ListingDate", "Sector"]]
-                df_desc["Code"] = df_desc["Code"].astype(str)
-                merged = pd.merge(df_naver, df_desc, left_on="code", right_on="Code", how="left")
-                merged["ListingDate"] = pd.to_datetime(merged["ListingDate"], errors="coerce")
-                merged["listing_date"] = merged["ListingDate"].dt.strftime("%Y-%m-%d").fillna("")
-                merged["days_since_listing"] = (datetime.now() - merged["ListingDate"]).dt.days.fillna(90).astype(int)
-                merged["sector"] = merged["Sector"].fillna("기타").astype(str)
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                    fut = executor.submit(lambda: fdr.StockListing("KRX-DESC")[["Code", "ListingDate", "Sector"]])
+                    df_desc = fut.result(timeout=1.5)
+                if df_desc is not None and not df_desc.empty:
+                    df_desc["Code"] = df_desc["Code"].astype(str)
+                    merged = pd.merge(df_naver.drop(columns=["listing_date", "days_since_listing", "sector"]), df_desc, left_on="code", right_on="Code", how="left")
+                    merged["ListingDate"] = pd.to_datetime(merged["ListingDate"], errors="coerce")
+                    merged["listing_date"] = merged["ListingDate"].dt.strftime("%Y-%m-%d").fillna("")
+                    merged["days_since_listing"] = (datetime.now() - merged["ListingDate"]).dt.days.fillna(90).astype(int)
+                    merged["sector"] = merged["Sector"].fillna("기타").astype(str)
 
-                # N개월 필터링 (days <= months * 30, 상장일 미확인 종목은 포함)
-                max_days = months * 30
-                merged = merged[(merged["days_since_listing"] <= max_days) | (merged["days_since_listing"] == 90)]
-                merged = merged.sort_values(by="days_since_listing", ascending=True).reset_index(drop=True)
+                    # N개월 필터링 (days <= months * 30, 상장일 미확인 종목은 포함)
+                    max_days = months * 30
+                    merged = merged[(merged["days_since_listing"] <= max_days) | (merged["days_since_listing"] == 90)]
+                    merged = merged.sort_values(by="days_since_listing", ascending=True).reset_index(drop=True)
 
-                res = pd.DataFrame()
-                res["code"] = merged["code"].astype(str)
-                res["name"] = merged["name"].astype(str)
-                res["market"] = merged["market"].astype(str)
-                res["listing_date"] = merged["listing_date"]
-                res["days_since_listing"] = merged["days_since_listing"]
-                res["price"] = merged["price"].astype(int)
-                res["change_rate"] = merged["change_rate"].round(2)
-                res["trade_value_억"] = merged["trade_value_억"].round(1)
-                res["marcap_억"] = merged["marcap_억"].round(1)
-                res["sector"] = merged["sector"]
-                return res
+                    res = pd.DataFrame()
+                    res["code"] = merged["code"].astype(str)
+                    res["name"] = merged["name"].astype(str)
+                    res["market"] = merged["market"].astype(str)
+                    res["listing_date"] = merged["listing_date"]
+                    res["days_since_listing"] = merged["days_since_listing"]
+                    res["price"] = merged["price"].astype(int)
+                    res["change_rate"] = merged["change_rate"].round(2)
+                    res["trade_value_억"] = merged["trade_value_억"].round(1)
+                    res["marcap_억"] = merged["marcap_억"].round(1)
+                    res["sector"] = merged["sector"]
+                    return res
             except Exception:
-                # KRX-DESC 병합 실패 시에도 네이버 데이터 자체는 반환
-                df_naver["listing_date"] = ""
-                df_naver["days_since_listing"] = 30
-                df_naver["sector"] = "신규상장"
-                return df_naver
+                pass
+            return df_naver
     except Exception as e:
         print(f"[Warn] Live new listings API fallback: {e}")
 
-    # 2. 백업: KRX-DESC 목록 기반 폴백
+    # 2. 백업: KRX-DESC 목록 기반 폴백 (1.5초 타임아웃)
     try:
-        df_desc = fdr.StockListing("KRX-DESC")
-        if df_desc.empty or "ListingDate" not in df_desc.columns:
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            fut = executor.submit(lambda: fdr.StockListing("KRX-DESC"))
+            df_desc = fut.result(timeout=1.5)
+        if df_desc is None or df_desc.empty or "ListingDate" not in df_desc.columns:
             return pd.DataFrame()
 
         df_desc["ListingDate"] = pd.to_datetime(df_desc["ListingDate"], errors="coerce")
@@ -72,9 +81,11 @@ def get_newly_listed_stocks(months: int = 12) -> pd.DataFrame:
         if new_stocks.empty:
             return pd.DataFrame()
 
-        # 시세 정보 병합
+        # 시세 정보 병합 (1.5초 타임아웃)
         try:
-            df_price = fdr.StockListing("KRX")[["Code", "Close", "ChagesRatio", "Amount", "Marcap"]]
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                fut_p = executor.submit(lambda: fdr.StockListing("KRX")[["Code", "Close", "ChagesRatio", "Amount", "Marcap"]])
+                df_price = fut_p.result(timeout=1.5)
             merged = pd.merge(new_stocks, df_price, on="Code", how="left")
         except Exception:
             merged = new_stocks

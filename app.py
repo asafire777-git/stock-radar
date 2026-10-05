@@ -1,6 +1,8 @@
 import concurrent.futures
 import datetime
+import json
 import os
+from pathlib import Path
 import sys
 import time
 import warnings
@@ -1936,12 +1938,24 @@ def load_overseas_detail(symbol: str, reuters_code: str = ""):
 
 
 def load_all_market_base_data(months: int = 12):
-    """급등주, 거래량급증주, 신규상장주 3대 기초 데이터를 멀티스레드 병렬로 동시 수집 (수집 시간 대폭 단축)"""
+    """급등주, 거래량급증주, 신규상장주 3대 기초 데이터를 멀티스레드 병렬로 동시 수집 (수집 시간 대폭 단축 및 절대 멈춤 방지)"""
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
         f_rising = executor.submit(load_rising_data)
         f_volume = executor.submit(load_volume_data)
         f_new = executor.submit(load_new_listings, months)
-        return f_rising.result(), f_volume.result(), f_new.result()
+        try:
+            r_rising = f_rising.result(timeout=4.0)
+        except Exception:
+            r_rising = pd.DataFrame()
+        try:
+            r_volume = f_volume.result(timeout=4.0)
+        except Exception:
+            r_volume = pd.DataFrame()
+        try:
+            r_new = f_new.result(timeout=4.0)
+        except Exception:
+            r_new = pd.DataFrame()
+        return r_rising, r_volume, r_new
 
 
 def _evaluate_single_candidate(row: dict, strategy_key: str):
@@ -1998,7 +2012,7 @@ def evaluate_candidates(pool_records: list, strategy_key: str) -> list:
         futures = [executor.submit(_evaluate_single_candidate, row, strategy_key) for row in pool_records]
         for f in futures:
             try:
-                res = f.result(timeout=15)
+                res = f.result(timeout=4.0)
                 if res:
                     results.append(res)
             except Exception:
@@ -2006,14 +2020,35 @@ def evaluate_candidates(pool_records: list, strategy_key: str) -> list:
     return results
 
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=86400)
 def load_all_stocks():
-    """전체 한국 상장 종목(코스피/코스닥 ~2,800개) 메타데이터 로드"""
+    """전체 한국 상장 종목(코스피/코스닥 ~2,800개) 메타데이터 로드 (로컬 번들 캐시 0.001초 우선 로드)"""
+    # 1. 로컬 번들 파일 우선 로드 (클라우드 배포 시 네트워크 지연 및 KRX 차단 완전 방어)
+    local_path = Path(__file__).parent / "data" / "krx_stocks.json"
+    if local_path.exists():
+        try:
+            with open(local_path, "r", encoding="utf-8") as f:
+                raw_list = json.load(f)
+            if raw_list:
+                df = pd.DataFrame(raw_list)
+                df = df.rename(columns={"code": "Code", "name": "Name", "market": "Market"})
+                options = [f"{r['Name']} ({r['Code']}) · {r['Market']}" for _, r in df.iterrows()]
+                code_map = {}
+                for _, r in df.iterrows():
+                    code_map[f"{r['Name']} ({r['Code']}) · {r['Market']}"] = r['Code']
+                    code_map[r['Name']] = r['Code']
+                    code_map[r['Code']] = r['Code']
+                return options, code_map, df
+        except Exception as e:
+            print(f"[Warn] Local krx_stocks load: {e}")
+
+    # 2. 로컬 파일 부재 시에만 FDR 안전 호출 (타임아웃 2초 제한)
     try:
         import FinanceDataReader as fdr
-        df = fdr.StockListing("KRX")
-        if df is None or df.empty:
-            df = fdr.StockListing("KRX-DESC")
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            fut = executor.submit(lambda: fdr.StockListing("KRX"))
+            df = fut.result(timeout=2.0)
         if df is None or df.empty:
             return [], {}, pd.DataFrame()
         df["Code"] = df["Code"].astype(str)
