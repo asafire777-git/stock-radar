@@ -630,16 +630,28 @@ def _get_column_modals_html(columns: list, is_dark: bool = False) -> str:
     """
 
 
-# 호환성 유지용 폴백 (외부 호출 시 대비)
-@st.dialog("📖 주식 전문 칼럼 정독", width="large")
+# ====================================================
+# 칼럼 상세 팝업 다이얼로그 (@st.dialog)
+# ====================================================
+@st.dialog("📚 주식 실전 지식 아카이브", width="large")
 def show_column_detail_dialog(column: dict, is_dark: bool = False):
-    """칼럼 본문 읽기 팝업 모달 (폴백)"""
-    st.html(_get_column_modals_html([column], is_dark))
-    st.html(f"<script>if(window.openColModal) window.openColModal('{column['id']}');</script>")
+    """칼럼 본문 읽기 팝업 다이얼로그 (100% Streamlit 네이티브)"""
+    st.markdown(f"### {column['title']}")
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        st.caption(f"🏷️ **분류**: `{column['category']}`")
+    with col2:
+        st.caption(f"⏱️ **정독 소요**: `{column['read_time']}`")
+    st.info(f"💡 **요약**: {column['summary']}")
+    st.markdown("---")
+    st.markdown(column["content"])
+    st.warning("⚠️ **교육 및 참고용 고지**: 본 칼럼은 주식 초보 투자자의 기술적 분석 역량 향상을 위해 통계적 기법을 정리한 정보성 콘텐츠이며, 특정 종목에 대한 투자 권유나 추천이 아닙니다.")
+    if st.button("확인 및 닫기", key=f"dlg_close_col_{column['id']}", use_container_width=True, type="primary"):
+        st.rerun()
 
 
-def render_stock_knowledge_tab(is_dark: bool = False):
-    """지식 아카이브 탭 렌더러 (0ms 클라이언트 모달 적용)"""
+def render_stock_knowledge_tab(is_dark: bool = False, key_prefix: str = ""):
+    """지식 아카이브 탭 렌더러 (네이티브 @st.dialog 적용)"""
     card_bg = "#151A23" if is_dark else "#FFFFFF"
     border_color = "rgba(255, 255, 255, 0.12)" if is_dark else "#E2E8F0"
     text_primary = "#F8FAFC" if is_dark else "#0F172A"
@@ -670,9 +682,9 @@ def render_stock_knowledge_tab(is_dark: bool = False):
     col_f1, col_f2 = st.columns([3, 2])
     with col_f1:
         cat_options = ["전체 보기", "차트 보조지표", "수급과 거래량", "실전 리스크 관리", "테마 & 미국주식"]
-        selected_cat = st.radio("카테고리 선택", cat_options, index=0, horizontal=True, label_visibility="collapsed")
+        selected_cat = st.radio("카테고리 선택", cat_options, index=0, horizontal=True, label_visibility="collapsed", key=f"{key_prefix}hub_cat")
     with col_f2:
-        search_kw = st.text_input("칼럼 검색", placeholder="🔍 키워드 검색 (예: 골든크로스, 볼린저밴드, 손절매, 나스닥...)", label_visibility="collapsed")
+        search_kw = st.text_input("칼럼 검색", placeholder="🔍 키워드 검색 (예: 골든크로스, 볼린저밴드, 손절매, 나스닥...)", label_visibility="collapsed", key=f"{key_prefix}hub_search")
 
     # 필터링
     filtered_cols = STOCK_COLUMNS
@@ -693,41 +705,22 @@ def render_stock_knowledge_tab(is_dark: bool = False):
             if idx < len(filtered_cols):
                 col_item = filtered_cols[idx]
                 with row_cols[j]:
-                    with st.container():
+                    with st.container(border=True):
                         st.html(f"""
-                        <div style="
-                            background:{card_bg};
-                            border:1px solid {border_color};
-                            border-radius:14px;
-                            padding:18px 18px 14px 18px;
-                            margin-bottom:12px;
-                            box-shadow:0 4px 12px rgba(0,0,0,0.03);
-                            height:225px;
-                            display:flex;
-                            flex-direction:column;
-                            justify-content:space-between;
-                        ">
-                            <div>
-                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                                    <span style="font-size:0.72rem; font-weight:800; background:rgba(59,130,246,0.12); color:#3B82F6; padding:2px 8px; border-radius:4px;">
-                                        {col_item['category']}
-                                    </span>
-                                    <span style="font-size:0.70rem; color:{text_secondary};">
-                                        ⏱️ {col_item['read_time']}
-                                    </span>
-                                </div>
-                                <h4 style="font-size:0.98rem; font-weight:800; color:{text_primary}; margin:0 0 8px 0; line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">
-                                    {col_item['title']}
-                                </h4>
-                                <p style="font-size:0.80rem; color:{text_secondary}; margin:0; line-height:1.45; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;">
-                                    {col_item['summary']}
-                                </p>
-                            </div>
-                            <button type="button" class="instant-col-read-btn" onclick="if(window.openColModal)window.openColModal('{col_item['id']}'); return false;">
-                                📖 칼럼 전문 정독하기
-                            </button>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                            <span style="font-size:0.75rem; font-weight:800; background:rgba(59,130,246,0.12); color:#3B82F6; padding:3px 8px; border-radius:4px;">
+                                {col_item['category']}
+                            </span>
+                            <span style="font-size:0.72rem; color:{text_secondary};">
+                                ⏱️ {col_item['read_time']}
+                            </span>
                         </div>
+                        <h4 style="font-size:0.96rem; font-weight:800; color:{text_primary}; margin:0 0 8px 0; line-height:1.4; min-height:44px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">
+                            {col_item['title']}
+                        </h4>
+                        <p style="font-size:0.80rem; color:{text_secondary}; margin:0 0 12px 0; line-height:1.45; min-height:50px; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;">
+                            {col_item['summary']}
+                        </p>
                         """)
-
-    # 16개 전체 칼럼의 0.00ms 클라이언트 모달 렌더링
-    st.html(_get_column_modals_html(STOCK_COLUMNS, is_dark))
+                        if st.button("📖 칼럼 전문 정독하기", key=f"{key_prefix}btn_col_{col_item['id']}", use_container_width=True):
+                            show_column_detail_dialog(col_item, is_dark)

@@ -552,7 +552,7 @@ def render_landing_page(is_dark: bool):
             <a href="#section-strategy" class="nav-anchor-btn" style="background: {btn_bg} !important; color: {btn_color} !important; border: {btn_border} !important;">🎯 3대 매매 전략</a>
             <a href="#section-quant" class="nav-anchor-btn" style="background: {btn_bg} !important; color: {btn_color} !important; border: {btn_border} !important;">⚡ 100점 배점표</a>
             <a href="#section-knowledge" class="nav-anchor-btn" style="background: rgba(37,99,235,0.12) !important; color: #2563EB !important; border: 1.5px solid rgba(37,99,235,0.35) !important; font-weight: 800 !important;">📚 투자 칼럼(16편)</a>
-            <a href="#section-policies" onclick="if(window.openLegalModal){{window.openLegalModal('disclaimer'); return false;}}" class="nav-anchor-btn" style="background: {btn_bg} !important; color: {btn_color} !important; border: {btn_border} !important;">📜 정책·면책</a>
+            <a href="#section-policies" class="nav-anchor-btn" style="background: {btn_bg} !important; color: {btn_color} !important; border: {btn_border} !important;">📜 정책·면책</a>
             <a href="#section-cta" class="nav-anchor-btn" style="background: #2563EB !important; color: #FFFFFF !important; border: none !important; font-weight: 800 !important;">🚀 바로 입장</a>
         </div>
         <div id="section-hero" class="anchor-marker"></div>
@@ -1193,7 +1193,7 @@ def render_landing_page(is_dark: bool):
     # ----------------------------------------------------
     st.markdown("<div id='section-knowledge' class='anchor-marker'></div>", unsafe_allow_html=True)
     st.markdown("<div style='height: 36px;'></div>", unsafe_allow_html=True)
-    render_stock_knowledge_tab(is_dark=is_dark)
+    render_stock_knowledge_tab(is_dark=is_dark, key_prefix="lp_")
 
     # ----------------------------------------------------
     # 9. 관리자 전용 파라미터(?admin=true) 호출 시 인증 다이얼로그
@@ -1240,4 +1240,4 @@ def render_landing_page(is_dark: bool):
     # ----------------------------------------------------
     st.markdown("<div id='section-policies' class='anchor-marker'></div>", unsafe_allow_html=True)
     st.markdown("<div style='height: 30px;'></div>", unsafe_allow_html=True)
-    render_footer_legal_bar(is_dark=is_dark)
+    render_footer_legal_bar(is_dark=is_dark, key_prefix="lp_")

@@ -4352,7 +4352,7 @@ elif "AI 성과 검증실" in selected_menu:
     render_performance_tab_view(is_dark)
 
 elif "지식 아카이브" in selected_menu or "16편" in selected_menu:
-    render_stock_knowledge_tab(is_dark=is_dark)
+    render_stock_knowledge_tab(is_dark=is_dark, key_prefix="app_")
 
 elif is_admin_active and "마스터 관리자" in selected_menu:
     render_admin_dashboard(is_dark=is_dark)
@@ -4363,5 +4363,5 @@ else:
 # ====================================================
 # FOOTER: 법적 면책 고지, 개인정보처리방침, 이용약관 (Google AdSense 준수)
 # ====================================================
-render_footer_legal_bar(is_dark=is_dark)
+render_footer_legal_bar(is_dark=is_dark, key_prefix="app_")
 
