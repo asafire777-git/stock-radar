@@ -54,8 +54,8 @@ def show_privacy_dialog(is_dark: bool = False):
 회원 탈퇴 요청 시 또는 개인정보 수집 목적이 달성된 경우 지체 없이 해당 정보를 영구 파기합니다.
 
 ### 4. 개인정보 보호책임자
-- **담당 부서**: Stock Radar 보안운영팀
-- **공식 문의**: contact@stockradar.ai / allbuyj@gmail.com
+- **담당 부서**: N-Stock 보안운영팀
+- **공식 문의 이메일**: contact@nstock.kr
     """)
     if st.button("확인 및 닫기", key="dlg_close_privacy_btn", use_container_width=True, type="primary"):
         st.rerun()
