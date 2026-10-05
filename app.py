@@ -559,7 +559,84 @@ if st.session_state["current_page"] == "dashboard":
             st.markdown("---")
 
         # ----------------------------------------------------
-        # 🎯 사이드바 핵심 LNB 관제 메뉴 (Navigation Bar)
+        # 🎯 1. 나의 투자 스타일 (초보자 원클릭 탭 바 - 최상단 배치)
+        # ----------------------------------------------------
+        with st.container(border=True):
+            st.markdown("#### 🎯 나의 투자 스타일")
+            
+            style_keys = ["🛡️ 안정 스윙", "⚡ 급등 단타", "🚀 신규 상장"]
+            style_map = {
+                "🛡️ 안정 스윙": "🛡️ 안정적인 스윙형 (추천)",
+                "⚡ 급등 단타": "⚡ 화끈한 급등 단타형",
+                "🚀 신규 상장": "🚀 신규상장 턴어라운드형",
+            }
+            
+            selected_style_key = st.segmented_control(
+                "투자 방식 선택",
+                options=style_keys,
+                default="🛡️ 안정 스윙",
+                label_visibility="collapsed",
+                key="sb_segmented_style",
+            ) or "🛡️ 안정 스윙"
+            
+            preset_style = style_map[selected_style_key]
+
+            # 실시간 전략 요약 뱃지
+            if "스윙" in selected_style_key:
+                def_change = 3.0
+                def_months = 12
+                guide_text = "💡 <b>스윙 추천</b>: 외인·기관 쌍끌이 수급 + 5/20일선 정배열 눌림목 지지 (물릴 위험 최소화)"
+                guide_color = "#2563EB"
+                guide_bg = "rgba(37,99,235,0.08)"
+            elif "단타" in selected_style_key:
+                def_change = 8.0
+                def_months = 12
+                guide_text = "💡 <b>단타 추천</b>: 오늘 시장 거래대금 폭발 주도주 + 8%+ 급등 탄력 모멘텀 (고수익형)"
+                guide_color = "#EF4444"
+                guide_bg = "rgba(239,68,68,0.08)"
+            else:
+                def_change = 2.0
+                def_months = 6
+                guide_text = "💡 <b>신규상장 추천</b>: 상장 6개월 내 바닥을 다지고 1차 반등하는 새내기 성장주"
+                guide_color = "#10B981"
+                guide_bg = "rgba(16,185,129,0.08)"
+
+            text_color = "#E2E8F0" if is_dark else "#1E293B"
+            st.html(f"""
+            <div style="background: {guide_bg}; border-left: 3px solid {guide_color}; padding: 7px 10px; border-radius: 6px; margin: 6px 0 8px 0; font-size: 0.80rem; line-height: 1.4; color: {text_color};">
+                {guide_text}
+            </div>
+            """)
+
+            # 접이식 퀀트 세부 필터 & 주기 설정
+            with st.expander("⚙️ 퀀트 세부 필터 & 주기 설정", expanded=False):
+                analysis_period = st.selectbox(
+                    "⏱️ 분석 기준 주기",
+                    [
+                        "⚡ 당일 실시간 주도주 (장중 급등 탄력형)",
+                        "📈 최근 3일 수급 모멘텀 (눌림목 반등형)",
+                        "🏆 1주일 스윙 추세형 (5일선·20일선 정배열)",
+                    ],
+                    index=0,
+                    key="sb_analysis_period",
+                )
+                market_filter = st.selectbox("시장 구분", ["전체 (KOSPI + KOSDAQ)", "KOSPI", "KOSDAQ"], key="sb_market_filter")
+                min_change_rate = st.slider(
+                    "최소 당일 상승률 (%)",
+                    min_value=0.0, max_value=25.0, value=def_change, step=0.5,
+                    key="sb_slider_change_rate",
+                    help="너무 높으면 상한가 직전이라 위험하고, 3~5%가 가장 안정적인 진입점입니다."
+                )
+                new_listing_months = st.slider(
+                    "신규상장 기준 (최근 N개월)",
+                    min_value=1, max_value=24, value=def_months,
+                    key="sb_slider_listing_months"
+                )
+
+        st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
+
+        # ----------------------------------------------------
+        # 🎯 2. 사이드바 핵심 LNB 관제 메뉴 (Navigation Bar)
         # ----------------------------------------------------
         st.markdown("### 📌 레이더 관제 메뉴")
 
@@ -593,55 +670,6 @@ if st.session_state["current_page"] == "dashboard":
 
         selected_menu = st.session_state["active_nav_menu"]
         st.markdown("---")
-
-        st.markdown("### 🎯 나의 투자 스타일 (초보자 원클릭)")
-        preset_style = st.radio(
-            "원하는 투자 방식을 골라보세요",
-            [
-                "🛡️ 안정적인 스윙형 (추천)",
-                "⚡ 화끈한 급등 단타형",
-                "🚀 신규상장 턴어라운드형",
-            ],
-            index=0,
-        )
-
-        # 프리셋에 따른 기본값 및 초보자 가이드
-        if "안정적인 스윙형" in preset_style:
-            def_change = 3.0
-            def_months = 12
-            preset_guide = "💡 **추천 이유**: 외국인·기관이 매수하고 차트가 안정적인 상승 초입에 진입한 종목으로, 물릴 위험이 적고 가장 안전합니다."
-        elif "화끈한 급등 단타형" in preset_style:
-            def_change = 8.0
-            def_months = 12
-            preset_guide = "💡 **추천 이유**: 오늘 시장의 거래대금이 강하게 몰린 주도주로, 탄력이 매우 좋고 빠른 단기 수익을 노립니다."
-        else:
-            def_change = 2.0
-            def_months = 6
-            preset_guide = "💡 **추천 이유**: 최근 상장 후 충분히 바닥을 다지고 강하게 반등하는 신규 성장주를 포착합니다."
-
-        st.info(preset_guide)
-
-        st.markdown("### ⏱️ AI 데이터 분석 주기")
-        analysis_period = st.selectbox(
-            "분석 기준 주기를 선택하세요",
-            [
-                "⚡ 당일 실시간 주도주 (장중 급등 탄력형)",
-                "📈 최근 3일 수급 모멘텀 (눌림목 반등형)",
-                "🏆 1주일 스윙 추세형 (5일선·20일선 정배열)",
-            ],
-            index=0,
-            key="sb_analysis_period",
-        )
-
-        # 고급 세부 조절 (원하는 사람만 열기)
-        with st.expander("🛠️ 세부 조건 직접 조절하기", expanded=False):
-            market_filter = st.selectbox("시장 구분", ["전체 (KOSPI + KOSDAQ)", "KOSPI", "KOSDAQ"])
-            min_change_rate = st.slider(
-                "최소 당일 상승률 (%)",
-                min_value=0.0, max_value=25.0, value=def_change, step=0.5,
-                help="너무 높으면 상한가 직전이라 위험하고, 3~5%가 가장 안정적인 진입점입니다."
-            )
-            new_listing_months = st.slider("신규상장 기준 (최근 N개월)", min_value=1, max_value=24, value=def_months)
 
         st.markdown("---")
         with st.expander("💡 AI 퀀트 점수가 무엇인가요?", expanded=False):
