@@ -167,6 +167,13 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+# [SEO & AdSense Meta Tags]
+st.html("""
+<meta name="google-adsense-account" content="ca-pub-8156609455915131">
+<meta name="google-site-verification" content="KYBb0IyYsq4KuxpfnqsH25yAX0Av3cJRte-8djk_IhQ" />
+<meta name="naver-site-verification" content="c627545950ba1fd21ae3bec8c5eb1c71f0ac3db5" />
+""")
+
 # [글로벌] Streamlit Cloud Manage app 버튼, 워터마크, 푸터 즉시 완전 박멸
 st.html("""
 <style>
