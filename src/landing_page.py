@@ -143,30 +143,64 @@ def open_login_modal():
         unsafe_allow_html=True,
     )
 
-    # ⚪ Google 계정으로 계속하기 (공식 OAuth 2.0 단독 집중 배치)
+    # ⚪ Google 계정으로 계속하기 (공식 Google 브랜드 디자인 & 원클릭 연동)
+    google_login_url = None
     try:
-        from src.google_auth import get_google_auth_url
+        try:
+            from src.google_auth import get_google_auth_url
+        except ImportError:
+            from google_auth import get_google_auth_url
         google_login_url = get_google_auth_url()
-        st.link_button(
-            "🚀 Google 계정으로 1초 만에 무료 시작하기",
-            google_login_url,
-            type="primary",
-            use_container_width=True
+    except Exception:
+        google_login_url = None
+
+    if not google_login_url:
+        # 비상 기본 URL 생성
+        google_login_url = (
+            "https://accounts.google.com/o/oauth2/v2/auth"
+            "?client_id=202909040774-qq9eb278ok5tfm7jk844ns24c855tkum.apps.googleusercontent.com"
+            "&redirect_uri=https%3A%2F%2Fnstock-radar.streamlit.app"
+            "&response_type=code"
+            "&scope=openid+email+profile"
+            "&access_type=offline"
+            "&prompt=select_account"
         )
-    except Exception as e:
-        if st.button("🚀 Google 계정으로 1초 만에 무료 시작하기", key="modal_google_fallback_btn", type="primary", use_container_width=True):
-            st.session_state["is_authenticated"] = True
-            st.session_state["user_info"] = {
-                "name": "Google 투자자",
-                "email": "investor@gmail.com",
-                "provider": "Google",
-                "badge": "🔵 Google 회원",
-            }
-            st.session_state["matrix_intro_transition"] = True
-            st.session_state["current_page"] = "dashboard"
-            if hasattr(st, "query_params"):
-                st.query_params["page"] = "dashboard"
-            st.rerun()
+
+    # 100% 브라우저 호환 & 공식 Google 브랜드 디자인 원클릭 로그인 버튼
+    st.markdown(
+        f"""
+        <div style="margin: 4px 0 10px 0;">
+            <a href="{google_login_url}" target="_top" style="
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 12px;
+                background: #FFFFFF;
+                color: #1F2937 !important;
+                border: 1.5px solid #DADCE0;
+                border-radius: 12px;
+                padding: 13px 20px;
+                font-size: 1.02rem;
+                font-weight: 800;
+                text-decoration: none !important;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+                transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+                cursor: pointer;
+                width: 100%;
+                box-sizing: border-box;
+            " onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 6px 18px rgba(66,133,244,0.25)';this.style.borderColor='#4285F4';" onmouseout="this.style.transform='translateY(0)';this.style.boxShadow='0 4px 12px rgba(0,0,0,0.08)';this.style.borderColor='#DADCE0';">
+                <svg width="22" height="22" viewBox="0 0 48 48" style="flex-shrink: 0;">
+                    <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                    <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                    <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.79l7.97-6.2z"/>
+                    <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                </svg>
+                <span style="color: #1F2937 !important; font-size: 1.02rem; font-weight: 800; letter-spacing: -0.3px;">Google 계정으로 1초 만에 무료 시작하기</span>
+            </a>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
 

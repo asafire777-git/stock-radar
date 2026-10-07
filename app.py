@@ -179,7 +179,7 @@ st.html("""
 # [글로벌] Streamlit Cloud Manage app 버튼, 워터마크, 푸터 즉시 완전 박멸
 st.html("""
 <style>
-footer, footer *, [data-testid="stFooter"], #MainMenu, [data-testid="stDeployButton"], [data-testid="stDecoration"], [data-testid="stStatusWidget"], [data-testid="stStatusWidget"] *, [data-testid="stToolbarActions"], [data-testid="manage-app-button"], button[data-testid="manage-app-button"], div[class*="viewerBadge"], a[class*="viewerBadge"], span[class*="viewerBadge"], div[class*="manageApp"], button[class*="manageApp"], a[class*="manageApp"], div[class*="styles_viewerBadge"], div[class*="viewerBadge_container"], .viewerBadge_container__1QSob, .styles_viewerBadge__1A-45, .viewerBadge_link__1S137, div[class*="StatusWidget"], div[class*="FloatingBadge"], div[class*="floatingBadge"], div[class*="ProfileBadge"], div[class*="profileBadge"], div[class*="HostBadge"], div[class*="hostBadge"], div[class*="cloudBadge"], div[class*="CloudBadge"], div[class*="viewer_badge"], div[class*="manage_app"], div[class*="hostedWith"], div[class*="hosted_with"], div[data-testid="stBottom"], div[class*="stBottom"], .stApp ~ div, body > div[class*="viewerBadge"], body > div[class*="manageApp"], body > div:last-child[class*="container"], button[title*="fullscreen"], button[title*="Fullscreen"], a[href*="utm_medium=oembed"], a[href*="streamlit.app"] {
+footer, footer *, [data-testid="stFooter"], #MainMenu, [data-testid="stDeployButton"], [data-testid="stDecoration"], [data-testid="stStatusWidget"], [data-testid="stStatusWidget"] *, [data-testid="stToolbarActions"], [data-testid="manage-app-button"], button[data-testid="manage-app-button"], div[class*="viewerBadge"], a[class*="viewerBadge"], span[class*="viewerBadge"], div[class*="manageApp"], button[class*="manageApp"], a[class*="manageApp"], div[class*="styles_viewerBadge"], div[class*="viewerBadge_container"], .viewerBadge_container__1QSob, .styles_viewerBadge__1A-45, .viewerBadge_link__1S137, div[class*="StatusWidget"], div[class*="FloatingBadge"], div[class*="floatingBadge"], div[class*="ProfileBadge"], div[class*="profileBadge"], div[class*="HostBadge"], div[class*="hostBadge"], div[class*="cloudBadge"], div[class*="CloudBadge"], div[class*="viewer_badge"], div[class*="manage_app"], div[class*="hostedWith"], div[class*="hosted_with"], div[data-testid="stBottom"], div[class*="stBottom"], .stApp ~ div, body > div[class*="viewerBadge"], body > div[class*="manageApp"], body > div:last-child[class*="container"], button[title*="fullscreen"], button[title*="Fullscreen"], a[href*="utm_medium=oembed"], footer a[href*="streamlit.app"] {
     display: none !important;
     visibility: hidden !important;
     opacity: 0 !important;
@@ -202,6 +202,17 @@ div:has(> a[href*="streamlit.io"]), div:has(> a[href*="share.streamlit"]), div:h
     height: 0px !important;
     position: absolute !important;
     left: -99999px !important;
+}
+/* 링크 버튼(구글 로그인 등) 절대 숨김 방지 및 최우선 가시성 보장 */
+.stLinkButton, .stLinkButton a, div[data-testid="stLinkButton"], a[data-testid="stLinkButton"] {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    position: relative !important;
+    left: auto !important;
+    top: auto !important;
+    z-index: 10 !important;
 }
 /* 검색 및 실행 시 전체 화면 흐려짐(Dimming) 완전 방지 - 전방위 차단 */
 .stApp[data-test-script-state="running"],
