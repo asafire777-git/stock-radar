@@ -380,13 +380,28 @@ def render_admin_dashboard(is_dark: bool = False):
 
     with ga4_col2:
         direct_link = ga4_live.get("deep_link", f"https://analytics.google.com/analytics/web/#/p{saved_prop_id}/reports/realtime")
+        active_users = ga4_live.get("active_users_30m")
+        is_api_connected = ga4_live.get("api_available", False)
+
+        if is_api_connected and active_users is not None:
+            status_box_bg = "#064E3B" if is_dark else "#ECFDF5"
+            status_border = "#059669" if is_dark else "#A7F3D0"
+            status_title = "🟢 GA4 실시간 Data API 다이렉트 연동 중"
+            status_main = f"🔥 현재 실시간 접속자: {active_users}명"
+            status_sub = f"최근 30분간 활성 방문자수 실시간 집계 중 (속성 #{saved_prop_id})"
+        else:
+            status_box_bg = "#064E3B" if is_dark else "#ECFDF5"
+            status_border = "#059669" if is_dark else "#A7F3D0"
+            status_title = "🟢 구글 공식 실시간 관제 연동 완료"
+            status_main = f"속성 #{saved_prop_id} (nstock.kr)"
+            status_sub = "아래 <b>[1초 직통 버튼]</b>을 누르시면 다른 메뉴 탐색 없이 대표님 속성의 실시간 방문자 대시보드가 즉시 새 탭에 펼쳐집니다."
 
         st.html(f"""
-        <div style="background:{'#064E3B' if is_dark else '#ECFDF5'}; border:1px solid {'#059669' if is_dark else '#A7F3D0'}; border-radius:14px; padding:16px 20px; text-align:left; margin-bottom:10px;">
-            <div style="font-size:0.75rem; color:#059669; font-weight:800; margin-bottom:4px;">🟢 구글 공식 실시간 관제 연동 완료</div>
-            <div style="font-size:1.15rem; font-weight:900; color:{'#A7F3D0' if is_dark else '#065F46'};">속성 #{saved_prop_id} (nstock.kr)</div>
+        <div style="background:{status_box_bg}; border:1px solid {status_border}; border-radius:14px; padding:16px 20px; text-align:left; margin-bottom:10px;">
+            <div style="font-size:0.75rem; color:#059669; font-weight:800; margin-bottom:4px;">{status_title}</div>
+            <div style="font-size:1.15rem; font-weight:900; color:{'#A7F3D0' if is_dark else '#065F46'};">{status_main}</div>
             <div style="font-size:0.75rem; color:{'#A7F3D0' if is_dark else '#047857'}; margin-top:4px; line-height:1.4;">
-                아래 <b>[1초 직통 버튼]</b>을 누르시면 다른 메뉴 탐색 없이 대표님 속성의 실시간 방문자 대시보드가 즉시 새 탭에 펼쳐집니다.
+                {status_sub}
             </div>
         </div>
         """)
@@ -400,6 +415,8 @@ def render_admin_dashboard(is_dark: bool = False):
 
         with st.expander("🔑 [고급] 관리자 화면 내 직접 표출 (Service Account JSON 연동)", expanded=False):
             st.caption("구글 클라우드에서 발급받은 서비스 계정 JSON 키를 등록하시면, 외부 사이트 이동 없이 관리자 센터 화면 안에서 실시간 접속자 수를 바로 불러옵니다.")
+            if is_api_connected:
+                st.success("✅ 서비스 계정 JSON 키가 정상 등록되어 실시간 API가 가동 중입니다.")
             sa_json_text = st.text_area("서비스 계정 JSON 키 내용", placeholder='{"type": "service_account", ...}', height=80, key="admin_sa_json_input")
             if st.button("🔑 서비스 계정 키 등록", key="admin_save_sa_key_btn", use_container_width=True):
                 if sa_json_text.strip():

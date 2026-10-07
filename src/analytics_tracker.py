@@ -199,6 +199,62 @@ def get_ga4_realtime_metrics(property_id: str = "557310438") -> dict:
             "top_sources": []
         }
 
+    # 1. 초경량 REST API 우선 시도 (google-auth + requests, C++ 빌드 필요 없음)
+    try:
+        from google.oauth2 import service_account
+        from google.auth.transport.requests import Request
+        import requests
+
+        creds_file = GA4_SERVICE_ACCOUNT_FILE if os.path.exists(GA4_SERVICE_ACCOUNT_FILE) else os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+        if creds_file and os.path.exists(creds_file):
+            scopes = ["https://www.googleapis.com/auth/analytics.readonly"]
+            credentials = service_account.Credentials.from_service_account_file(creds_file, scopes=scopes)
+            credentials.refresh(Request())
+            token = credentials.token
+
+            url = f"https://analyticsdata.googleapis.com/v1beta/properties/{prop_id}:runRealtimeReport"
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json"
+            }
+            body = {
+                "metrics": [{"name": "activeUsers"}],
+                "dimensions": [{"name": "country"}]
+            }
+            resp = requests.post(url, headers=headers, json=body, timeout=5)
+            if resp.status_code == 200:
+                data = resp.json()
+                total_active = 0
+                for row in data.get("rows", []):
+                    vals = row.get("metricValues", [])
+                    if vals:
+                        total_active += int(vals[0].get("value", 0))
+                return {
+                    "api_available": True,
+                    "status_msg": "🟢 Google Analytics Data API 실시간 연동 정상 (REST)",
+                    "property_id": prop_id,
+                    "measurement_id": "G-GQH6DB56V0",
+                    "deep_link": deep_link,
+                    "active_users_30m": total_active,
+                    "today_pageviews": 0,
+                    "top_sources": []
+                }
+            else:
+                err_msg = resp.text[:100]
+                return {
+                    "api_available": False,
+                    "status_msg": f"⚠️ GA4 API 응답 ({resp.status_code}): {err_msg}",
+                    "property_id": prop_id,
+                    "measurement_id": "G-GQH6DB56V0",
+                    "deep_link": deep_link,
+                    "active_users_30m": None,
+                    "today_pageviews": None,
+                    "top_sources": []
+                }
+    except Exception as e_rest:
+        pass
+
+    # 2. 클라이언트 라이브러리 폴백
     try:
         from google.analytics.data_v1beta import BetaAnalyticsDataClient
         from google.analytics.data_v1beta.types import RunRealtimeReportRequest, Metric, Dimension
