@@ -35,7 +35,7 @@ try:
         fetch_top_rising_stocks,
         fetch_top_volume_stocks,
     )
-    from src.landing_page import render_landing_page
+    from src.landing_page import render_landing_page, open_login_modal
     from src.matrix_loader import render_matrix_loader
     from src.prediction_model import predictor
     from src.quant_scorer import calculate_quant_score
@@ -101,7 +101,7 @@ except ImportError:
         fetch_top_rising_stocks,
         fetch_top_volume_stocks,
     )
-    from landing_page import render_landing_page
+    from landing_page import render_landing_page, open_login_modal
     from matrix_loader import render_matrix_loader
     from prediction_model import predictor
     from quant_scorer import calculate_quant_score
@@ -558,6 +558,32 @@ elif st.session_state.get("current_page") == "intro":
 is_dark = (st.session_state.get("theme_mode", "light") == "dark")
 
 
+def is_google_authenticated() -> bool:
+    """사용자가 구글 계정으로 공식 로그인한 상태인지 확인"""
+    if not st.session_state.get("is_authenticated", False):
+        return False
+    user_info = st.session_state.get("user_info") or {}
+    return user_info.get("provider") == "Google"
+
+
+def get_diagnosis_quota_status() -> tuple[bool, int]:
+    """
+    구글 정회원은 무제한(True, 999), 비회원은 1일 3회 제한
+    반환값: (진단_가능_여부, 잔여_횟수)
+    """
+    if is_google_authenticated():
+        return True, 999
+    used = st.session_state.get("guest_diagnosis_count", 0)
+    remaining = max(0, 3 - used)
+    return remaining > 0, remaining
+
+
+def record_diagnosis_usage():
+    """진단 실행 시 카운트 증가 (비회원인 경우에만)"""
+    if not is_google_authenticated():
+        st.session_state["guest_diagnosis_count"] = st.session_state.get("guest_diagnosis_count", 0) + 1
+
+
 # ----------------------------------------------------
 # 2. 사이드바 (대시보드 페이지에서만 렌더링)
 # ----------------------------------------------------
@@ -585,6 +611,12 @@ if st.session_state["current_page"] == "dashboard":
                     <span class="badge-pill notranslate" translate="no" style="padding: 2px 8px; font-size: 0.72rem; margin-bottom: 0;">{u_badge}</span>
                 </div>"""
             )
+
+            # 비회원인 경우 구글 정회원 무료 해금 버튼 제공
+            if not is_google_authenticated():
+                if st.button("🔑 구글 정회원 무료 전환 (4대 혜택)", type="primary", key="sb_upgrade_btn", use_container_width=True):
+                    open_login_modal()
+
             col_sb1, col_sb2 = st.columns(2)
             with col_sb1:
                 if st.button("🏠 홈으로", key="sb_btn_home", use_container_width=True):
@@ -3160,8 +3192,29 @@ div[data-testid="stFormSubmitButton"] button:not([kind*="primary"]):hover * {{
     -webkit-text-fill-color: #000000 !important;
     font-weight: 900 !important;
 }}
-</style>
-<div style="background:{'#151A23' if is_dark else '#FFFFFF'}; border:2px solid {'#38BDF8' if is_dark else '#2563EB'}; border-radius:12px; padding:16px 20px; margin-bottom:14px; box-shadow:0 4px 14px rgba(37,99,235,0.12);">
+</style>"""
+    )
+
+    can_diag, rem_diag = get_diagnosis_quota_status()
+    is_google = is_google_authenticated()
+
+    # 상단 정회원 혜택 및 비회원 진단 횟수 잔여 표시
+    if is_google:
+        quota_html = """
+        <div style="font-size:0.85rem; color:#059669; font-weight:800; display:flex; align-items:center; gap:6px; margin-top:6px;">
+            <span>✨ 🔵 <b>Google 정회원</b>: 2,870개 전종목 실시간 AI 정밀 진단 무제한 활성화</span>
+        </div>
+        """
+    else:
+        quota_html = f"""
+        <div style="font-size:0.84rem; color:#2563EB; font-weight:700; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px; margin-top:6px;">
+            <div>💡 <b>비회원 체험 모드</b>: 오늘 무료 정밀진단 잔여 <b style="color:#DC2626; font-size:0.95rem;">{rem_diag} / 3회</b></div>
+            <div style="font-size:0.80rem; color:#64748B;">구글 로그인 시 평생 무제한 무료 진단</div>
+        </div>
+        """
+
+    st.html(
+        f"""<div style="background:{'#151A23' if is_dark else '#FFFFFF'}; border:2px solid {'#38BDF8' if is_dark else '#2563EB'}; border-radius:12px; padding:16px 20px; margin-bottom:14px; box-shadow:0 4px 14px rgba(37,99,235,0.12);">
             <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
                 <div>
                     <span style="font-size:1.25rem; font-weight:900; color:{'#F8FAFC' if is_dark else '#0F172A'};">🔍 국내·해외 통합 프리미엄 AI 즉시 검색기</span>
@@ -3171,6 +3224,7 @@ div[data-testid="stFormSubmitButton"] button:not([kind*="primary"]):hover * {{
                     ⚡ 종목명이나 티커 입력 후 <b>Enter</b>를 누르면 즉시 AI 정밀 진단이 실행됩니다
                 </div>
             </div>
+            {quota_html}
         </div>"""
     )
 
@@ -3193,25 +3247,32 @@ div[data-testid="stFormSubmitButton"] button:not([kind*="primary"]):hover * {{
         st.session_state["diagnosed_stock"] = None
         st.session_state["search_query_buffer"] = ""
         st.session_state["related_search_matches"] = []
+        st.session_state["search_quota_locked"] = False
         st.rerun(scope="fragment")
 
     if btn_search and query_text:
-        matches = resolve_stock_search(query_text, all_stocks_df, code_map)
-        if matches:
-            st.session_state["diagnosed_stock"] = matches[0]
-            st.session_state["related_search_matches"] = matches[1:7]
-            st.session_state["search_query_buffer"] = query_text
-            try:
-                m0 = matches[0]
-                log_search_event(query_text, m0.get("name", query_text), m0.get("code", ""), m0.get("market", "KOSPI"), "search_bar")
-            except Exception:
-                pass
+        if not can_diag:
+            st.session_state["search_quota_locked"] = True
+            st.rerun(scope="fragment")
         else:
-            try:
-                log_search_event(query_text, query_text, "", "UNKNOWN", "search_bar")
-            except Exception:
-                pass
-            st.warning(f"'{query_text}'에 해당하는 상장 종목을 찾지 못했습니다. 국내 종목명, 6자리 코드 또는 미국 주식 티커/한글명을 확인해 주세요.")
+            st.session_state["search_quota_locked"] = False
+            matches = resolve_stock_search(query_text, all_stocks_df, code_map)
+            if matches:
+                record_diagnosis_usage()
+                st.session_state["diagnosed_stock"] = matches[0]
+                st.session_state["related_search_matches"] = matches[1:7]
+                st.session_state["search_query_buffer"] = query_text
+                try:
+                    m0 = matches[0]
+                    log_search_event(query_text, m0.get("name", query_text), m0.get("code", ""), m0.get("market", "KOSPI"), "search_bar")
+                except Exception:
+                    pass
+            else:
+                try:
+                    log_search_event(query_text, query_text, "", "UNKNOWN", "search_bar")
+                except Exception:
+                    pass
+                st.warning(f"'{query_text}'에 해당하는 상장 종목을 찾지 못했습니다. 국내 종목명, 6자리 코드 또는 미국 주식 티커/한글명을 확인해 주세요.")
 
     # 인기 검색어 칩 (국내 핵심 주도주 + 해외 대표 슈퍼스타)
     chips = ["비츠로테크", "삼성전자", "테슬라", "엔비디아", "팔란티어", "아이온큐", "레딧"]
@@ -3219,17 +3280,23 @@ div[data-testid="stFormSubmitButton"] button:not([kind*="primary"]):hover * {{
     for i, chip in enumerate(chips):
         with chip_cols[i]:
             if st.button(f"#{chip}", key=f"chip_btn_{chip}", use_container_width=True):
-                matches = resolve_stock_search(chip, all_stocks_df, code_map)
-                if matches:
-                    st.session_state["diagnosed_stock"] = matches[0]
-                    st.session_state["related_search_matches"] = matches[1:7]
-                    st.session_state["search_query_buffer"] = chip
-                    try:
-                        m0 = matches[0]
-                        log_search_event(chip, m0.get("name", chip), m0.get("code", ""), m0.get("market", "KOSPI"), "quick_chip")
-                    except Exception:
-                        pass
+                if not can_diag:
+                    st.session_state["search_quota_locked"] = True
                     st.rerun(scope="fragment")
+                else:
+                    st.session_state["search_quota_locked"] = False
+                    matches = resolve_stock_search(chip, all_stocks_df, code_map)
+                    if matches:
+                        record_diagnosis_usage()
+                        st.session_state["diagnosed_stock"] = matches[0]
+                        st.session_state["related_search_matches"] = matches[1:7]
+                        st.session_state["search_query_buffer"] = chip
+                        try:
+                            m0 = matches[0]
+                            log_search_event(chip, m0.get("name", chip), m0.get("code", ""), m0.get("market", "KOSPI"), "quick_chip")
+                        except Exception:
+                            pass
+                        st.rerun(scope="fragment")
 
     # 연관 종목 바로가기 칩 (복수 매칭 시)
     related = st.session_state.get("related_search_matches", [])
@@ -3241,9 +3308,34 @@ div[data-testid="stFormSubmitButton"] button:not([kind*="primary"]):hover * {{
                 mkt_tag = r_item.get("market", "")
                 tag_str = f" · {mkt_tag}" if mkt_tag else ""
                 if st.button(f"👉 {r_item['name']} ({r_item['code']}){tag_str}", key=f"btn_rel_{r_item['code']}", use_container_width=True):
-                    st.session_state["diagnosed_stock"] = r_item
-                    st.session_state["search_query_buffer"] = r_item["name"]
-                    st.rerun(scope="fragment")
+                    if not can_diag:
+                        st.session_state["search_quota_locked"] = True
+                        st.rerun(scope="fragment")
+                    else:
+                        st.session_state["search_quota_locked"] = False
+                        record_diagnosis_usage()
+                        st.session_state["diagnosed_stock"] = r_item
+                        st.session_state["search_query_buffer"] = r_item["name"]
+                        st.rerun(scope="fragment")
+
+    # 비회원 3회 한도 초과 시 안내 카드 렌더링
+    if st.session_state.get("search_quota_locked", False) and not is_google:
+        st.html(
+            f"""<div style="background:{'#1E293B' if is_dark else '#FEF2F2'}; border:2px solid #EF4444; border-radius:14px; padding:22px 20px; text-align:center; margin:16px 0; box-shadow:0 4px 14px rgba(239,68,68,0.15);">
+                <div style="font-size:1.8rem; margin-bottom:6px;">🔒</div>
+                <div style="font-size:1.15rem; font-weight:900; color:#DC2626; margin-bottom:6px;">
+                    오늘 비회원 무료 AI 정밀진단 한도(3회)를 모두 사용하셨습니다
+                </div>
+                <div style="font-size:0.9rem; color:{'#CBD5E1' if is_dark else '#475569'}; line-height:1.6; margin-bottom:14px;">
+                    구글 계정으로 1초 만에 무료 정회원 등록하시면<br/>
+                    <b>2,870개 전종목 실시간 AI 입체 수급 분석 및 목표가를 평생 무제한</b>으로 확인하실 수 있습니다.
+                </div>
+            </div>"""
+        )
+        col_sq1, col_sq2, col_sq3 = st.columns([1, 2, 1])
+        with col_sq2:
+            if st.button("🚀 Google 계정으로 1초 만에 무료 해금하기", key="quota_unlock_btn_search", type="primary", use_container_width=True):
+                open_login_modal()
 
     # 진단 종목 렌더링
     active_diag = st.session_state.get("diagnosed_stock")
@@ -3448,75 +3540,132 @@ def render_ai_picks_tab(candidates, preset_style, is_dark):
 
         st.markdown("---")
         st.markdown("#### ⭐ 오늘의 추천 TOP 2~5 상세 분석 & 매매 가이드")
+        is_google = is_google_authenticated()
 
         for _, r in df_ai.iloc[1:5].iterrows():
             r_code = str(r['code'])
             r_target = int(r['price'] * 1.06)
             r_stop = int(r['price'] * 0.97)
+            r_rank = int(r['rank'])
+            is_locked = (r_rank >= 4) and (not is_google)
 
-            with st.container():
-                st.html(
-                    f"""<div class="recommend-card">
-                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-                            <div>
-                                <span class="stock-title">#{r['rank']} {r['name']}</span>
-                                <span class="stock-meta">({r_code} / {r['market']})</span>
-                                <span style="margin-left:10px; font-weight:bold; color:{'#EF4444' if r['change_rate'] > 0 else '#3B82F6'}; font-size:1.15rem;">
-                                    {r['price']:,}원 ({r['change_rate']:+.2f}%)
-                                </span>
-                            </div>
-                            <div>
-                                <span style="background:{'#DC2626' if r['grade']=='S' else '#EA580C' if r['grade']=='A' else '#2563EB'}; color:white; padding:4px 10px; border-radius:6px; font-weight:bold; font-size:0.9rem;">
-                                    등급: {r['grade']} ({r['total_score']}점)
-                                </span>
-                                <span style="background:#059669; color:white; padding:4px 10px; border-radius:6px; font-weight:bold; font-size:0.9rem; margin-left:6px;">
-                                    상승확률: {r['upside_prob']}%
-                                </span>
-                            </div>
-                        </div>
-                        <div style="margin-top:8px;">
-                            <span class="signal-desc">📌 <b>포착 신호:</b> {r['signals']}</span>
-                        </div>
-                    </div>"""
-                )
-
-                with st.expander(f"🔰 [추천 #{r['rank']}] {r['name']} ({r_code}) - 초보자 실전 매매 가이드 & 캔들 차트 펼치기", expanded=False):
-                    col_rg1, col_rg2 = st.columns([1.1, 1.9])
-                    r_ohlcv = load_stock_chart(r_code, days=60)
-                    r_ohlcv_ind = compute_technical_indicators(r_ohlcv) if not r_ohlcv.empty else pd.DataFrame()
-                    r_inv = load_stock_investors(r_code)
-
-                    with col_rg1:
-                        f_val = r_inv['foreign'].tail(5).sum() if not r_inv.empty and 'foreign' in r_inv.columns else 0.0
-                        org_val = r_inv['institution'].tail(5).sum() if not r_inv.empty and 'institution' in r_inv.columns else 0.0
-
-                        st.html(
-                            f"""<div style="background:{'#1E293B' if is_dark else '#F8FAFC'}; border:1px solid {'#334155' if is_dark else '#E2E8F0'}; border-radius:10px; padding:14px; font-size:0.9rem; line-height:1.6;">
-                                <div style="font-weight:800; color:{'#38BDF8' if is_dark else '#1D4ED8'}; margin-bottom:8px;">🎯 {r['name']} 초보자 실전 매매 가이드</div>
-                                <div style="margin-bottom:6px;">• <b>1차 목표가:</b> <span style="color:#EF4444; font-weight:bold;">{r_target:,}원 (+6.0%)</span></div>
-                                <div style="margin-bottom:6px;">• <b>권장 손절선:</b> <span style="color:#3B82F6; font-weight:bold;">{r_stop:,}원 (-3.0%)</span></div>
-                                <div style="margin-bottom:6px;">• <b>최근 5일 큰손 수급:</b> 외인 <span style="color:{'#EF4444' if f_val>0 else '#3B82F6'}; font-weight:bold;">{f_val:+.1f}억</span> / 기관 <span style="color:{'#EF4444' if org_val>0 else '#3B82F6'}; font-weight:bold;">{org_val:+.1f}억</span></div>
-                                <div style="margin-top:8px; padding-top:8px; border-top:1px dashed {'#475569' if is_dark else '#CBD5E1'}; color:{'#CBD5E1' if is_dark else '#475569'};">
-                                    💡 <b>AI 포착 신호:</b> {r['signals']}<br>
-                                    📌 <b>핵심 추천 사유:</b> {r['reasons']}
+            if is_locked:
+                with st.container():
+                    st.html(
+                        f"""<div class="recommend-card">
+                            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                                <div>
+                                    <span class="stock-title">#{r_rank} {r['name']}</span>
+                                    <span class="stock-meta">({r_code} / {r['market']})</span>
+                                    <span style="margin-left:10px; font-weight:bold; color:{'#EF4444' if r['change_rate'] > 0 else '#3B82F6'}; font-size:1.15rem;">
+                                        {r['price']:,}원 ({r['change_rate']:+.2f}%)
+                                    </span>
                                 </div>
-                            </div>"""
-                        )
+                                <div>
+                                    <span style="background:#64748B; color:white; padding:4px 10px; border-radius:6px; font-weight:bold; font-size:0.9rem;">
+                                        등급: 🔒 정회원
+                                    </span>
+                                    <span style="background:#475569; color:white; padding:4px 10px; border-radius:6px; font-weight:bold; font-size:0.9rem; margin-left:6px;">
+                                        상승확률: 🔒 정회원
+                                    </span>
+                                </div>
+                            </div>
+                            <div style="margin-top:8px;">
+                                <span class="signal-desc">📌 <b>포착 신호:</b> <span style="filter: blur(4px); user-select: none;">외인 기관 동시 순매수 유입 급등 신호 포착</span> <b style="color:#2563EB;">(🔒 구글 1초 로그인 시 즉시 확인)</b></span>
+                            </div>
+                        </div>"""
+                    )
 
-                        if not r_inv.empty:
-                            st.html("<div style='font-size:0.9rem; font-weight:700; margin-top:10px; margin-bottom:4px;'>👥 최근 5거래일 외국인·기관 순매수 현황</div>")
-                            display_investor_table(r_inv, 5)
+                    st.html(
+                        f"""<div style="background:{'#1E293B' if is_dark else '#EFF6FF'}; border:1.5px dashed {'#38BDF8' if is_dark else '#3B82F6'}; border-radius:10px; padding:12px 16px; margin: 8px 0; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                            <div>
+                                <span style="font-weight:800; color:{'#38BDF8' if is_dark else '#1D4ED8'}; font-size:0.92rem;">🔒 #{r_rank} {r['name']} 1차 목표가(+6%) & 손절가(-3%) 비공개</span>
+                                <div style="font-size:0.80rem; color:{'#94A3B8' if is_dark else '#64748B'};">1~3위는 무료 전체 공개, 4위 이하는 구글 정회원 무료 등록 시 전면 해금됩니다.</div>
+                            </div>
+                        </div>"""
+                    )
+                    if st.button(f"🔑 #{r_rank} {r['name']} 목표가 1초 무료 확인하기", key=f"unlock_top_{r_rank}_{r_code}", use_container_width=True):
+                        open_login_modal()
 
-                    with col_rg2:
-                        if not r_ohlcv_ind.empty and len(r_ohlcv_ind) >= 10:
-                            st.plotly_chart(
-                                render_stock_mini_chart(r_ohlcv_ind, r['name'], is_dark),
-                                use_container_width=True,
-                                key=f"chart_top_{r['rank']}_{r_code}",
-                                config={"scrollZoom": False, "displayModeBar": False, "showTips": False, "doubleClick": False, "responsive": True},
+                    with st.expander(f"🔒 [추천 #{r_rank}] {r['name']} ({r_code}) - 목표가 및 정밀 캔들 차트 (정회원 전용)", expanded=False):
+                        st.html(f"""
+                            <div style="background:{'#1E293B' if is_dark else '#F8FAFC'}; border:1.5px solid {'#334155' if is_dark else '#E2E8F0'}; border-radius:10px; padding:20px; text-align:center;">
+                                <div style="font-size:1.6rem; margin-bottom:6px;">🔒</div>
+                                <div style="font-weight:800; color:{'#38BDF8' if is_dark else '#1D4ED8'}; font-size:1.02rem; margin-bottom:6px;">
+                                    #{r_rank} {r['name']} 초보자 실전 매매 가이드 & 캔들 차트 잠금
+                                </div>
+                                <div style="font-size:0.86rem; color:{'#94A3B8' if is_dark else '#64748B'}; line-height:1.6; margin-bottom:12px;">
+                                    구글 계정으로 1초 만에 무료 정회원 등록하시면<br/>
+                                    <b>#{r_rank} {r['name']} 적정 매도가와 외인·기관 실시간 수급</b>을 즉시 무료로 확인하실 수 있습니다.
+                                </div>
+                            </div>
+                        """)
+                        if st.button(f"🚀 Google 계정으로 1초 만에 무료 해금", key=f"unlock_exp_{r_rank}_{r_code}", type="primary", use_container_width=True):
+                            open_login_modal()
+            else:
+                with st.container():
+                    st.html(
+                        f"""<div class="recommend-card">
+                            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                                <div>
+                                    <span class="stock-title">#{r['rank']} {r['name']}</span>
+                                    <span class="stock-meta">({r_code} / {r['market']})</span>
+                                    <span style="margin-left:10px; font-weight:bold; color:{'#EF4444' if r['change_rate'] > 0 else '#3B82F6'}; font-size:1.15rem;">
+                                        {r['price']:,}원 ({r['change_rate']:+.2f}%)
+                                    </span>
+                                </div>
+                                <div>
+                                    <span style="background:{'#DC2626' if r['grade']=='S' else '#EA580C' if r['grade']=='A' else '#2563EB'}; color:white; padding:4px 10px; border-radius:6px; font-weight:bold; font-size:0.9rem;">
+                                        등급: {r['grade']} ({r['total_score']}점)
+                                    </span>
+                                    <span style="background:#059669; color:white; padding:4px 10px; border-radius:6px; font-weight:bold; font-size:0.9rem; margin-left:6px;">
+                                        상승확률: {r['upside_prob']}%
+                                    </span>
+                                </div>
+                            </div>
+                            <div style="margin-top:8px;">
+                                <span class="signal-desc">📌 <b>포착 신호:</b> {r['signals']}</span>
+                            </div>
+                        </div>"""
+                    )
+
+                    with st.expander(f"🔰 [추천 #{r['rank']}] {r['name']} ({r_code}) - 초보자 실전 매매 가이드 & 캔들 차트 펼치기", expanded=False):
+                        col_rg1, col_rg2 = st.columns([1.1, 1.9])
+                        r_ohlcv = load_stock_chart(r_code, days=60)
+                        r_ohlcv_ind = compute_technical_indicators(r_ohlcv) if not r_ohlcv.empty else pd.DataFrame()
+                        r_inv = load_stock_investors(r_code)
+
+                        with col_rg1:
+                            f_val = r_inv['foreign'].tail(5).sum() if not r_inv.empty and 'foreign' in r_inv.columns else 0.0
+                            org_val = r_inv['institution'].tail(5).sum() if not r_inv.empty and 'institution' in r_inv.columns else 0.0
+
+                            st.html(
+                                f"""<div style="background:{'#1E293B' if is_dark else '#F8FAFC'}; border:1px solid {'#334155' if is_dark else '#E2E8F0'}; border-radius:10px; padding:14px; font-size:0.9rem; line-height:1.6;">
+                                    <div style="font-weight:800; color:{'#38BDF8' if is_dark else '#1D4ED8'}; margin-bottom:8px;">🎯 {r['name']} 초보자 실전 매매 가이드</div>
+                                    <div style="margin-bottom:6px;">• <b>1차 목표가:</b> <span style="color:#EF4444; font-weight:bold;">{r_target:,}원 (+6.0%)</span></div>
+                                    <div style="margin-bottom:6px;">• <b>권장 손절선:</b> <span style="color:#3B82F6; font-weight:bold;">{r_stop:,}원 (-3.0%)</span></div>
+                                    <div style="margin-bottom:6px;">• <b>최근 5일 큰손 수급:</b> 외인 <span style="color:{'#EF4444' if f_val>0 else '#3B82F6'}; font-weight:bold;">{f_val:+.1f}억</span> / 기관 <span style="color:{'#EF4444' if org_val>0 else '#3B82F6'}; font-weight:bold;">{org_val:+.1f}억</span></div>
+                                    <div style="margin-top:8px; padding-top:8px; border-top:1px dashed {'#475569' if is_dark else '#CBD5E1'}; color:{'#CBD5E1' if is_dark else '#475569'};">
+                                        💡 <b>AI 포착 신호:</b> {r['signals']}<br>
+                                        📌 <b>핵심 추천 사유:</b> {r['reasons']}
+                                    </div>
+                                </div>"""
                             )
-                        else:
-                            st.caption("차트 데이터를 불러오는 중입니다.")
+
+                            if not r_inv.empty:
+                                st.html("<div style='font-size:0.9rem; font-weight:700; margin-top:10px; margin-bottom:4px;'>👥 최근 5거래일 외국인·기관 순매수 현황</div>")
+                                display_investor_table(r_inv, 5)
+
+                        with col_rg2:
+                            if not r_ohlcv_ind.empty and len(r_ohlcv_ind) >= 10:
+                                st.plotly_chart(
+                                    render_stock_mini_chart(r_ohlcv_ind, r['name'], is_dark),
+                                    use_container_width=True,
+                                    key=f"chart_top_{r['rank']}_{r_code}",
+                                    config={"scrollZoom": False, "displayModeBar": False, "showTips": False, "doubleClick": False, "responsive": True},
+                                )
+                            else:
+                                st.caption("차트 데이터를 불러오는 중입니다.")
 
 
         st.markdown("#### 📋 AI 추천 전체 순위표 (TOP 20)")
@@ -3528,7 +3677,31 @@ def render_ai_picks_tab(candidates, preset_style, is_dark):
             "순위", "종목코드", "종목명", "시장", "현재가(원)", "등락률(%)",
             "AI등급", "종합점수", "5일 상승확률", "예측방향", "핵심 포착신호"
         ]
+
+        if not is_google:
+            # 4위 이하 종목 잠금 마스킹
+            display_df.loc[display_df["순위"] >= 4, "AI등급"] = "🔒"
+            display_df.loc[display_df["순위"] >= 4, "종합점수"] = "🔒"
+            display_df.loc[display_df["순위"] >= 4, "5일 상승확률"] = "🔒 정회원 전용"
+            display_df.loc[display_df["순위"] >= 4, "예측방향"] = "🔒 정회원 전용"
+            display_df.loc[display_df["순위"] >= 4, "핵심 포착신호"] = "🔒 구글 1초 로그인 시 100% 무료 해금"
+
+            st.html(
+                f"""<div style="background:{'#1E293B' if is_dark else '#EFF6FF'}; border:1.5px solid {'#38BDF8' if is_dark else '#3B82F6'}; border-radius:10px; padding:12px 18px; margin: 10px 0; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                    <div>
+                        <span style="font-weight:900; color:{'#38BDF8' if is_dark else '#1D4ED8'}; font-size:0.95rem;">🔒 4위~20위 AI 퀀트 시그널 잠금 안내</span>
+                        <span style="font-size:0.82rem; color:{'#94A3B8' if is_dark else '#64748B'}; margin-left:8px;">(1~3위는 무료 전체 공개, 4위 이하는 구글 정회원 무료 등록 시 전면 해금)</span>
+                    </div>
+                </div>"""
+            )
+
         st.dataframe(display_df, use_container_width=True, hide_index=True)
+
+        if not is_google:
+            col_tbl1, col_tbl2, col_tbl3 = st.columns([1, 2, 1])
+            with col_tbl2:
+                if st.button("🚀 Google 계정으로 1초 만에 4위~20위 전체 목표가 무료 해금", key="unlock_table_btn", type="primary", use_container_width=True):
+                    open_login_modal()
     else:
         st.info("현재 분석 가능한 추천 종목을 불러오는 중입니다...")
 
@@ -4080,6 +4253,23 @@ def render_diagnosis_tab_view(all_stocks_df, code_map, is_dark):
         # 0. AI 종합 진단실 프리미엄 안내 배너
         st.html(render_clinic_banner_html(is_dark))
 
+        can_diag_t4, rem_diag_t4 = get_diagnosis_quota_status()
+        is_google_t4 = is_google_authenticated()
+
+        if is_google_t4:
+            st.html(
+                f"""<div style="background:{'#064E3B' if is_dark else '#ECFDF5'}; border:1px solid #10B981; border-radius:8px; padding:8px 14px; margin-bottom:12px; font-size:0.85rem; color:{'#6EE7B7' if is_dark else '#065F46'}; font-weight:800;">
+                    ✨ 🔵 <b>Google 정회원 활성화</b>: 2,870개 전종목 실시간 1초 종합 정밀 진단 무제한 무료 이용 중
+                </div>"""
+            )
+        else:
+            st.html(
+                f"""<div style="background:{'#1E293B' if is_dark else '#EFF6FF'}; border:1px solid #3B82F6; border-radius:8px; padding:8px 14px; margin-bottom:12px; font-size:0.84rem; color:{'#93C5FD' if is_dark else '#1E40AF'}; font-weight:700; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
+                    <div>💡 <b>비회원 체험 모드</b>: 오늘 무료 정밀 진단 잔여 <b style="color:#DC2626; font-size:0.95rem;">{rem_diag_t4} / 3회</b></div>
+                    <div style="font-size:0.80rem; color:{'#94A3B8' if is_dark else '#64748B'};">구글 계정 1초 로그인 시 평생 무제한 무료</div>
+                </div>"""
+            )
+
         # 기본 진단 종목 결정
         default_stock = st.session_state.get("t4_diagnosed_stock")
         if not default_stock:
@@ -4114,50 +4304,77 @@ def render_diagnosis_tab_view(all_stocks_df, code_map, is_dark):
             st.session_state["t4_search_buffer"] = ""
             st.session_state["t4_related_matches"] = []
             st.session_state["t4_active_theme"] = None
+            st.session_state["t4_quota_locked"] = False
             st.rerun(scope="fragment")
 
         if btn_t4_search and t4_query:
-            t4_q = t4_query.strip()
-            # 1. 개별 종목 검색을 최우선 시도 (완전 일치 / 접두사 일치)
-            matches = resolve_stock_search(t4_q, all_stocks_df, code_map)
-
-            # 2. 검색어가 테마명/키워드 자체인지 확인
-            t_key, t_info = find_theme_by_query(t4_q, code_map)
-            is_pure_theme = (t_info is not None) and (t4_q not in code_map) and not (matches and matches[0]["name"] == t4_q)
-
-            if is_pure_theme:
-                # 사용자가 '2차전지', '반도체', '원전' 등 순수 테마를 입력한 경우
-                st.session_state["t4_active_theme"] = t_info
-                theme_stocks = t_info.get("stocks", [])
-                if theme_stocks:
-                    st.session_state["t4_diagnosed_stock"] = {"code": theme_stocks[0]["code"], "name": theme_stocks[0]["name"], "market": theme_stocks[0].get("market", "KRX")}
-                    st.session_state["t4_related_matches"] = theme_stocks[1:]
-                st.session_state["t4_search_buffer"] = t4_q
-                try:
-                    log_search_event(t4_q, f"{t4_q} (테마)", "THEME", "THEME", "1sec_diagnosis")
-                except Exception:
-                    pass
-                st.rerun(scope="fragment")
-            elif matches:
-                # 개별 종목 검색 매칭 성공 (예: '삼천당제약' 입력 시 삼천당제약 확정!)
-                st.session_state["t4_diagnosed_stock"] = matches[0]
-                st.session_state["t4_related_matches"] = matches[1:7]
-                st.session_state["t4_search_buffer"] = matches[0]["name"]
-                # 해당 종목이 속한 주도 테마가 있다면 대장주 매트릭스도 함께 연동
-                _, stock_theme = find_theme_of_stock(matches[0]["code"], matches[0]["name"])
-                st.session_state["t4_active_theme"] = stock_theme
-                try:
-                    m0 = matches[0]
-                    log_search_event(t4_q, m0.get("name", t4_q), m0.get("code", ""), m0.get("market", "KOSPI"), "1sec_diagnosis")
-                except Exception:
-                    pass
+            if not can_diag_t4:
+                st.session_state["t4_quota_locked"] = True
                 st.rerun(scope="fragment")
             else:
-                try:
-                    log_search_event(t4_q, t4_q, "", "UNKNOWN", "1sec_diagnosis")
-                except Exception:
-                    pass
-                st.warning(f"'{t4_q}'에 해당하는 상장 종목 또는 업종/테마를 찾지 못했습니다. '2차전지', '반도체', '원전', '로봇', '방산' 등의 업종명 또는 종목명을 확인해 주세요.")
+                st.session_state["t4_quota_locked"] = False
+                t4_q = t4_query.strip()
+                # 1. 개별 종목 검색을 최우선 시도 (완전 일치 / 접두사 일치)
+                matches = resolve_stock_search(t4_q, all_stocks_df, code_map)
+
+                # 2. 검색어가 테마명/키워드 자체인지 확인
+                t_key, t_info = find_theme_by_query(t4_q, code_map)
+                is_pure_theme = (t_info is not None) and (t4_q not in code_map) and not (matches and matches[0]["name"] == t4_q)
+
+                if is_pure_theme:
+                    record_diagnosis_usage()
+                    # 사용자가 '2차전지', '반도체', '원전' 등 순수 테마를 입력한 경우
+                    st.session_state["t4_active_theme"] = t_info
+                    theme_stocks = t_info.get("stocks", [])
+                    if theme_stocks:
+                        st.session_state["t4_diagnosed_stock"] = {"code": theme_stocks[0]["code"], "name": theme_stocks[0]["name"], "market": theme_stocks[0].get("market", "KRX")}
+                        st.session_state["t4_related_matches"] = theme_stocks[1:]
+                    st.session_state["t4_search_buffer"] = t4_q
+                    try:
+                        log_search_event(t4_q, f"{t4_q} (테마)", "THEME", "THEME", "1sec_diagnosis")
+                    except Exception:
+                        pass
+                    st.rerun(scope="fragment")
+                elif matches:
+                    record_diagnosis_usage()
+                    # 개별 종목 검색 매칭 성공 (예: '삼천당제약' 입력 시 삼천당제약 확정!)
+                    st.session_state["t4_diagnosed_stock"] = matches[0]
+                    st.session_state["t4_related_matches"] = matches[1:7]
+                    st.session_state["t4_search_buffer"] = matches[0]["name"]
+                    # 해당 종목이 속한 주도 테마가 있다면 대장주 매트릭스도 함께 연동
+                    _, stock_theme = find_theme_of_stock(matches[0]["code"], matches[0]["name"])
+                    st.session_state["t4_active_theme"] = stock_theme
+                    try:
+                        m0 = matches[0]
+                        log_search_event(t4_q, m0.get("name", t4_q), m0.get("code", ""), m0.get("market", "KOSPI"), "1sec_diagnosis")
+                    except Exception:
+                        pass
+                    st.rerun(scope="fragment")
+                else:
+                    try:
+                        log_search_event(t4_q, t4_q, "", "UNKNOWN", "1sec_diagnosis")
+                    except Exception:
+                        pass
+                    st.warning(f"'{t4_q}'에 해당하는 상장 종목 또는 업종/테마를 찾지 못했습니다. '2차전지', '반도체', '원전', '로봇', '방산' 등의 업종명 또는 종목명을 확인해 주세요.")
+
+        # 3회 한도 초과 시 잠금 카드
+        if st.session_state.get("t4_quota_locked", False) and not is_google_t4:
+            st.html(
+                f"""<div style="background:{'#1E293B' if is_dark else '#FEF2F2'}; border:2px solid #EF4444; border-radius:14px; padding:22px 20px; text-align:center; margin:14px 0; box-shadow:0 4px 14px rgba(239,68,68,0.15);">
+                    <div style="font-size:1.8rem; margin-bottom:6px;">🔒</div>
+                    <div style="font-size:1.15rem; font-weight:900; color:#DC2626; margin-bottom:6px;">
+                        오늘 비회원 무료 AI 정밀진단 한도(3회)를 모두 사용하셨습니다
+                    </div>
+                    <div style="font-size:0.9rem; color:{'#CBD5E1' if is_dark else '#475569'}; line-height:1.6; margin-bottom:14px;">
+                        구글 계정으로 1초 만에 무료 정회원 등록하시면<br/>
+                        <b>2,870개 전종목 실시간 AI 입체 수급 분석 및 목표가를 평생 무제한</b>으로 확인하실 수 있습니다.
+                    </div>
+                </div>"""
+            )
+            col_t4_q1, col_t4_q2, col_t4_q3 = st.columns([1, 2, 1])
+            with col_t4_q2:
+                if st.button("🚀 Google 계정으로 1초 만에 무료 해금하기", key="quota_unlock_btn_t4", type="primary", use_container_width=True):
+                    open_login_modal()
 
         # 2. 10대 핵심 주도 섹터 퀵 필터 칩 (원클릭 레이더)
         st.markdown(
