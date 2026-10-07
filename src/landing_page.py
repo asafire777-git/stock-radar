@@ -108,65 +108,59 @@ def create_showcase_figure(pattern_type: str = "breakout", is_dark: bool = True)
     return fig
 
 
-@st.dialog("🔐 Stock Radar AI 퀀트 멤버십 로그인")
+@st.dialog("🔐 N-Stock 정회원 멤버십 로그인")
 def open_login_modal():
     """
-    카카오, 구글, 게스트 소셜 간편 로그인 팝업 모달
-    아우라와 명확히 차별화된 퀀트 금융 투자자 멤버십 브랜딩
+    공식 Google OAuth 2.0 1초 원클릭 로그인 및 4대 정회원 독점 혜택 안내 모달
     """
     st.markdown(
         """
-        <div style="text-align: center; margin-bottom: 18px;">
-            <div class="badge-pill notranslate" translate="no" style="font-size: 0.8rem; margin-bottom: 8px;">
-                📈 VIP QUANT INTELLIGENCE
+        <div style="text-align: center; margin-bottom: 14px;">
+            <div class="badge-pill notranslate" translate="no" style="font-size: 0.78rem; margin-bottom: 8px; background: rgba(59, 130, 246, 0.12); color: #3B82F6; border: 1px solid rgba(59, 130, 246, 0.3);">
+                ✨ GOOGLE 1초 원클릭 무료 연동
             </div>
-            <div style="font-size: 1.3rem; font-weight: 900; margin-bottom: 6px;">
-                AI 급등주 & 큰손 수급 분석 레이더
+            <div style="font-size: 1.25rem; font-weight: 900; margin-bottom: 4px;">
+                N-Stock 실시간 AI 퀀트 멤버십
             </div>
-            <div style="font-size: 0.9rem; opacity: 0.82; line-height: 1.5;">
-                간편 소셜 로그인으로 1초 만에 입장하고<br>
-                <b>오늘의 AI 원픽 추천주</b>와 <b>외인·기관 실시간 수급</b>을 확인하세요.
+            <div style="font-size: 0.88rem; opacity: 0.82; line-height: 1.5;">
+                구글 계정으로 1초 만에 무료 정회원 등록하고<br>
+                <b>2,870개 전종목 AI 목표가 및 외인·기관 실시간 수급</b>을 확인하세요.
+            </div>
+        </div>
+
+        <div style="background: rgba(59, 130, 246, 0.06); border: 1px solid rgba(59, 130, 246, 0.22); border-radius: 12px; padding: 14px 16px; margin: 12px 0 16px 0; text-align: left;">
+            <div style="font-size: 0.82rem; font-weight: 800; color: #2563EB; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                <span>🎁</span> <span>로그인 즉시 평생 무료 제공되는 4대 정회원 혜택</span>
+            </div>
+            <div style="font-size: 0.82rem; line-height: 1.7; opacity: 0.92;">
+                • <b>⭐ 관심종목 영구 보존</b> : 스마트폰·PC 어디서나 실시간 자동 클라우드 동기화<br/>
+                • <b>🎯 AI 적정 목표가 & 손절가</b> : 2,870개 전종목 적정 매도가(+5%) 100% 전면 해금<br/>
+                • <b>🩺 1초 종목 정밀진단 무제한</b> : 보유/관심주 외인·기관 실시간 입체 수급 분석<br/>
+                • <b>⚡ 나만의 투자 스타일 기억</b> : 스윙/단타/신규상장 맞춤 레이더 프리셋 자동 복원
             </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    # 🟡 카카오 1초 간편 로그인
-    if st.button("💬 카카오 1초 간편 로그인", key="modal_kakao_btn", use_container_width=True):
-        st.session_state["is_authenticated"] = True
-        st.session_state["user_info"] = {
-            "name": "카카오 투자자",
-            "email": "investor@kakao.com",
-            "provider": "Kakao",
-            "badge": "🟡 Kakao VIP",
-        }
-        st.session_state["matrix_intro_transition"] = True
-        st.session_state["current_page"] = "dashboard"
-        if hasattr(st, "query_params"):
-            st.query_params["page"] = "dashboard"
-        st.rerun()
-
-    st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
-
-    # ⚪ Google 계정으로 계속하기 (공식 OAuth 2.0 실시간 연동)
+    # ⚪ Google 계정으로 계속하기 (공식 OAuth 2.0 단독 집중 배치)
     try:
         from src.google_auth import get_google_auth_url
         google_login_url = get_google_auth_url()
         st.link_button(
-            "🌐 Google 계정으로 계속하기",
+            "🚀 Google 계정으로 1초 만에 무료 시작하기",
             google_login_url,
             type="primary",
             use_container_width=True
         )
-    except Exception:
-        if st.button("🌐 Google 계정으로 계속하기", key="modal_google_btn", use_container_width=True):
+    except Exception as e:
+        if st.button("🚀 Google 계정으로 1초 만에 무료 시작하기", key="modal_google_fallback_btn", type="primary", use_container_width=True):
             st.session_state["is_authenticated"] = True
             st.session_state["user_info"] = {
                 "name": "Google 투자자",
                 "email": "investor@gmail.com",
                 "provider": "Google",
-                "badge": "🔵 Google VIP",
+                "badge": "🔵 Google 회원",
             }
             st.session_state["matrix_intro_transition"] = True
             st.session_state["current_page"] = "dashboard"
@@ -174,25 +168,27 @@ def open_login_modal():
                 st.query_params["page"] = "dashboard"
             st.rerun()
 
-    st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
 
-    # ⚡ 무료 체험(게스트) 즉시 입장
-    if st.button("⚡ 무료 체험(게스트) 즉시 시작", key="modal_guest_btn", use_container_width=True):
-        st.session_state["is_authenticated"] = True
-        st.session_state["user_info"] = {
-            "name": "게스트 회원",
-            "email": "guest@stockradar.ai",
-            "provider": "Guest",
-            "badge": "🟢 체험 회원",
-        }
-        st.session_state["matrix_intro_transition"] = True
-        st.session_state["current_page"] = "dashboard"
-        if hasattr(st, "query_params"):
-            st.query_params["page"] = "dashboard"
-        st.rerun()
+    # 비회원 둘러보기 (작은 접이식 메뉴로 깔끔히 배치)
+    with st.expander("👀 로그인 없이 대시보드 먼저 둘러보기", expanded=False):
+        st.caption("비회원 체험 모드에서는 관심종목 클라우드 저장 및 일부 AI 세부 목표가가 제한될 수 있습니다.")
+        if st.button("체험 모드로 대시보드 입장", key="modal_guest_btn", use_container_width=True):
+            st.session_state["is_authenticated"] = True
+            st.session_state["user_info"] = {
+                "name": "체험 투자자",
+                "email": "guest@stockradar.ai",
+                "provider": "Guest",
+                "badge": "🟢 체험 회원",
+            }
+            st.session_state["matrix_intro_transition"] = True
+            st.session_state["current_page"] = "dashboard"
+            if hasattr(st, "query_params"):
+                st.query_params["page"] = "dashboard"
+            st.rerun()
 
     st.markdown("---")
-    st.caption("🔒 Stock Radar는 금융투자업 규정을 준수하며 안전한 데이터 분석 정보만을 제공합니다.")
+    st.caption("🔒 N-Stock은 금융투자업 규정을 준수하며 안전한 데이터 분석 정보만을 제공합니다.")
 
 
 def render_landing_page(is_dark: bool):
@@ -544,7 +540,7 @@ def render_landing_page(is_dark: bool):
                         st.query_params["page"] = "dashboard"
                     st.rerun()
             else:
-                if st.button("🔑 간편 로그인", type="primary", key="top_login_btn", use_container_width=True):
+                if st.button("🔑 정회원 로그인", type="primary", key="top_login_btn", use_container_width=True):
                     open_login_modal()
 
     st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
@@ -603,18 +599,13 @@ def render_landing_page(is_dark: bool):
                 key="hero_cta_btn",
             ):
                 if not is_authed:
-                    st.session_state["is_authenticated"] = True
-                    st.session_state["user_info"] = {
-                        "name": "체험 투자자",
-                        "email": "guest@stockradar.ai",
-                        "provider": "Guest",
-                        "badge": "🟢 체험 회원",
-                    }
-                st.session_state["matrix_intro_transition"] = True
-                st.session_state["current_page"] = "dashboard"
-                if hasattr(st, "query_params"):
-                    st.query_params["page"] = "dashboard"
-                st.rerun()
+                    open_login_modal()
+                else:
+                    st.session_state["matrix_intro_transition"] = True
+                    st.session_state["current_page"] = "dashboard"
+                    if hasattr(st, "query_params"):
+                        st.query_params["page"] = "dashboard"
+                    st.rerun()
 
     # 핵심 신뢰 지표 4선
     st.markdown("<div style='height: 25px;'></div>", unsafe_allow_html=True)
@@ -1185,18 +1176,13 @@ def render_landing_page(is_dark: bool):
                 key="bottom_cta_btn",
             ):
                 if not is_authed:
-                    st.session_state["is_authenticated"] = True
-                    st.session_state["user_info"] = {
-                        "name": "체험 투자자",
-                        "email": "guest@stockradar.ai",
-                        "provider": "Guest",
-                        "badge": "🟢 체험 회원",
-                    }
-                st.session_state["matrix_intro_transition"] = True
-                st.session_state["current_page"] = "dashboard"
-                if hasattr(st, "query_params"):
-                    st.query_params["page"] = "dashboard"
-                st.rerun()
+                    open_login_modal()
+                else:
+                    st.session_state["matrix_intro_transition"] = True
+                    st.session_state["current_page"] = "dashboard"
+                    if hasattr(st, "query_params"):
+                        st.query_params["page"] = "dashboard"
+                    st.rerun()
 
     # ----------------------------------------------------
     # 8. 주식 실전 지식 아카이브 (16편 칼럼 - Google AdSense & E-E-A-T 검증 전용)
