@@ -185,6 +185,15 @@ def get_ga4_realtime_metrics(property_id: str = "557310438") -> dict:
     """
     prop_id = property_id if property_id else "557310438"
     has_creds = os.path.exists(GA4_SERVICE_ACCOUNT_FILE) or "GOOGLE_APPLICATION_CREDENTIALS" in os.environ
+    secret_creds = None
+    try:
+        import streamlit as st
+        if hasattr(st, "secrets") and "ga4_service_account" in st.secrets:
+            secret_creds = dict(st.secrets["ga4_service_account"])
+            has_creds = True
+    except Exception:
+        pass
+
     deep_link = f"https://analytics.google.com/analytics/web/#/p{prop_id}/reports/realtime"
 
     if not has_creds:
@@ -206,9 +215,15 @@ def get_ga4_realtime_metrics(property_id: str = "557310438") -> dict:
         import requests
 
         creds_file = GA4_SERVICE_ACCOUNT_FILE if os.path.exists(GA4_SERVICE_ACCOUNT_FILE) else os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
-        if creds_file and os.path.exists(creds_file):
-            scopes = ["https://www.googleapis.com/auth/analytics.readonly"]
+        scopes = ["https://www.googleapis.com/auth/analytics.readonly"]
+        credentials = None
+
+        if secret_creds:
+            credentials = service_account.Credentials.from_service_account_info(secret_creds, scopes=scopes)
+        elif creds_file and os.path.exists(creds_file):
             credentials = service_account.Credentials.from_service_account_file(creds_file, scopes=scopes)
+
+        if credentials:
             credentials.refresh(Request())
             token = credentials.token
 
