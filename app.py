@@ -479,6 +479,27 @@ if "is_authenticated" not in st.session_state:
 if "user_info" not in st.session_state:
     st.session_state["user_info"] = None
 
+# 1-1-1. Google OAuth 2.0 콜백 인증 처리 (?code=...)
+if hasattr(st, "query_params"):
+    auth_code = st.query_params.get("code")
+    if auth_code:
+        try:
+            from src.google_auth import exchange_code_for_user
+            from src.user_manager import save_or_update_user
+            user_profile = exchange_code_for_user(auth_code)
+            if user_profile and user_profile.get("email"):
+                db_user = save_or_update_user(user_profile)
+                st.session_state["is_authenticated"] = True
+                st.session_state["user_info"] = db_user
+                st.session_state["current_page"] = "dashboard"
+                st.session_state["matrix_intro_transition"] = True
+                st.query_params.clear()
+                st.query_params["page"] = "dashboard"
+                st.toast(f"🎉 {db_user.get('name', '고객')}님 환영합니다! 구글 정회원 로그인이 완료되었습니다.", icon="✅")
+                st.rerun()
+        except Exception as e:
+            print(f"[OAuth Callback Error] {e}")
+
 # URL 쿼리 파라미터 확인 (?nav=dashboard 또는 ?page=dashboard)
 target_page = None
 if hasattr(st, "query_params"):
@@ -536,10 +557,20 @@ if st.session_state["current_page"] == "dashboard":
             u_name = user.get("name", "회원")
             u_email = user.get("email", "")
             u_badge = user.get("badge", "VIP")
+            u_pic = user.get("picture", "")
+            if u_pic:
+                avatar_html = f'<img src="{u_pic}" style="width:36px; height:36px; border-radius:50%; border:2px solid #3B82F6; margin-right:10px; vertical-align:middle; object-fit:cover;" />'
+            else:
+                avatar_html = '<span style="font-size:1.4rem; margin-right:8px; vertical-align:middle;">👤</span>'
             st.html(
                 f"""<div class="user-profile-card">
-                    <div style="font-size: 1.05rem; font-weight: 800; margin-bottom: 2px;">👤 {u_name}님</div>
-                    <div style="font-size: 0.8rem; opacity: 0.75; margin-bottom: 6px;">{u_email}</div>
+                    <div style="display:flex; align-items:center; margin-bottom:6px;">
+                        {avatar_html}
+                        <div style="overflow:hidden;">
+                            <div style="font-size: 1.0rem; font-weight: 800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{u_name}님</div>
+                            <div style="font-size: 0.75rem; opacity: 0.75; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{u_email}</div>
+                        </div>
+                    </div>
                     <span class="badge-pill notranslate" translate="no" style="padding: 2px 8px; font-size: 0.72rem; margin-bottom: 0;">{u_badge}</span>
                 </div>"""
             )
@@ -3014,9 +3045,15 @@ with head_c2:
     if user:
         u_name = user.get("name", "회원")
         u_badge = user.get("badge", "VIP")
+        u_pic = user.get("picture", "")
+        if u_pic:
+            head_avatar = f'<img src="{u_pic}" style="width:24px; height:24px; border-radius:50%; border:1.5px solid #3B82F6; margin-right:6px; vertical-align:middle; object-fit:cover;" />'
+        else:
+            head_avatar = '<span style="font-size:1.05rem; margin-right:5px; vertical-align:middle;">👤</span>'
         st.html(
-            f"""<div style="text-align: right; padding-top: 2px; margin-bottom: 6px;">
-                <span style="font-weight: 800; font-size: 0.95rem;">👤 {u_name}님</span>
+            f"""<div style="text-align: right; padding-top: 2px; margin-bottom: 6px; display:flex; align-items:center; justify-content:flex-end;">
+                {head_avatar}
+                <span style="font-weight: 800; font-size: 0.95rem;">{u_name}님</span>
                 <span class="badge-pill notranslate" translate="no" style="margin-left: 6px; padding: 2px 8px; font-size: 0.75rem;">{u_badge}</span>
             </div>"""
         )

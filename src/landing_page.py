@@ -149,20 +149,30 @@ def open_login_modal():
 
     st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
 
-    # ⚪ Google 계정으로 계속하기
-    if st.button("🌐 Google 계정으로 계속하기", key="modal_google_btn", use_container_width=True):
-        st.session_state["is_authenticated"] = True
-        st.session_state["user_info"] = {
-            "name": "Google 투자자",
-            "email": "investor@gmail.com",
-            "provider": "Google",
-            "badge": "🔵 Google VIP",
-        }
-        st.session_state["matrix_intro_transition"] = True
-        st.session_state["current_page"] = "dashboard"
-        if hasattr(st, "query_params"):
-            st.query_params["page"] = "dashboard"
-        st.rerun()
+    # ⚪ Google 계정으로 계속하기 (공식 OAuth 2.0 실시간 연동)
+    try:
+        from src.google_auth import get_google_auth_url
+        google_login_url = get_google_auth_url()
+        st.link_button(
+            "🌐 Google 계정으로 계속하기",
+            google_login_url,
+            type="primary",
+            use_container_width=True
+        )
+    except Exception:
+        if st.button("🌐 Google 계정으로 계속하기", key="modal_google_btn", use_container_width=True):
+            st.session_state["is_authenticated"] = True
+            st.session_state["user_info"] = {
+                "name": "Google 투자자",
+                "email": "investor@gmail.com",
+                "provider": "Google",
+                "badge": "🔵 Google VIP",
+            }
+            st.session_state["matrix_intro_transition"] = True
+            st.session_state["current_page"] = "dashboard"
+            if hasattr(st, "query_params"):
+                st.query_params["page"] = "dashboard"
+            st.rerun()
 
     st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
 

@@ -20,6 +20,7 @@ try:
         get_ga4_realtime_metrics,
         save_ga4_service_account_json
     )
+    from src.user_manager import get_user_metrics
 except ImportError:
     from analytics_tracker import (
         get_analytics_metrics,
@@ -33,6 +34,10 @@ except ImportError:
         get_ga4_realtime_metrics,
         save_ga4_service_account_json
     )
+    try:
+        from user_manager import get_user_metrics
+    except ImportError:
+        get_user_metrics = lambda: {"total_users": 0, "today_active": 0, "users_list": []}
 
 
 @st.fragment
@@ -495,3 +500,45 @@ def render_admin_dashboard(is_dark: bool = False):
         st.dataframe(df_logs, use_container_width=True, height=260)
     else:
         st.info("아직 기록된 실제 사용자 검색 로그가 없습니다. (순수 실측 데이터 수집 대기 중)")
+
+    # 9. [신규 추가] 👥 실제 등록 회원 관제소 (Real Google Users DB)
+    st.markdown("---")
+    st.markdown("#### 👥 실제 가입 회원 명부 & 활동 관제탑 (Google Users DB)")
+
+    u_metrics = get_user_metrics()
+    total_u = u_metrics.get("total_users", 0)
+    today_act = u_metrics.get("today_active", 0)
+    users_list = u_metrics.get("users_list", [])
+
+    u_col1, u_col2 = st.columns(2)
+    with u_col1:
+        st.metric("누적 가입 정회원수", f"{total_u}명")
+    with u_col2:
+        st.metric("오늘 접속 회원수", f"{today_act}명")
+
+    if users_list:
+        df_u = pd.DataFrame(users_list)
+        show_u_cols = [c for c in ["name", "email", "provider", "first_login", "last_login", "login_count"] if c in df_u.columns]
+        df_u = df_u[show_u_cols]
+        u_rename = {
+            "name": "회원 성명",
+            "email": "구글 이메일",
+            "provider": "인증 수단",
+            "first_login": "최초 가입일시",
+            "last_login": "최근 접속일시",
+            "login_count": "누적 로그인 수"
+        }
+        df_u = df_u.rename(columns=u_rename)
+
+        u_csv = df_u.to_csv(index=False, encoding="utf-8-sig")
+        st.download_button(
+            label="📥 회원 명부 엑셀(CSV) 다운로드",
+            data=u_csv,
+            file_name="nstock_registered_users.csv",
+            mime="text/csv",
+            use_container_width=False,
+            key="btn_download_users_csv"
+        )
+        st.dataframe(df_u, use_container_width=True, height=220)
+    else:
+        st.info("아직 가입된 회원이 없습니다. 구글 로그인이 발생하면 자동으로 실측 집계됩니다.")
