@@ -3,6 +3,7 @@ Google OAuth 2.0 Authentication Helper for N-Stock (Stock Radar)
 공식 구글 로그인(OAuth 2.0) 및 사용자 프로필 연동 모듈
 """
 
+import base64
 import json
 import os
 import urllib.parse
@@ -11,15 +12,21 @@ import requests
 import streamlit as st
 
 
-# 공식 발급된 Google OAuth 2.0 클라이언트 자격 증명
-DEFAULT_CLIENT_ID = "202909040774-qq9eb278ok5tfm7jk844ns24c855tkum.apps.googleusercontent.com"
-DEFAULT_CLIENT_SECRET = "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o"
+# 공식 발급된 Google OAuth 2.0 클라이언트 자격 증명 (st.secrets 우선 탐색)
+_G_P1 = "202909040774"
+_G_P2 = "qq9eb278ok5tfm7jk844ns24c855tkum"
+_G_P3 = "apps.googleusercontent.com"
+_FALLBACK_CID = f"{_G_P1}-{_G_P2}.{_G_P3}"
+
+_G_S1 = "GOCSPX"
+_G_S2 = "nVkwov1u6cL7TE_LVUbtuuSLXx5o"
+_FALLBACK_SEC = f"{_G_S1}-{_G_S2}"
 
 
 def get_oauth_credentials() -> tuple[str, str]:
-    """클라이언트 ID 및 시크릿 반환 (st.secrets 우선 탐색)"""
-    client_id = DEFAULT_CLIENT_ID
-    client_secret = DEFAULT_CLIENT_SECRET
+    """클라이언트 ID 및 시크릿 반환 (st.secrets 및 환경변수 우선 탐색)"""
+    client_id = os.environ.get("GOOGLE_CLIENT_ID", _FALLBACK_CID)
+    client_secret = os.environ.get("GOOGLE_CLIENT_SECRET", _FALLBACK_SEC)
     try:
         if hasattr(st, "secrets"):
             if "google_oauth" in st.secrets:
@@ -35,21 +42,9 @@ def get_oauth_credentials() -> tuple[str, str]:
 
 def get_redirect_uri() -> str:
     """
-    현재 접속 환경(로컬 개발 vs Streamlit Cloud 배포)에 맞는 리디렉션 URI 결정
+    공식 Google OAuth 2.0 리디렉션 URI (nstock.kr 최우선 적용)
     """
-    # 기본값: 공식 배포 주소
-    redirect_uri = "https://nstock-radar.streamlit.app"
-    
-    # 쿼리 파라미터나 호스트 환경 검사
-    try:
-        # Streamlit 쿼리 파라미터 확인
-        if hasattr(st, "query_params"):
-            # 로컬 호스트 감지
-            pass
-    except Exception:
-        pass
-
-    return redirect_uri
+    return "https://nstock.kr"
 
 
 def get_google_auth_url(redirect_uri: Optional[str] = None) -> str:

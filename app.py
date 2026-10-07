@@ -497,7 +497,7 @@ if hasattr(st, "query_params"):
         try:
             from src.google_auth import exchange_code_for_user
             from src.user_manager import save_or_update_user
-            user_profile = exchange_code_for_user(auth_code)
+            user_profile = exchange_code_for_user(auth_code, redirect_uri="https://nstock.kr")
             if user_profile and user_profile.get("email"):
                 db_user = save_or_update_user(user_profile)
                 st.session_state["is_authenticated"] = True
@@ -508,8 +508,12 @@ if hasattr(st, "query_params"):
                 st.query_params["page"] = "dashboard"
                 st.toast(f"🎉 {db_user.get('name', '고객')}님 환영합니다! 구글 정회원 로그인이 완료되었습니다.", icon="✅")
                 st.rerun()
+            else:
+                st.query_params.clear()
+                st.toast("⚠️ 구글 계정 인증 정보를 불러오지 못했습니다. 다시 시도해 주세요.", icon="⚠️")
         except Exception as e:
             print(f"[OAuth Callback Error] {e}")
+            st.query_params.clear()
 
 # URL 쿼리 파라미터 확인 (?nav=dashboard 또는 ?page=dashboard)
 target_page = None

@@ -143,7 +143,6 @@ def open_login_modal():
         unsafe_allow_html=True,
     )
 
-    # ⚪ Google 계정으로 계속하기 (공식 Google 브랜드 디자인 & 원클릭 연동)
     google_login_url = None
     try:
         try:
@@ -152,19 +151,10 @@ def open_login_modal():
             from google_auth import get_google_auth_url
         google_login_url = get_google_auth_url()
     except Exception:
-        google_login_url = None
+        google_login_url = "https://nstock.kr"
 
     if not google_login_url:
-        # 비상 기본 URL 생성
-        google_login_url = (
-            "https://accounts.google.com/o/oauth2/v2/auth"
-            "?client_id=202909040774-qq9eb278ok5tfm7jk844ns24c855tkum.apps.googleusercontent.com"
-            "&redirect_uri=https%3A%2F%2Fnstock-radar.streamlit.app"
-            "&response_type=code"
-            "&scope=openid+email+profile"
-            "&access_type=offline"
-            "&prompt=select_account"
-        )
+        google_login_url = "https://nstock.kr"
 
     # ⚪ Google 계정으로 계속하기 (공식 Streamlit 네이티브 링크 버튼 - iframe 완벽 호환)
     st.link_button(
