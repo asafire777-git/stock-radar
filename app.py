@@ -3679,7 +3679,11 @@ def render_ai_picks_tab(candidates, preset_style, is_dark):
         ]
 
         if not is_google:
-            # 4위 이하 종목 잠금 마스킹
+            # 4위 이하 종목 잠금 마스킹을 위해 열 타입을 문자열로 변환 (pandas 2.0+ TypeError/LossySetitemError 방지)
+            for col in ["AI등급", "종합점수", "5일 상승확률", "예측방향", "핵심 포착신호"]:
+                if col in display_df.columns:
+                    display_df[col] = display_df[col].astype(object)
+
             display_df.loc[display_df["순위"] >= 4, "AI등급"] = "🔒"
             display_df.loc[display_df["순위"] >= 4, "종합점수"] = "🔒"
             display_df.loc[display_df["순위"] >= 4, "5일 상승확률"] = "🔒 정회원 전용"
