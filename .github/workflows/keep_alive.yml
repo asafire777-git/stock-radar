@@ -1,0 +1,34 @@
+name: 🔄 24/7 Keep-Alive Monitor (Streamlit Sleep Prevention)
+
+on:
+  schedule:
+    # 매 15분마다 자동 실행하여 Streamlit 무료 티어 수면(Sleep) 모드 100% 방지
+    - cron: '*/15 * * * *'
+  workflow_dispatch: # 관리자 수동 즉시 실행 지원
+
+jobs:
+  ping:
+    name: Ping Streamlit & nstock.kr
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Keep-Alive HTTP Requests
+        run: |
+          echo "=========================================="
+          echo "⏰ Running 24/7 Keep-Alive Ping..."
+          echo "=========================================="
+          
+          # 1. 메인 Streamlit 클라우드 앱 핑
+          APP_STATUS=$(curl -s -L -o /dev/null -w "%{http_code}" https://nstock-radar.streamlit.app/)
+          echo "1. Streamlit App (nstock-radar.streamlit.app): HTTP $APP_STATUS"
+
+          # 2. Streamlit 내부 Healthz 헬스체크 엔드포인트 핑
+          HEALTH_STATUS=$(curl -s -L -o /dev/null -w "%{http_code}" https://nstock-radar.streamlit.app/healthz)
+          echo "2. Streamlit Healthz Check: HTTP $HEALTH_STATUS"
+
+          # 3. 공식 브랜드 도메인 핑
+          DOMAIN_STATUS=$(curl -s -L -o /dev/null -w "%{http_code}" https://nstock.kr/)
+          echo "3. Official Domain (nstock.kr): HTTP $DOMAIN_STATUS"
+
+          echo "=========================================="
+          echo "✅ Keep-Alive Ping completed successfully!"
+          echo "=========================================="
