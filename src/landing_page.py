@@ -305,7 +305,9 @@ def render_landing_page(is_dark: bool):
             justify-content: center;
             gap: 8px;
             padding: 8px 14px;
-            margin: 4px 0 18px 0;
+            margin: 6px auto 18px auto !important;
+            width: fit-content !important;
+            max-width: 100% !important;
             border-radius: 9999px;
             overflow-x: auto;
             white-space: nowrap;
@@ -1160,10 +1162,109 @@ def render_landing_page(is_dark: bool):
         )
 
     # ----------------------------------------------------
-    # 7. 하단 전환 유도 통합 배너 버튼 (CTA Grand Banner Button)
+    # 7. 주식 실전 지식 아카이브 16편 정규 마스터코스 (Natural In-Flow Integration)
+    # ----------------------------------------------------
+    st.markdown("<div id='section-knowledge' class='anchor-marker'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height: 48px;'></div>", unsafe_allow_html=True)
+
+    card_inner_bg = "#1E293B" if is_dark else "#FFFFFF"
+    card_inner_border = "#334155" if is_dark else "#E2E8F0"
+    text_sub = "#94A3B8" if is_dark else "#475569"
+
+    st.markdown(
+        f"""
+        <div style="text-align: center; margin-bottom: 28px;">
+            <span class="badge-pill notranslate" translate="no" style="background: rgba(37,99,235,0.12); color: #2563EB; border: 1px solid rgba(37,99,235,0.3); padding: 4px 12px; font-weight: 700;">📚 실전 투자 지식 아카이브</span>
+            <h2 style="font-size: 1.85rem; font-weight: 900; margin: 12px 0 8px 0; letter-spacing: -0.5px;">16편 실전 퀀트 매매 정규 마스터코스</h2>
+            <p style="font-size: 0.98rem; color: {text_sub}; margin: 0 auto; max-width: 680px; line-height: 1.6;">
+                초보 투자자부터 전업 트레이더까지, 5/20/60일선 정배열과 볼린저 밴드, 외국인·기관 수급 매집, -3% 칼손절 원칙 등 16개 핵심 실전 전략을 체계적으로 마스터하세요.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    k_col1, k_col2, k_col3, k_col4 = st.columns(4)
+    with k_col1:
+        st.markdown(
+            f"""
+            <div class="step-card" style="background: {card_inner_bg}; border: 1px solid {card_inner_border}; min-height: 160px; padding: 18px 16px;">
+                <div style="font-size: 1.12rem; font-weight: 800; color: #2563EB; margin-bottom: 6px;">📈 차트 & 기술 분석</div>
+                <div style="font-size: 0.84rem; color: {text_sub}; line-height: 1.55;">
+                    • 1편: 이동평균선 정배열 공식<br>
+                    • 2편: 볼린저 밴드 상단 돌파<br>
+                    • 3편: RSI 다이버전스 포착<br>
+                    • 6편: MACD 0선 골든크로스
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with k_col2:
+        st.markdown(
+            f"""
+            <div class="step-card" style="background: {card_inner_bg}; border: 1px solid {card_inner_border}; min-height: 160px; padding: 18px 16px;">
+                <div style="font-size: 1.12rem; font-weight: 800; color: #10B981; margin-bottom: 6px;">💰 세력 수급 & 테마</div>
+                <div style="font-size: 0.84rem; color: {text_sub}; line-height: 1.55;">
+                    • 4편: 거래대금 1,000억의 의미<br>
+                    • 5편: 외인·기관 쌍끌이 매집<br>
+                    • 10편: 테마 순환매 길목 지키기<br>
+                    • 15편: 호가창 잔량의 역설
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with k_col3:
+        st.markdown(
+            f"""
+            <div class="step-card" style="background: {card_inner_bg}; border: 1px solid {card_inner_border}; min-height: 160px; padding: 18px 16px;">
+                <div style="font-size: 1.12rem; font-weight: 800; color: #F59E0B; margin-bottom: 6px;">🛡️ 리스크 & 자금 관리</div>
+                <div style="font-size: 0.84rem; color: {text_sub}; line-height: 1.55;">
+                    • 7편: -3% 원칙과 분할 매매<br>
+                    • 8편: 신규 상장주 보호예수<br>
+                    • 14편: 만기일과 실적 시즌 대응<br>
+                    • 16편: 승률 50% 복리 자금 관리
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with k_col4:
+        st.markdown(
+            f"""
+            <div class="step-card" style="background: {card_inner_bg}; border: 1px solid {card_inner_border}; min-height: 160px; padding: 18px 16px;">
+                <div style="font-size: 1.12rem; font-weight: 800; color: #8B5CF6; margin-bottom: 6px;">⚡ AI 퀀트 & 매매 전략</div>
+                <div style="font-size: 0.84rem; color: {text_sub}; line-height: 1.55;">
+                    • 9편: 캔들 핀바와 세력 시그널<br>
+                    • 11편: 미국 프리마켓 시간표<br>
+                    • 12편: 4대 가중치 연산 공식<br>
+                    • 13편: 당일 단타 vs 스윙 분할
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    st.markdown("<div style='height: 16px;'></div>", unsafe_allow_html=True)
+    _, col_k_btn1, col_k_btn2, _ = st.columns([1.5, 2.5, 2.5, 1.5])
+    with col_k_btn1:
+        if st.button("📖 16편 전편 웹 칼럼 읽기 (새 창)", key="btn_lp_open_web_columns", use_container_width=True):
+            st.html('<script>window.open("/columns/", "_blank");</script>')
+    with col_k_btn2:
+        if st.button("📊 대시보드에서 전편 열람하기", key="btn_lp_open_dash_archive", use_container_width=True):
+            st.session_state["matrix_intro_transition"] = True
+            st.session_state["active_nav_menu"] = "📚 주식 실전 지식 아카이브 (16편)"
+            st.session_state["current_page"] = "dashboard"
+            if hasattr(st, "query_params"):
+                st.query_params["page"] = "dashboard"
+            st.rerun()
+
+    # ----------------------------------------------------
+    # 8. 하단 전환 유도 통합 배너 버튼 (CTA Grand Banner Button)
     # ----------------------------------------------------
     st.markdown("<div id='section-cta' class='anchor-marker'></div>", unsafe_allow_html=True)
-    st.markdown("<div style='height: 36px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True)
     _, col_cta_bottom, _ = st.columns([1.2, 3.6, 1.2])
     with col_cta_bottom:
         with st.container(key="bottom_cta_box"):
@@ -1181,12 +1282,6 @@ def render_landing_page(is_dark: bool):
                         st.query_params["page"] = "dashboard"
                     st.rerun()
 
-    # ----------------------------------------------------
-    # 8. 주식 실전 지식 아카이브 (16편 칼럼 - Google AdSense & E-E-A-T 검증 전용)
-    # ----------------------------------------------------
-    st.markdown("<div id='section-knowledge' class='anchor-marker'></div>", unsafe_allow_html=True)
-    st.markdown("<div style='height: 36px;'></div>", unsafe_allow_html=True)
-    render_stock_knowledge_tab(is_dark=is_dark, key_prefix="lp_", is_compact=True)
 
     # ----------------------------------------------------
     # 9. 관리자 전용 파라미터(?admin=true) 호출 시 인증 다이얼로그
