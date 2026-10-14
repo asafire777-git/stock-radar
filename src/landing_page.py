@@ -293,13 +293,13 @@ def render_landing_page(is_dark: bool):
         [data-testid="block-container"],
         .stMain .block-container,
         .main .block-container,
-        section[data-testid="stMain"] > div.block-container {
+        section[data-testid="stMain"] > div.block-container {{
             max-width: 1200px !important;
             margin-left: auto !important;
             margin-right: auto !important;
             width: 100% !important;
             box-sizing: border-box !important;
-        }
+        }}
 
         /* 부드러운 스크롤 & 앵커 마커 오프셋 */
         html {{
