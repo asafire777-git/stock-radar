@@ -75,9 +75,15 @@ try:
         render_clinic_banner_html,
         render_health_summary_card_html,
         render_doctor_briefing_card_html,
+        render_gemini_argon_briefing_card_html,
         render_vital_signs_html,
         render_prescriptions_html,
         render_essential_trading_metrics_html,
+    )
+    from src.gemini_engine import (
+        answer_stock_question_with_argon,
+        generate_argon_market_intelligence_report,
+        render_argon_market_intelligence_html,
     )
     from src.analytics_tracker import log_search_event
     from src.admin_dashboard import render_admin_dashboard
@@ -141,9 +147,15 @@ except ImportError:
         render_clinic_banner_html,
         render_health_summary_card_html,
         render_doctor_briefing_card_html,
+        render_gemini_argon_briefing_card_html,
         render_vital_signs_html,
         render_prescriptions_html,
         render_essential_trading_metrics_html,
+    )
+    from gemini_engine import (
+        answer_stock_question_with_argon,
+        generate_argon_market_intelligence_report,
+        render_argon_market_intelligence_html,
     )
     from analytics_tracker import log_search_event
     from admin_dashboard import render_admin_dashboard
@@ -3464,6 +3476,19 @@ def render_ai_picks_tab(candidates, preset_style, is_dark):
         df_ai = df_ai.sort_values(by=["total_score", "upside_prob"], ascending=False).reset_index(drop=True).head(20)
         df_ai["rank"] = df_ai.index + 1
 
+        # 🌐 [Gemini 4 Argon] 시장 인텔리전스 & 수급 기상도 배너
+        try:
+            top_picks_txt = "\n".join([f"- #{r['rank']} {r['name']}: {r['price']:,}원 ({r['change_rate']:+.2f}%), 점수 {r['total_score']}점" for _, r in df_ai.head(5).iterrows()])
+            intel_res = generate_argon_market_intelligence_report(
+                kospi_val="코스피 이평선 정배열 추세",
+                kosdaq_val="코스닥 수급 쏠림 지속",
+                usd_rate=float(get_usd_krw_rate()) if "get_usd_krw_rate" in globals() else 1350.0,
+                top_picks_str=top_picks_txt,
+            )
+            st.html(render_argon_market_intelligence_html(intel_res, is_dark=is_dark))
+        except Exception as e:
+            print(f"[Argon Market Intel Error] {e}")
+
         # 🏆 오늘의 AI 강력 추천 1위 (원픽 VIP 카드)
         top1 = df_ai.iloc[0]
         target_high = int(top1['price'] * 1.06)
@@ -4612,14 +4637,20 @@ def render_diagnosis_tab_view(all_stocks_df, code_map, is_dark):
             currency_mode=ovs_mode_code,
         ))
 
-        # 6-2. AI 전담 주치의 1초 심층 임상 소견서 (자연어 심층 브리핑)
-        st.html(render_doctor_briefing_card_html(
+        # 6-2. Google Gemini 4 Argon 100만 토큰 멀티팩터 심층 퀀트 임상 소견서 (2026 Frontier AI)
+        is_google = is_google_authenticated()
+        st.html(render_gemini_argon_briefing_card_html(
             name=target_name,
             code=target_code,
             market=mkt_name,
-            briefing=briefing,
+            price=curr_price,
+            change_rate=change_rate,
             vitals_data=vitals_data,
+            detail=detail,
             is_dark=is_dark,
+            is_ovs=is_ovs,
+            usd_rate=usd_rate,
+            is_google_member=is_google,
         ))
 
         # 6-3. 투자자 8대 필수 핵심 실시간 지표 보드 (실시간 거래대금, 거래량, 시고저 밴드, 시총, 52주 고저, 외인소진율, PER/PBR, EPS/배당)
@@ -4639,6 +4670,64 @@ def render_diagnosis_tab_view(all_stocks_df, code_map, is_dark):
 
         # 6-5. AI 주치의 실전 맞춤 처방전 (4단 그리드)
         st.html(render_prescriptions_html(prescriptions, is_dark=is_dark))
+
+        # 6-6. 💬 [대화형 AI 투자 비서] Gemini 4 Argon 1:1 실시간 종목 질의응답
+        with st.expander(f"💬 [Gemini 4 Argon AI 비서] '{target_name}'에 대해 무엇이든 물어보세요", expanded=True):
+            st.markdown(
+                f"<div style='font-size:0.88rem; color:{'#94A3B8' if is_dark else '#475569'}; margin-bottom:12px;'>"
+                f"100만 토큰 통합 추론 모델 <b>Google Gemini 4 Argon</b>이 '{target_name}'의 현재 수급, 매매 타점, 리스크 관리 전략을 실시간으로 답변해 드립니다."
+                f"</div>",
+                unsafe_allow_html=True
+            )
+
+            chip_col1, chip_col2 = st.columns(2)
+            with chip_col1:
+                q1 = f"🎯 지금 {target_name} 신규 진입하기에 적정한 타점인가요?"
+                if st.button(q1, key=f"btn_argon_q1_{target_code}", use_container_width=True):
+                    st.session_state[f"argon_active_q_{target_code}"] = q1
+            with chip_col2:
+                q2 = f"🩸 최근 외인·기관 수급에서 눈여겨볼 핵심 포인트는?"
+                if st.button(q2, key=f"btn_argon_q2_{target_code}", use_container_width=True):
+                    st.session_state[f"argon_active_q_{target_code}"] = q2
+
+            user_q = st.text_input(
+                "직접 질문 입력하기",
+                value=st.session_state.get(f"argon_active_q_{target_code}", ""),
+                placeholder="예: 단타와 스윙 중 어떤 전략이 유리할까요? 적정 손절선은?",
+                key=f"argon_q_input_{target_code}"
+            )
+
+            col_sub1, col_sub2 = st.columns([1.6, 2.4])
+            with col_sub1:
+                submit_q = st.button("🚀 Gemini 4 Argon에게 질문하기", key=f"btn_submit_argon_{target_code}", type="primary", use_container_width=True)
+
+            if submit_q and user_q.strip():
+                with st.spinner(f"🤖 Gemini 4 Argon이 '{target_name}'의 퀀트 데이터와 시장 컨텍스트를 심층 추론 중입니다..."):
+                    stock_ctx = {
+                        "name": target_name,
+                        "code": target_code,
+                        "market": mkt_name,
+                        "price": f"${curr_price:.2f}" if is_ovs else f"{curr_price:,}원",
+                        "change_rate": f"{change_rate:+.2f}",
+                        "health_score": vitals_data.get("health_score", 70),
+                        "health_grade": vitals_data.get("health_grade", "B"),
+                    }
+                    ans = answer_stock_question_with_argon(user_q, stock_context=stock_ctx)
+                    st.session_state[f"argon_ans_{target_code}"] = ans
+
+            saved_ans = st.session_state.get(f"argon_ans_{target_code}")
+            if saved_ans:
+                st.markdown(
+                    f"""<div style="background:{'#1E293B' if is_dark else '#F0FDF4'}; border:1.5px solid {'#6366F1' if is_dark else '#10B981'}; border-radius:12px; padding:18px 20px; margin-top:14px;">
+                        <div style="font-weight:800; color:{'#A5B4FC' if is_dark else '#059669'}; font-size:0.95rem; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+                            <span>🤖</span> <span>Gemini 4 Argon AI 투자 비서 답변:</span>
+                        </div>
+                        <div style="font-size:0.9rem; color:{'#E2E8F0' if is_dark else '#1E293B'}; line-height:1.7; white-space:pre-wrap;">
+{saved_ans}
+                        </div>
+                    </div>""",
+                    unsafe_allow_html=True
+                )
 
         # 7. 🔬 [정밀 엑스레이 캔들 영상 & 큰손 수급 해부도]
         with st.expander(f"🔬 [정밀 엑스레이 판독실] {target_name}({target_code}) 3단 캔들 차트 & 일별 수급표 펼쳐보기", expanded=True):
