@@ -1100,15 +1100,30 @@ if is_intro:
 [data-testid="stSidebar"], section[data-testid="stSidebar"], [data-testid="stExpandSidebarButton"], [data-testid="collapsedControl"] {
     display: none !important;
 }
-.main .block-container {
-    max-width: 1240px !important;
+.stMainBlockContainer,
+[data-testid="stMainBlockContainer"],
+.block-container,
+[data-testid="block-container"],
+.stMain .block-container,
+.main .block-container,
+section[data-testid="stMain"] > div.block-container,
+section[data-testid="stMain"] > div:first-child {
+    max-width: 1200px !important;
     padding-top: 1.0rem !important;
     padding-left: 1.5rem !important;
     padding-right: 1.5rem !important;
     padding-bottom: 3.5rem !important;
-    margin: 0 auto !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
 }
 @media (max-width: 768px) {
+    .stMainBlockContainer,
+    [data-testid="stMainBlockContainer"],
+    .block-container,
+    [data-testid="block-container"],
+    .stMain .block-container,
     .main .block-container {
         padding-left: 0.8rem !important;
         padding-right: 0.8rem !important;
@@ -1118,15 +1133,30 @@ if is_intro:
 """
 else:
     layout_css = """
-.main .block-container {
-    max-width: 1360px !important;
-    margin: 0 auto !important;
+.stMainBlockContainer,
+[data-testid="stMainBlockContainer"],
+.block-container,
+[data-testid="block-container"],
+.stMain .block-container,
+.main .block-container,
+section[data-testid="stMain"] > div.block-container,
+section[data-testid="stMain"] > div:first-child {
+    max-width: 1240px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
     padding-top: 1.2rem !important;
     padding-left: 1.5rem !important;
     padding-right: 1.5rem !important;
     padding-bottom: 3.5rem !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
 }
 @media (max-width: 768px) {
+    .stMainBlockContainer,
+    [data-testid="stMainBlockContainer"],
+    .block-container,
+    [data-testid="block-container"],
+    .stMain .block-container,
     .main .block-container {
         padding-left: 0.8rem !important;
         padding-right: 0.8rem !important;
@@ -3520,22 +3550,22 @@ def render_ai_picks_tab(candidates, preset_style, is_dark):
 
         st.html(
             f"""<div style="background:{vip_bg}; border:2px solid {vip_border}; border-radius:12px; padding:18px 22px; margin-bottom:14px; box-shadow:0 4px 6px -1px rgba(0,0,0,0.06);">
-                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
                     <div>
                         <span style="background:#16A34A; color:white; font-size:0.85rem; font-weight:bold; padding:4px 12px; border-radius:20px;">🏆 [{preset_style}] AI 추천 1위 (원픽)</span>
-                        <div style="margin-top:10px;">
+                        <div style="margin-top:8px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                             <span style="font-size:1.55rem; font-weight:900; color:{vip_text};">{top1['name']}</span>
-                            <span style="color:#64748B; font-size:1rem; margin-left:8px;">({top1['code']} / {top1['market']})</span>
-                            <span style="margin-left:12px; font-size:1.35rem; font-weight:bold; color:{'#EF4444' if top1['change_rate'] > 0 else '#3B82F6'};">
+                            <span style="color:#64748B; font-size:1rem;">({top1['code']} / {top1['market']})</span>
+                            <span style="margin-left:6px; font-size:1.35rem; font-weight:bold; color:{'#EF4444' if top1['change_rate'] > 0 else '#3B82F6'}; white-space:nowrap;">
                                 {top1['price']:,}원 ({top1['change_rate']:+.2f}%)
                             </span>
                         </div>
                     </div>
-                    <div>
+                    <div style="display:flex; align-items:center; gap:8px; white-space:nowrap;">
                         <span style="background:{'#DC2626' if top1['grade']=='S' else '#EA580C' if top1['grade']=='A' else '#2563EB'}; color:white; padding:6px 14px; border-radius:8px; font-weight:bold; font-size:1rem;">
                             AI 등급: {top1['grade']} ({top1['total_score']}점)
                         </span>
-                        <span style="background:#059669; color:white; padding:6px 14px; border-radius:8px; font-weight:bold; font-size:1rem; margin-left:8px;">
+                        <span style="background:#059669; color:white; padding:6px 14px; border-radius:8px; font-weight:bold; font-size:1rem;">
                             5일 내 상승 확률: {top1['upside_prob']}%
                         </span>
                     </div>
@@ -3602,19 +3632,19 @@ def render_ai_picks_tab(candidates, preset_style, is_dark):
                 with st.container():
                     st.html(
                         f"""<div class="recommend-card">
-                            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-                                <div>
+                            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                                     <span class="stock-title">#{r_rank} {r['name']}</span>
                                     <span class="stock-meta">({r_code} / {r['market']})</span>
-                                    <span style="margin-left:10px; font-weight:bold; color:{'#EF4444' if r['change_rate'] > 0 else '#3B82F6'}; font-size:1.15rem;">
+                                    <span style="font-weight:bold; color:{'#EF4444' if r['change_rate'] > 0 else '#3B82F6'}; font-size:1.15rem; margin-left:4px; white-space:nowrap;">
                                         {r['price']:,}원 ({r['change_rate']:+.2f}%)
                                     </span>
                                 </div>
-                                <div>
+                                <div style="display:flex; align-items:center; gap:8px; white-space:nowrap;">
                                     <span style="background:#64748B; color:white; padding:4px 10px; border-radius:6px; font-weight:bold; font-size:0.9rem;">
                                         등급: 🔒 정회원
                                     </span>
-                                    <span style="background:#475569; color:white; padding:4px 10px; border-radius:6px; font-weight:bold; font-size:0.9rem; margin-left:6px;">
+                                    <span style="background:#475569; color:white; padding:4px 10px; border-radius:6px; font-weight:bold; font-size:0.9rem;">
                                         상승확률: 🔒 정회원
                                     </span>
                                 </div>
@@ -3655,19 +3685,19 @@ def render_ai_picks_tab(candidates, preset_style, is_dark):
                 with st.container():
                     st.html(
                         f"""<div class="recommend-card">
-                            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-                                <div>
+                            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                                     <span class="stock-title">#{r['rank']} {r['name']}</span>
                                     <span class="stock-meta">({r_code} / {r['market']})</span>
-                                    <span style="margin-left:10px; font-weight:bold; color:{'#EF4444' if r['change_rate'] > 0 else '#3B82F6'}; font-size:1.15rem;">
+                                    <span style="font-weight:bold; color:{'#EF4444' if r['change_rate'] > 0 else '#3B82F6'}; font-size:1.15rem; margin-left:4px; white-space:nowrap;">
                                         {r['price']:,}원 ({r['change_rate']:+.2f}%)
                                     </span>
                                 </div>
-                                <div>
+                                <div style="display:flex; align-items:center; gap:8px; white-space:nowrap;">
                                     <span style="background:{'#DC2626' if r['grade']=='S' else '#EA580C' if r['grade']=='A' else '#2563EB'}; color:white; padding:4px 10px; border-radius:6px; font-weight:bold; font-size:0.9rem;">
                                         등급: {r['grade']} ({r['total_score']}점)
                                     </span>
-                                    <span style="background:#059669; color:white; padding:4px 10px; border-radius:6px; font-weight:bold; font-size:0.9rem; margin-left:6px;">
+                                    <span style="background:#059669; color:white; padding:4px 10px; border-radius:6px; font-weight:bold; font-size:0.9rem;">
                                         상승확률: {r['upside_prob']}%
                                     </span>
                                 </div>

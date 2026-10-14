@@ -286,6 +286,21 @@ def render_landing_page(is_dark: bool):
             left: -99999px !important;
         }}
 
+        /* 🌟 와이드 모니터 중앙 정렬 (pccraft.kr 스타일) */
+        .stMainBlockContainer,
+        [data-testid="stMainBlockContainer"],
+        .block-container,
+        [data-testid="block-container"],
+        .stMain .block-container,
+        .main .block-container,
+        section[data-testid="stMain"] > div.block-container {
+            max-width: 1200px !important;
+            margin-left: auto !important;
+            margin-right: auto !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+        }
+
         /* 부드러운 스크롤 & 앵커 마커 오프셋 */
         html {{
             scroll-behavior: smooth !important;
