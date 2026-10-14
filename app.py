@@ -527,10 +527,12 @@ if hasattr(st, "query_params"):
             print(f"[OAuth Callback Error] {e}")
             st.query_params.clear()
 
-# URL 쿼리 파라미터 확인 (?nav=dashboard 또는 ?page=dashboard)
+# URL 쿼리 파라미터 확인 (?nav=dashboard 또는 ?page=dashboard, ?menu=..., ?tab=...)
 target_page = None
+target_menu = None
 if hasattr(st, "query_params"):
     target_page = st.query_params.get("page") or st.query_params.get("nav")
+    target_menu = st.query_params.get("menu") or st.query_params.get("tab")
     admin_param = str(st.query_params.get("admin", "")).strip()
     if admin_param:
         if verify_admin_password(admin_param):
@@ -538,38 +540,55 @@ if hasattr(st, "query_params"):
         elif admin_param.lower() in ["true", "1", "login", "open"]:
             st.session_state["prompt_admin_login"] = True
 
-if target_page in ["dashboard", "radar", "app"]:
-    # 새로고침(F5) 시 분석 대시보드 화면 100% 유지 (매트릭스 인트로 애니메이션은 생략하고 즉시 화면 로드)
-    if "current_page" not in st.session_state or st.session_state.get("current_page") != "dashboard":
-        st.session_state["matrix_intro_transition"] = False
-    st.session_state["current_page"] = "dashboard"
-    st.session_state["is_authenticated"] = True
-    if not st.session_state.get("user_info"):
-        st.session_state["user_info"] = {
-            "name": "체험 투자자",
-            "email": "guest@stockradar.ai",
-            "provider": "Guest",
-            "badge": "🟢 체험 회원",
-        }
-    # 브라우저 주소창에 ?page=dashboard 유지 (새로고침 시 튕김 방지)
-    if hasattr(st, "query_params") and st.query_params.get("page") != "dashboard":
-        st.query_params["page"] = "dashboard"
+# 항상 유효한 세션 및 체험 유저 프로필 유지
+st.session_state["is_authenticated"] = True
+if not st.session_state.get("user_info"):
+    st.session_state["user_info"] = {
+        "name": "체험 투자자",
+        "email": "guest@stockradar.ai",
+        "provider": "Guest",
+        "badge": "🟢 체험 회원",
+    }
+
+# URL ?menu=... 또는 ?tab=... 파라미터가 있는 경우 즉각 관제 메뉴 전환
+if target_menu:
+    tm = str(target_menu).lower().strip()
+    if any(k in tm for k in ["archive", "column", "16", "아카이브", "지식"]):
+        st.session_state["active_nav_menu"] = "📚 주식 실전 지식 아카이브 (16편)"
+        st.session_state["current_page"] = "dashboard"
+    elif any(k in tm for k in ["intro", "about", "guide", "소개"]):
+        st.session_state["active_nav_menu"] = "🏠 서비스 소개 & 실전 가이드"
+        st.session_state["current_page"] = "intro"
+    elif any(k in tm for k in ["quant", "algorithm", "알고리즘", "퀀트"]):
+        st.session_state["active_nav_menu"] = "🏠 서비스 소개 & 실전 가이드"
+        st.session_state["current_page"] = "intro"
+    elif any(k in tm for k in ["picks", "radar", "ai", "추천"]):
+        st.session_state["active_nav_menu"] = "🎯 오늘의 AI 추천주 (원픽 TOP 20)"
+        st.session_state["current_page"] = "dashboard"
+    elif any(k in tm for k in ["rising", "급등"]):
+        st.session_state["active_nav_menu"] = "⚡ 실시간 급등 순위 (TOP 100)"
+        st.session_state["current_page"] = "dashboard"
+    elif any(k in tm for k in ["new", "상장"]):
+        st.session_state["active_nav_menu"] = "🚀 신규 상장주 모니터링"
+        st.session_state["current_page"] = "dashboard"
+    elif any(k in tm for k in ["diag", "진단"]):
+        st.session_state["active_nav_menu"] = "🩺 1초 종목 종합 정밀 진단실"
+        st.session_state["current_page"] = "dashboard"
+    elif any(k in tm for k in ["argon", "chat", "비서"]):
+        st.session_state["active_nav_menu"] = "🤖 Gemini 4 Argon 1:1 AI 투자 비서"
+        st.session_state["current_page"] = "dashboard"
+    elif any(k in tm for k in ["perf", "성과", "검증"]):
+        st.session_state["active_nav_menu"] = "🏆 AI 성과 검증실 (적중률)"
+        st.session_state["current_page"] = "dashboard"
 elif target_page in ["intro", "home"]:
     st.session_state["current_page"] = "intro"
-    if hasattr(st, "query_params") and st.query_params.get("page") != "intro":
-        st.query_params["page"] = "intro"
+    st.session_state["active_nav_menu"] = "🏠 서비스 소개 & 실전 가이드"
 else:
-    # URL 파라미터가 없는 경우 세션 상태 확인, 최초 방문이면 'intro'
+    # 기본 접속 시 항상 실시간 AI 대시보드로 진입
     if "current_page" not in st.session_state:
-        st.session_state["current_page"] = "intro"
-
-# 현재 페이지 상태를 URL 쿼리 파라미터와 엄격히 동기화
-if st.session_state.get("current_page") == "dashboard":
-    if hasattr(st, "query_params") and st.query_params.get("page") != "dashboard":
-        st.query_params["page"] = "dashboard"
-elif st.session_state.get("current_page") == "intro":
-    if hasattr(st, "query_params") and st.query_params.get("page") == "dashboard":
-        st.query_params.clear()
+        st.session_state["current_page"] = "dashboard"
+    if "active_nav_menu" not in st.session_state:
+        st.session_state["active_nav_menu"] = "🎯 오늘의 AI 추천주 (원픽 TOP 20)"
 
 is_dark = (st.session_state.get("theme_mode", "light") == "dark")
 
@@ -601,54 +620,53 @@ def record_diagnosis_usage():
 
 
 # ----------------------------------------------------
-# 2. 사이드바 (대시보드 페이지에서만 렌더링)
+# 2. 사이드바 (상시 렌더링 - 홈, 대시보드, 아카이브 전 화면 메뉴 유지)
 # ----------------------------------------------------
-if st.session_state["current_page"] == "dashboard":
-    with st.sidebar:
-        user = st.session_state.get("user_info")
-        if user:
-            u_name = user.get("name", "회원")
-            u_email = user.get("email", "")
-            u_badge = user.get("badge", "VIP")
-            u_pic = user.get("picture", "")
-            if u_pic:
-                avatar_html = f'<img src="{u_pic}" style="width:36px; height:36px; border-radius:50%; border:2px solid #3B82F6; margin-right:10px; vertical-align:middle; object-fit:cover;" />'
-            else:
-                avatar_html = '<span style="font-size:1.4rem; margin-right:8px; vertical-align:middle;">👤</span>'
-            st.html(
-                f"""<div class="user-profile-card">
-                    <div style="display:flex; align-items:center; margin-bottom:6px;">
-                        {avatar_html}
-                        <div style="overflow:hidden;">
-                            <div style="font-size: 1.0rem; font-weight: 800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{u_name}님</div>
-                            <div style="font-size: 0.75rem; opacity: 0.75; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{u_email}</div>
-                        </div>
+with st.sidebar:
+    user = st.session_state.get("user_info")
+    if user:
+        u_name = user.get("name", "회원")
+        u_email = user.get("email", "")
+        u_badge = user.get("badge", "VIP")
+        u_pic = user.get("picture", "")
+        if u_pic:
+            avatar_html = f'<img src="{u_pic}" style="width:36px; height:36px; border-radius:50%; border:2px solid #3B82F6; margin-right:10px; vertical-align:middle; object-fit:cover;" />'
+        else:
+            avatar_html = '<span style="font-size:1.4rem; margin-right:8px; vertical-align:middle;">👤</span>'
+        st.html(
+            f"""<div class="user-profile-card">
+                <div style="display:flex; align-items:center; margin-bottom:6px;">
+                    {avatar_html}
+                    <div style="overflow:hidden;">
+                        <div style="font-size: 1.0rem; font-weight: 800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{u_name}님</div>
+                        <div style="font-size: 0.75rem; opacity: 0.75; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{u_email}</div>
                     </div>
-                    <span class="badge-pill notranslate" translate="no" style="padding: 2px 8px; font-size: 0.72rem; margin-bottom: 0;">{u_badge}</span>
-                </div>"""
-            )
+                </div>
+                <span class="badge-pill notranslate" translate="no" style="padding: 2px 8px; font-size: 0.72rem; margin-bottom: 0;">{u_badge}</span>
+            </div>"""
+        )
 
-            # 비회원인 경우 구글 정회원 무료 해금 버튼 제공
-            if not is_google_authenticated():
-                if st.button("🔑 구글 정회원 무료 전환 (4대 혜택)", type="primary", key="sb_upgrade_btn", use_container_width=True):
-                    open_login_modal()
+        # 비회원인 경우 구글 정회원 무료 해금 버튼 제공
+        if not is_google_authenticated():
+            if st.button("🔑 구글 정회원 무료 전환 (4대 혜택)", type="primary", key="sb_upgrade_btn", use_container_width=True):
+                open_login_modal()
 
-            col_sb1, col_sb2 = st.columns(2)
-            with col_sb1:
-                if st.button("🏠 홈으로", key="sb_btn_home", use_container_width=True):
-                    st.session_state["current_page"] = "intro"
-                    if hasattr(st, "query_params"):
-                        st.query_params["page"] = "intro"
-                    st.rerun()
-            with col_sb2:
-                if st.button("🚪 로그아웃", key="sb_btn_logout", use_container_width=True):
-                    st.session_state["is_authenticated"] = False
-                    st.session_state["user_info"] = None
-                    st.session_state["current_page"] = "intro"
-                    if hasattr(st, "query_params"):
-                        st.query_params.clear()
-                    st.rerun()
-            st.markdown("---")
+        col_sb1, col_sb2 = st.columns(2)
+        with col_sb1:
+            if st.button("🏠 서비스 소개", key="sb_btn_home", use_container_width=True):
+                st.session_state["active_nav_menu"] = "🏠 서비스 소개 & 실전 가이드"
+                st.session_state["current_page"] = "intro"
+                st.rerun()
+        with col_sb2:
+            if st.button("🚪 세션 초기화", key="sb_btn_logout", use_container_width=True):
+                st.session_state["is_authenticated"] = False
+                st.session_state["user_info"] = None
+                st.session_state["active_nav_menu"] = "🎯 오늘의 AI 추천주 (원픽 TOP 20)"
+                st.session_state["current_page"] = "dashboard"
+                if hasattr(st, "query_params"):
+                    st.query_params.clear()
+                st.rerun()
+        st.markdown("---")
 
         # ----------------------------------------------------
         # 🎯 1. 나의 투자 스타일 (초보자 원클릭 탭 바 - 최상단 배치)
@@ -734,6 +752,7 @@ if st.session_state["current_page"] == "dashboard":
 
         is_admin_active = st.session_state.get("is_admin_mode", False)
         nav_options = [
+            "🏠 서비스 소개 & 실전 가이드",
             "🎯 오늘의 AI 추천주 (원픽 TOP 20)",
             "⚡ 실시간 급등 순위 (TOP 100)",
             "🚀 신규 상장주 모니터링",
@@ -746,7 +765,7 @@ if st.session_state["current_page"] == "dashboard":
             nav_options.append("👑 마스터 관리자 상세 통계실")
 
         if "active_nav_menu" not in st.session_state or st.session_state["active_nav_menu"] not in nav_options:
-            st.session_state["active_nav_menu"] = nav_options[0]
+            st.session_state["active_nav_menu"] = "🎯 오늘의 AI 추천주 (원픽 TOP 20)"
 
         current_active = st.session_state["active_nav_menu"]
         for idx, opt in enumerate(nav_options):
@@ -759,6 +778,10 @@ if st.session_state["current_page"] == "dashboard":
             ):
                 if st.session_state["active_nav_menu"] != opt:
                     st.session_state["active_nav_menu"] = opt
+                    if "서비스 소개" in opt:
+                        st.session_state["current_page"] = "intro"
+                    else:
+                        st.session_state["current_page"] = "dashboard"
                     st.rerun()
 
         selected_menu = st.session_state["active_nav_menu"]
@@ -832,20 +855,11 @@ if st.session_state["current_page"] == "dashboard":
         st.markdown("---")
         now_str = get_now_kst().strftime("%Y-%m-%d %H:%M:%S KST")
         st.caption(f"기준 시간: {now_str}")
-else:
-    # 소개 페이지 기본 파라미터
-    preset_style = "🛡️ 안정적인 스윙형 (추천)"
-    market_filter = "전체 (KOSPI + KOSDAQ)"
-    min_change_rate = 3.0
-    new_listing_months = 12
-    analysis_period = "⚡ 당일 실시간 주도주 (장중 급등 탄력형)"
-    selected_menu = "🎯 오늘의 AI 추천주 (원픽 TOP 20)"
-
 
 # ----------------------------------------------------
 # 3. 테마에 따른 동적 CSS 주입 (크롬 오번역 방지 & 도구바 제거)
 # ----------------------------------------------------
-is_intro = (st.session_state.get("current_page", "intro") == "intro")
+is_intro = (st.session_state.get("active_nav_menu") == "🏠 서비스 소개 & 실전 가이드" or st.session_state.get("current_page", "dashboard") == "intro")
 
 common_css = """
 footer,
@@ -1095,44 +1109,7 @@ button[role="tab"]:nth-of-type(4)[aria-selected="true"] *,
 }
 """
 
-if is_intro:
-    layout_css = """
-[data-testid="stSidebar"], section[data-testid="stSidebar"], [data-testid="stExpandSidebarButton"], [data-testid="collapsedControl"] {
-    display: none !important;
-}
-.stMainBlockContainer,
-[data-testid="stMainBlockContainer"],
-.block-container,
-[data-testid="block-container"],
-.stMain .block-container,
-.main .block-container,
-section[data-testid="stMain"] > div.block-container,
-section[data-testid="stMain"] > div:first-child {
-    max-width: 1200px !important;
-    padding-top: 1.0rem !important;
-    padding-left: 1.5rem !important;
-    padding-right: 1.5rem !important;
-    padding-bottom: 3.5rem !important;
-    margin-left: auto !important;
-    margin-right: auto !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
-}
-@media (max-width: 768px) {
-    .stMainBlockContainer,
-    [data-testid="stMainBlockContainer"],
-    .block-container,
-    [data-testid="block-container"],
-    .stMain .block-container,
-    .main .block-container {
-        padding-left: 0.8rem !important;
-        padding-right: 0.8rem !important;
-        padding-top: 0.8rem !important;
-    }
-}
-"""
-else:
-    layout_css = """
+layout_css = """
 .stMainBlockContainer,
 [data-testid="stMainBlockContainer"],
 .block-container,
@@ -3035,8 +3012,9 @@ def show_stock_chart_dialog(code: str, name: str, is_dark: bool):
 # ----------------------------------------------------
 # 5. 페이지 라우팅 (소개 페이지 vs 실시간 분석 대시보드)
 # ----------------------------------------------------
-if st.session_state.get("current_page", "intro") == "intro":
+if st.session_state.get("active_nav_menu") == "🏠 서비스 소개 & 실전 가이드" or st.session_state.get("current_page") == "intro":
     render_landing_page(is_dark)
+    render_footer_legal_bar(is_dark=is_dark, key_prefix="intro_")
     st.stop()
 
 # ----------------------------------------------------
