@@ -1186,7 +1186,7 @@ def render_landing_page(is_dark: bool):
     # ----------------------------------------------------
     st.markdown("<div id='section-knowledge' class='anchor-marker'></div>", unsafe_allow_html=True)
     st.markdown("<div style='height: 36px;'></div>", unsafe_allow_html=True)
-    render_stock_knowledge_tab(is_dark=is_dark, key_prefix="lp_")
+    render_stock_knowledge_tab(is_dark=is_dark, key_prefix="lp_", is_compact=True)
 
     # ----------------------------------------------------
     # 9. 관리자 전용 파라미터(?admin=true) 호출 시 인증 다이얼로그

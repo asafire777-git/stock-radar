@@ -650,7 +650,7 @@ def show_column_detail_dialog(column: dict, is_dark: bool = False):
         st.rerun()
 
 
-def render_stock_knowledge_tab(is_dark: bool = False, key_prefix: str = ""):
+def render_stock_knowledge_tab(is_dark: bool = False, key_prefix: str = "", is_compact: bool = False):
     """지식 아카이브 탭 렌더러 (네이티브 @st.dialog 적용)"""
     card_bg = "#151A23" if is_dark else "#FFFFFF"
     border_color = "rgba(255, 255, 255, 0.12)" if is_dark else "#E2E8F0"
@@ -678,7 +678,87 @@ def render_stock_knowledge_tab(is_dark: bool = False, key_prefix: str = ""):
     </div>
     """)
 
-    # 카테고리 필터 & 검색
+    if is_compact:
+        # 🌟 컴팩트 모드 (메인 랜딩 페이지 전용): 핵심 필독 BEST 4편만 깔끔하게 노출 + 전편 관제실 이동 버튼 + 접기/펼치기 아코디언
+        highlight_ids = ["ma_golden_cross", "investor_dual_buying", "stoploss_risk_management", "break_even_quant_formula"]
+        highlight_cols = [c for c in STOCK_COLUMNS if c["id"] in highlight_ids]
+        remaining_cols = [c for c in STOCK_COLUMNS if c["id"] not in highlight_ids]
+
+        st.caption("🌟 **N-Stock 퀀트 리서치팀 추천 핵심 필독 칼럼 (BEST 4)**")
+
+        # 4개 핵심 하이라이트 카드 (2열 x 2행)
+        cols_per_row = 2
+        for i in range(0, len(highlight_cols), cols_per_row):
+            row_cols = st.columns(cols_per_row)
+            for j in range(cols_per_row):
+                idx = i + j
+                if idx < len(highlight_cols):
+                    col_item = highlight_cols[idx]
+                    with row_cols[j]:
+                        with st.container(border=True):
+                            st.html(f"""
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                <span style="font-size:0.75rem; font-weight:800; background:rgba(59,130,246,0.12); color:#3B82F6; padding:3px 8px; border-radius:4px;">
+                                    {col_item['category']}
+                                </span>
+                                <span style="font-size:0.72rem; color:{text_secondary};">
+                                    ⏱️ {col_item['read_time']}
+                                </span>
+                            </div>
+                            <h4 style="font-size:0.96rem; font-weight:800; color:{text_primary}; margin:0 0 8px 0; line-height:1.4; min-height:44px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">
+                                {col_item['title']}
+                            </h4>
+                            <p style="font-size:0.80rem; color:{text_secondary}; margin:0 0 12px 0; line-height:1.45; min-height:50px; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;">
+                                {col_item['summary']}
+                            </p>
+                            """)
+                            if st.button("📖 칼럼 전문 정독하기", key=f"{key_prefix}btn_col_{col_item['id']}", use_container_width=True):
+                                show_column_detail_dialog(col_item, is_dark)
+
+        st.markdown("<div style='margin-top:16px;'></div>", unsafe_allow_html=True)
+        col_cta1, col_cta2 = st.columns([1.6, 1.4])
+        with col_cta1:
+            if st.button("📚 16편 전편 아카이브 전용 관제실로 이동 →", key=f"{key_prefix}btn_goto_hub_dash", type="primary", use_container_width=True):
+                st.session_state["active_nav_menu"] = "📚 주식 실전 지식 아카이브 (16편)"
+                st.session_state["current_page"] = "dashboard"
+                if hasattr(st, "query_params"):
+                    st.query_params["page"] = "dashboard"
+                st.rerun()
+        with col_cta2:
+            st.link_button("🌐 웹 전용 16편 아카이브 허브 열기", "https://nstock.kr/columns/", use_container_width=True)
+
+        with st.expander("▼ 나머지 12편 칼럼 목록 펼쳐보기 / 접기", expanded=False):
+            st.caption("추가 12개 전문 칼럼 목록입니다.")
+            cols_sub = 3
+            for i in range(0, len(remaining_cols), cols_sub):
+                r_cols = st.columns(cols_sub)
+                for j in range(cols_sub):
+                    idx = i + j
+                    if idx < len(remaining_cols):
+                        c_item = remaining_cols[idx]
+                        with r_cols[j]:
+                            with st.container(border=True):
+                                st.html(f"""
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                    <span style="font-size:0.75rem; font-weight:800; background:rgba(59,130,246,0.12); color:#3B82F6; padding:3px 8px; border-radius:4px;">
+                                        {c_item['category']}
+                                    </span>
+                                    <span style="font-size:0.72rem; color:{text_secondary};">
+                                        ⏱️ {c_item['read_time']}
+                                    </span>
+                                </div>
+                                <h4 style="font-size:0.92rem; font-weight:800; color:{text_primary}; margin:0 0 6px 0; line-height:1.4; min-height:40px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">
+                                    {c_item['title']}
+                                </h4>
+                                <p style="font-size:0.78rem; color:{text_secondary}; margin:0 0 10px 0; line-height:1.45; min-height:44px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">
+                                    {c_item['summary']}
+                                </p>
+                                """)
+                                if st.button("📖 전문 읽기", key=f"{key_prefix}sub_col_{c_item['id']}", use_container_width=True):
+                                    show_column_detail_dialog(c_item, is_dark)
+        return
+
+    # 카테고리 필터 & 검색 (대시보드 전용 전체 모드)
     col_f1, col_f2 = st.columns([3, 2])
     with col_f1:
         cat_options = ["전체 보기", "차트 보조지표", "수급과 거래량", "실전 리스크 관리", "테마 & 미국주식"]
