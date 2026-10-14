@@ -471,6 +471,34 @@ div[class*="st-key-sb_theme_radio"] div[data-testid="stRadio"] label {
         highlightTabs();
     });
     observer.observe(document.body, { childList: true, subtree: true, attributes: true });
+
+    // 📡 Parent <-> Streamlit SPA Navigation Bridge (Zero-Reload / Instant Tab Switch)
+    window.addEventListener("message", function(event) {
+        if (!event.data || event.data.type !== "NSTOCK_NAVIGATE") return;
+        const targetMenu = event.data.menu;
+        const menuKeywords = {
+            "picks": "AI 추천주",
+            "archive": "지식 아카이브",
+            "quant": "서비스 소개",
+            "intro": "서비스 소개",
+            "rising": "실시간 급등",
+            "new": "신규 상장",
+            "diag": "1초 종목",
+            "argon": "Argon",
+            "perf": "성과 검증"
+        };
+        const keyword = menuKeywords[targetMenu] || "AI 추천주";
+
+        const sidebar = document.querySelector('[data-testid="stSidebar"]');
+        if (!sidebar) return;
+        const buttons = sidebar.querySelectorAll('button');
+        for (let btn of buttons) {
+            if (btn.innerText && btn.innerText.includes(keyword)) {
+                btn.click();
+                break;
+            }
+        }
+    });
 })();
 </script>
 """)
@@ -550,7 +578,7 @@ if not st.session_state.get("user_info"):
         "badge": "🟢 체험 회원",
     }
 
-# URL ?menu=... 또는 ?tab=... 파라미터가 있는 경우 즉각 관제 메뉴 전환
+# URL ?menu=... 또는 ?tab=... 파라미터가 있는 경우 즉각 1회성 관제 메뉴 전환 및 소거
 if target_menu:
     tm = str(target_menu).lower().strip()
     if any(k in tm for k in ["archive", "column", "16", "아카이브", "지식"]):
@@ -580,9 +608,17 @@ if target_menu:
     elif any(k in tm for k in ["perf", "성과", "검증"]):
         st.session_state["active_nav_menu"] = "🏆 AI 성과 검증실 (적중률)"
         st.session_state["current_page"] = "dashboard"
+    try:
+        st.query_params.clear()
+    except Exception:
+        pass
 elif target_page in ["intro", "home"]:
     st.session_state["current_page"] = "intro"
     st.session_state["active_nav_menu"] = "🏠 서비스 소개 & 실전 가이드"
+    try:
+        st.query_params.clear()
+    except Exception:
+        pass
 else:
     # 기본 접속 시 항상 실시간 AI 대시보드로 진입
     if "current_page" not in st.session_state:
@@ -776,15 +812,33 @@ with st.sidebar:
                 type="primary" if is_active else "secondary",
                 use_container_width=True,
             ):
-                if st.session_state["active_nav_menu"] != opt:
-                    st.session_state["active_nav_menu"] = opt
-                    if "서비스 소개" in opt:
-                        st.session_state["current_page"] = "intro"
-                    else:
-                        st.session_state["current_page"] = "dashboard"
-                    st.rerun()
+                st.session_state["active_nav_menu"] = opt
+                if "서비스 소개" in opt:
+                    st.session_state["current_page"] = "intro"
+                else:
+                    st.session_state["current_page"] = "dashboard"
+                if hasattr(st, "query_params"):
+                    try:
+                        st.query_params.clear()
+                    except Exception:
+                        pass
+                st.rerun()
 
         selected_menu = st.session_state["active_nav_menu"]
+
+        # 상위 웹페이지(nstock.kr) 상단 띠 배너 액티브 상태 비동기 실시간 동기화
+        st.html(f"""
+        <script>
+        try {{
+            if (window.parent && window.parent !== window) {{
+                window.parent.postMessage({{
+                    type: "NSTOCK_TAB_CHANGED",
+                    active_menu: "{selected_menu}"
+                }}, "*");
+            }}
+        }} catch(e) {{}}
+        </script>
+        """)
         st.markdown("---")
 
         st.markdown("---")
@@ -3012,10 +3066,16 @@ def show_stock_chart_dialog(code: str, name: str, is_dark: bool):
 # ----------------------------------------------------
 # 5. 페이지 라우팅 (소개 페이지 vs 실시간 분석 대시보드)
 # ----------------------------------------------------
-if st.session_state.get("active_nav_menu") == "🏠 서비스 소개 & 실전 가이드" or st.session_state.get("current_page") == "intro":
-    render_landing_page(is_dark)
-    render_footer_legal_bar(is_dark=is_dark, key_prefix="intro_")
-    st.stop()
+if st.session_state.get("active_nav_menu") == "🏠 서비스 소개 & 실전 가이드":
+    if st.session_state.get("current_page") == "dashboard":
+        st.session_state["active_nav_menu"] = "🎯 오늘의 AI 추천주 (원픽 TOP 20)"
+    else:
+        st.session_state["current_page"] = "intro"
+        render_landing_page(is_dark)
+        render_footer_legal_bar(is_dark=is_dark, key_prefix="intro_")
+        st.stop()
+
+st.session_state["current_page"] = "dashboard"
 
 # ----------------------------------------------------
 # 5-1. 매트릭스 디지털 연산 트랜지션 로더 (서비스 소개 -> 대시보드 진입 시)
