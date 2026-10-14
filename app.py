@@ -738,6 +738,7 @@ if st.session_state["current_page"] == "dashboard":
             "⚡ 실시간 급등 순위 (TOP 100)",
             "🚀 신규 상장주 모니터링",
             "🩺 1초 종목 종합 정밀 진단실",
+            "🤖 Gemini 4 Argon 1:1 AI 투자 비서",
             "🏆 AI 성과 검증실 (적중률)",
             "📚 주식 실전 지식 아카이브 (16편)",
         ]
@@ -4762,6 +4763,150 @@ def render_diagnosis_tab_view(all_stocks_df, code_map, is_dark):
 
     render_quick_diagnosis_tab(all_stocks_df, code_map, is_dark)
 
+
+# ====================================================
+# TAB: Gemini 4 Argon 1:1 대화형 AI 투자 비서 (독립 관제실)
+# ====================================================
+def render_argon_chat_assistant_view(all_stocks_df, code_map, is_dark: bool = False):
+    st.markdown(
+        f"""<div style="background: linear-gradient(135deg, {'#1E1B4B' if is_dark else '#EEF2FF'} 0%, {'#312E81' if is_dark else '#E0E7FF'} 100%);
+                    border: 1.5px solid {'#6366F1' if is_dark else '#818CF8'};
+                    border-radius: 16px; padding: 22px 26px; margin-bottom: 20px; box-shadow: 0 4px 20px rgba(99,102,241,0.12);">
+            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+                <div style="display:flex; align-items:center; gap:14px;">
+                    <div style="font-size: 2rem; background: {'rgba(99,102,241,0.25)' if is_dark else '#FFFFFF'}; border-radius: 14px; width:52px; height:52px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+                        🤖
+                    </div>
+                    <div>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <h2 style="margin:0; font-size:1.35rem; font-weight:800; color:{'#FFFFFF' if is_dark else '#1E1B4B'};">
+                                Gemini 4 Argon 1:1 실시간 AI 투자 비서
+                            </h2>
+                            <span style="background:linear-gradient(90deg, #6366F1, #8B5CF6); color:#fff; font-size:0.72rem; font-weight:800; padding:2px 8px; border-radius:12px; letter-spacing:0.5px;">
+                                2026.09.30 엔진 탑재
+                            </span>
+                        </div>
+                        <div style="font-size:0.86rem; color:{'#C7D2FE' if is_dark else '#4338CA'}; margin-top:4px;">
+                            100만 토큰 초광대역 문맥 창 & 하이브리드 추론 기반 퀀트 리스크 분석실
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <span style="font-size:0.8rem; background:{'rgba(16,185,129,0.15)' if is_dark else '#DCFCE7'}; color:{'#34D399' if is_dark else '#059669'}; border:1px solid {'#059669' if is_dark else '#86EFAC'}; border-radius:20px; padding:4px 12px; font-weight:700;">
+                        🟢 AI 퀀트 추론 엔진 상시 가동 중
+                    </span>
+                </div>
+            </div>
+        </div>""",
+        unsafe_allow_html=True
+    )
+
+    col_target, col_reset = st.columns([3.8, 1.2])
+    with col_target:
+        stock_options = ["🌐 [전체 시장] 국내외 증시 매크로 / 주도 테마 / 종합 투자 질문"]
+        if all_stocks_df is not None and not all_stocks_df.empty:
+            for _, r in all_stocks_df.head(60).iterrows():
+                c = str(r.get("code", "")).zfill(6)
+                n = str(r.get("name", ""))
+                stock_options.append(f"📈 {n} ({c})")
+
+        selected_target = st.selectbox(
+            "🎯 분석 및 질문 대상 선택 (선택 사항)",
+            stock_options,
+            index=0,
+            key="argon_dedicated_target_select",
+            help="특정 종목을 선택하시면 해당 종목의 실시간 퀀트 지표와 수급 데이터를 AI 비서에게 함께 전달합니다."
+        )
+
+    with col_reset:
+        st.write("")
+        st.write("")
+        if st.button("🗑️ 대화 기록 초기화", key="btn_argon_chat_reset", use_container_width=True, help="지금까지의 1:1 대화 내역을 초기화합니다."):
+            st.session_state["argon_dedicated_chat_history"] = []
+            st.rerun()
+
+    # 빠른 추천 질문 칩
+    st.markdown("<div style='font-size:0.85rem; font-weight:700; margin:10px 0 6px 0; color:#6B7280;'>⚡ 빠른 추천 질문 (클릭 시 즉시 질의)</div>", unsafe_allow_html=True)
+    chip_cols = st.columns(4)
+    quick_queries = [
+        "🔥 오늘 국내 증시 외인·기관 주도 섹터와 유망 테마는?",
+        "📊 20일 생명선 지지와 거래량 급증 판독 기준은?",
+        "🛡️ 변동성 장세 손익비 2:1 설정과 리스크 관리법은?",
+        "💎 단기 스윙 관점 분할 매수 및 최적 손절 라인은?"
+    ]
+    prompt_to_run = None
+    for idx, (c, q_text) in enumerate(zip(chip_cols, quick_queries)):
+        with c:
+            if st.button(q_text, key=f"argon_quick_chip_{idx}", use_container_width=True):
+                prompt_to_run = q_text
+
+    if "argon_dedicated_chat_history" not in st.session_state:
+        st.session_state["argon_dedicated_chat_history"] = []
+
+    # Display welcome message if history is empty
+    if not st.session_state["argon_dedicated_chat_history"]:
+        with st.chat_message("assistant", avatar="🤖"):
+            st.markdown(
+                """안녕하세요! **N-Stock 공식 AI 투자 비서 Gemini 4 Argon**입니다. 
+100만 토큰 초광대역 문맥 창과 퀀트 추론 알고리즘을 바탕으로 투자자님의 질문에 냉철하고 명쾌하게 답변해 드립니다.
+
+- 📌 **종목 문의**: 상단에서 종목을 선택하거나 질문에 종목명을 직접 입력하세요.
+- 🌐 **시장 문의**: 당일 코스피/코스닥 지수 흐름, 주도 테마, 외인·기관 수급 동향을 질의하세요.
+- 📐 **매매 기법**: 지지/저항선, 눌림목 타점, 손익비 2:1 원칙, 리스크 관리 조언을 제공합니다.
+"""
+            )
+
+    # Render history
+    for msg in st.session_state["argon_dedicated_chat_history"]:
+        role = msg.get("role", "assistant")
+        avatar = "👤" if role == "user" else "🤖"
+        with st.chat_message(role, avatar=avatar):
+            st.markdown(msg.get("content", ""))
+
+    # Input handling
+    user_input = st.chat_input("Gemini 4 Argon에게 투자 및 종목 분석 질문을 입력하세요...")
+    if prompt_to_run:
+        user_input = prompt_to_run
+
+    if user_input:
+        st.session_state["argon_dedicated_chat_history"].append({"role": "user", "content": user_input})
+        with st.chat_message("user", avatar="👤"):
+            st.markdown(user_input)
+
+        stock_ctx = None
+        if selected_target and not selected_target.startswith("🌐"):
+            try:
+                parts = selected_target.replace("📈 ", "").split(" (")
+                s_name = parts[0].strip()
+                s_code = parts[1].replace(")", "").strip()
+                stock_ctx = {
+                    "name": s_name,
+                    "code": s_code,
+                    "market": "KRX",
+                }
+                if all_stocks_df is not None and not all_stocks_df.empty:
+                    matched = all_stocks_df[all_stocks_df["code"].astype(str).str.zfill(6) == s_code]
+                    if not matched.empty:
+                        row_m = matched.iloc[0]
+                        stock_ctx["price"] = f"{int(row_m.get('close', 0)):,}원"
+                        stock_ctx["change_rate"] = f"{float(row_m.get('change_pct', 0)):+.2f}"
+                        stock_ctx["health_score"] = int(row_m.get("quant_score", 70))
+                        stock_ctx["health_grade"] = str(row_m.get("grade", "B"))
+            except Exception:
+                pass
+
+        with st.chat_message("assistant", avatar="🤖"):
+            with st.spinner("🤖 Gemini 4 Argon이 퀀트 빅데이터와 시장 컨텍스트를 다각도로 분석 중입니다..."):
+                ans = answer_stock_question_with_argon(
+                    question=user_input,
+                    stock_context=stock_ctx,
+                    conversation_history=st.session_state["argon_dedicated_chat_history"][:-1]
+                )
+                st.markdown(ans)
+                st.session_state["argon_dedicated_chat_history"].append({"role": "assistant", "content": ans})
+        st.rerun()
+
+
 # ====================================================
 # 6. 관제 메뉴별 화면 단독 렌더링 (초고속 성능 최적화)
 # ====================================================
@@ -4779,6 +4924,9 @@ elif "신규 상장주" in selected_menu:
 
 elif "1초 종목" in selected_menu:
     render_diagnosis_tab_view(all_stocks_df, code_map, is_dark)
+
+elif "Gemini 4 Argon" in selected_menu or "AI 투자 비서" in selected_menu:
+    render_argon_chat_assistant_view(all_stocks_df, code_map, is_dark)
 
 elif "AI 성과 검증실" in selected_menu:
     render_performance_tab_view(is_dark)
