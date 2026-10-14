@@ -4731,14 +4731,17 @@ def render_diagnosis_tab_view(all_stocks_df, code_map, is_dark):
             )
 
             chip_col1, chip_col2 = st.columns(2)
+            trigger_q = None
             with chip_col1:
                 q1 = f"🎯 지금 {target_name} 신규 진입하기에 적정한 타점인가요?"
                 if st.button(q1, key=f"btn_argon_q1_{target_code}", use_container_width=True):
                     st.session_state[f"argon_active_q_{target_code}"] = q1
+                    trigger_q = q1
             with chip_col2:
                 q2 = f"🩸 최근 외인·기관 수급에서 눈여겨볼 핵심 포인트는?"
                 if st.button(q2, key=f"btn_argon_q2_{target_code}", use_container_width=True):
                     st.session_state[f"argon_active_q_{target_code}"] = q2
+                    trigger_q = q2
 
             user_q = st.text_input(
                 "직접 질문 입력하기",
@@ -4751,7 +4754,9 @@ def render_diagnosis_tab_view(all_stocks_df, code_map, is_dark):
             with col_sub1:
                 submit_q = st.button("🚀 Gemini 4 Argon에게 질문하기", key=f"btn_submit_argon_{target_code}", type="primary", use_container_width=True)
 
-            if submit_q and user_q.strip():
+            query_to_run = trigger_q or (user_q.strip() if submit_q and user_q.strip() else None)
+
+            if query_to_run:
                 with st.spinner(f"🤖 Gemini 4 Argon이 '{target_name}'의 퀀트 데이터와 시장 컨텍스트를 심층 추론 중입니다..."):
                     stock_ctx = {
                         "name": target_name,
@@ -4762,8 +4767,9 @@ def render_diagnosis_tab_view(all_stocks_df, code_map, is_dark):
                         "health_score": vitals_data.get("health_score", 70),
                         "health_grade": vitals_data.get("health_grade", "B"),
                     }
-                    ans = answer_stock_question_with_argon(user_q, stock_context=stock_ctx)
+                    ans = answer_stock_question_with_argon(query_to_run, stock_context=stock_ctx)
                     st.session_state[f"argon_ans_{target_code}"] = ans
+                    st.rerun()
 
             saved_ans = st.session_state.get(f"argon_ans_{target_code}")
             if saved_ans:
@@ -5037,15 +5043,22 @@ Google DeepMind의 100만 토큰 초광대역 문맥 창과 퀀트 추론 알고
 
     # 질문 확정 처리 (상단 폼 전송, 추천 칩 클릭, 하단 chat_input 중 하나라도 있으면 실행)
     question_to_process = None
+    is_quick_prompt = False
     if btn_send and direct_user_q and direct_user_q.strip():
         question_to_process = direct_user_q.strip()
     elif prompt_to_run and prompt_to_run.strip():
         question_to_process = prompt_to_run.strip()
+        is_quick_prompt = True
     elif bottom_input and bottom_input.strip():
         question_to_process = bottom_input.strip()
 
     if question_to_process:
-        st.session_state["argon_dedicated_chat_history"].append({"role": "user", "content": question_to_process})
+        if is_quick_prompt:
+            # 🌟 예시 버튼(빠른 추천 질문 칩) 클릭 시에는 이전 답변 밑으로 중복 누적되지 않고 깔끔하게 새로운 답변으로 갱신
+            st.session_state["argon_dedicated_chat_history"] = [{"role": "user", "content": question_to_process}]
+        else:
+            st.session_state["argon_dedicated_chat_history"].append({"role": "user", "content": question_to_process})
+
         stock_ctx = extract_stock_context_from_text(question_to_process, all_stocks_df, code_map)
 
         with st.chat_message("user", avatar="👤"):
@@ -5057,7 +5070,7 @@ Google DeepMind의 100만 토큰 초광대역 문맥 창과 퀀트 추론 알고
                 ans = answer_stock_question_with_argon(
                     question=question_to_process,
                     stock_context=stock_ctx,
-                    conversation_history=st.session_state["argon_dedicated_chat_history"][:-1]
+                    conversation_history=st.session_state["argon_dedicated_chat_history"][:-1] if not is_quick_prompt else None
                 )
                 st.markdown(ans)
                 st.session_state["argon_dedicated_chat_history"].append({"role": "assistant", "content": ans})
