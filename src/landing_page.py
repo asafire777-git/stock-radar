@@ -199,8 +199,8 @@ def render_landing_page(is_dark: bool):
     - AI 퀀트 100점 만점 배점표
     - 하단 전환 배너
     """
-    is_authed = st.session_state.get("is_authenticated", False)
-    user = st.session_state.get("user_info", {})
+    user = st.session_state.get("user_info") or {}
+    is_google_user = bool(user and user.get("provider") == "Google")
 
     nav_bg = "rgba(15, 23, 42, 0.95)" if is_dark else "rgba(255, 255, 255, 0.96)"
     nav_border = "1px solid rgba(51, 65, 85, 0.9)" if is_dark else "1px solid rgba(203, 213, 225, 0.95)"
@@ -544,14 +544,17 @@ def render_landing_page(is_dark: bool):
                     st.rerun()
 
         with c_auth:
-            if is_authed:
+            if is_google_user:
                 u_name = user.get("name", "회원")
                 if st.button(f"🚀 {u_name}님 대시보드 입장", type="primary", key="top_enter_btn", use_container_width=True):
                     st.session_state["matrix_intro_transition"] = True
                     st.session_state["current_page"] = "dashboard"
                     st.session_state["active_nav_menu"] = "🎯 오늘의 AI 추천주 (원픽 TOP 20)"
+                    tok = st.session_state.get("auth_token")
                     if hasattr(st, "query_params"):
                         st.query_params.clear()
+                        if tok:
+                            st.query_params["auth_tok"] = tok
                     st.rerun()
             else:
                 if st.button("🔑 정회원 로그인", type="primary", key="top_login_btn", use_container_width=True):
@@ -615,8 +618,11 @@ def render_landing_page(is_dark: bool):
                 st.session_state["matrix_intro_transition"] = True
                 st.session_state["current_page"] = "dashboard"
                 st.session_state["active_nav_menu"] = "🎯 오늘의 AI 추천주 (원픽 TOP 20)"
+                tok = st.session_state.get("auth_token")
                 if hasattr(st, "query_params"):
                     st.query_params.clear()
+                    if tok and is_google_user:
+                        st.query_params["auth_tok"] = tok
                 st.rerun()
 
     # 핵심 신뢰 지표 4선
@@ -1289,8 +1295,11 @@ def render_landing_page(is_dark: bool):
                 st.session_state["matrix_intro_transition"] = True
                 st.session_state["current_page"] = "dashboard"
                 st.session_state["active_nav_menu"] = "🎯 오늘의 AI 추천주 (원픽 TOP 20)"
+                tok = st.session_state.get("auth_token")
                 if hasattr(st, "query_params"):
                     st.query_params.clear()
+                    if tok and is_google_user:
+                        st.query_params["auth_tok"] = tok
                 st.rerun()
 
 

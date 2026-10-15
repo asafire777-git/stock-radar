@@ -119,37 +119,81 @@ def get_user_by_email(email: str) -> Optional[Dict]:
 AUTH_SECRET = "nstock_secret_key_2026_quant_radar_auth"
 
 
-def generate_auth_token(email: str) -> str:
-    """새로고침 시 로그인 유지를 위한 안전한 HMAC 서명 토큰 생성"""
+def generate_auth_token(email: str, name: str = "", picture: str = "") -> str:
+    """새로고침 시 로그인 유지를 위한 안전한 HMAC 서명 토큰 생성 (사용자 프로필 내장)"""
     import hmac
     import hashlib
     import time
+    import base64
+    import json
     ts = int(time.time())
     clean_email = str(email).strip().lower()
-    msg = f"{clean_email}:{ts}"
-    sig = hmac.new(AUTH_SECRET.encode(), msg.encode(), hashlib.sha256).hexdigest()[:24]
-    return f"{msg}:{sig}"
+    clean_name = str(name).strip() or "구글 회원"
+    clean_pic = str(picture).strip()
+
+    payload_dict = {"email": clean_email, "name": clean_name, "pic": clean_pic, "ts": ts}
+    payload_str = json.dumps(payload_dict, separators=(',', ':'))
+    b64_payload = base64.urlsafe_b64encode(payload_str.encode()).decode().rstrip("=")
+    sig = hmac.new(AUTH_SECRET.encode(), b64_payload.encode(), hashlib.sha256).hexdigest()[:24]
+    return f"{b64_payload}.{sig}"
 
 
-def verify_auth_token(token: str) -> Optional[str]:
-    """인증 토큰 검증 후 유효한 이메일 반환 (30일 유효)"""
+def verify_auth_token(token: str) -> Optional[Dict]:
+    """인증 토큰 검증 후 유효한 사용자 프로필 딕셔너리 반환 (30일 유효)"""
     import hmac
     import hashlib
     import time
+    import base64
+    import json
     try:
-        parts = str(token).split(":")
-        if len(parts) != 3:
-            return None
-        email, ts_str, sig = parts
-        ts = int(ts_str)
-        # 최대 30일(2,592,000초) 유효
-        now = time.time()
-        if now - ts > 2592000 or now - ts < -3600:
-            return None
-        expected_sig = hmac.new(AUTH_SECRET.encode(), f"{email}:{ts}".encode(), hashlib.sha256).hexdigest()[:24]
-        if hmac.compare_digest(sig, expected_sig):
-            return email.lower().strip()
-    except Exception:
+        raw = str(token).strip()
+        # 점(.) 구분자 신규 토큰
+        if "." in raw:
+            parts = raw.split(".")
+            if len(parts) != 2:
+                return None
+            b64_payload, sig = parts
+            expected_sig = hmac.new(AUTH_SECRET.encode(), b64_payload.encode(), hashlib.sha256).hexdigest()[:24]
+            if not hmac.compare_digest(sig, expected_sig):
+                return None
+
+            rem = len(b64_payload) % 4
+            padded_b64 = b64_payload + ("=" * ((4 - rem) % 4))
+            data = json.loads(base64.urlsafe_b64decode(padded_b64).decode())
+
+            email = str(data.get("email", "")).strip().lower()
+            ts = int(data.get("ts", 0))
+            now = time.time()
+            if now - ts > 2592000 or now - ts < -3600:
+                return None
+
+            return {
+                "email": email,
+                "name": str(data.get("name", "구글 회원")).strip() or "구글 회원",
+                "picture": str(data.get("pic", "")).strip(),
+                "provider": "Google",
+                "badge": "🔵 Google 회원",
+            }
+        # 콜론(:) 구분자 레거시 토큰 하위 호환
+        elif ":" in raw:
+            parts = raw.split(":")
+            if len(parts) == 3:
+                email, ts_str, sig = parts
+                ts = int(ts_str)
+                now = time.time()
+                if now - ts > 2592000 or now - ts < -3600:
+                    return None
+                expected_sig = hmac.new(AUTH_SECRET.encode(), f"{email}:{ts}".encode(), hashlib.sha256).hexdigest()[:24]
+                if hmac.compare_digest(sig, expected_sig):
+                    return {
+                        "email": email.strip().lower(),
+                        "name": "구글 회원",
+                        "picture": "",
+                        "provider": "Google",
+                        "badge": "🔵 Google 회원",
+                    }
+    except Exception as e:
+        print(f"[Verify Auth Token Error] {e}")
         return None
     return None
 

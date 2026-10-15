@@ -612,22 +612,42 @@ if "is_authenticated" not in st.session_state:
 if "user_info" not in st.session_state:
     st.session_state["user_info"] = None
 
-# 1-1-0. URL 파라미터 (?auth_tok=...) 기반 자동 로그인 복원 엔진 (F5 새로고침 유지)
+
+def is_google_authenticated() -> bool:
+    """사용자가 구글 계정으로 공식 로그인한 상태인지 확인"""
+    if not st.session_state.get("is_authenticated", False):
+        return False
+    user_info = st.session_state.get("user_info") or {}
+    return user_info.get("provider") == "Google"
+
+
+def clear_nav_query_params():
+    """네비게이션 파라미터만 정리하되, 인증 토큰(auth_tok)은 철저히 보존하여 F5 새로고침 세션 유지"""
+    if not hasattr(st, "query_params"):
+        return
+    tok = st.session_state.get("auth_token") or st.query_params.get("auth_tok")
+    try:
+        st.query_params.clear()
+        if tok and is_google_authenticated():
+            st.query_params["auth_tok"] = tok
+    except Exception:
+        pass
+
+
+# 1-1-0. URL 파라미터 (?auth_tok=...) 기반 자동 로그인 복원 엔진 (F5 새로고침 영구 유지)
 if hasattr(st, "query_params"):
     auth_tok = st.query_params.get("auth_tok")
     if auth_tok and (not st.session_state.get("user_info") or st.session_state.get("user_info", {}).get("provider") == "Guest"):
         try:
-            from src.user_manager import verify_auth_token, get_user_by_email
-            verified_email = verify_auth_token(auth_tok)
-            if verified_email:
-                u_profile = get_user_by_email(verified_email)
-                if u_profile:
-                    st.session_state["is_authenticated"] = True
-                    st.session_state["user_info"] = u_profile
-                    st.session_state["auth_token"] = auth_tok
-                    from src.user_watchlist import load_user_watchlist, load_user_personality
-                    st.session_state["user_watchlist"] = load_user_watchlist(verified_email)
-                    st.session_state["user_personality"] = load_user_personality(verified_email)
+            from src.user_manager import verify_auth_token
+            verified_profile = verify_auth_token(auth_tok)
+            if verified_profile and isinstance(verified_profile, dict) and verified_profile.get("email"):
+                st.session_state["is_authenticated"] = True
+                st.session_state["user_info"] = verified_profile
+                st.session_state["auth_token"] = auth_tok
+                from src.user_watchlist import load_user_watchlist, load_user_personality
+                st.session_state["user_watchlist"] = load_user_watchlist(verified_profile["email"])
+                st.session_state["user_personality"] = load_user_personality(verified_profile["email"])
         except Exception as e:
             print(f"[Auth Token Hydration Error] {e}")
 
@@ -646,7 +666,11 @@ if hasattr(st, "query_params"):
                 st.session_state["current_page"] = "dashboard"
                 st.session_state["matrix_intro_transition"] = True
                 
-                tok = generate_auth_token(db_user["email"])
+                tok = generate_auth_token(
+                    db_user["email"],
+                    db_user.get("name", ""),
+                    db_user.get("picture", "")
+                )
                 st.session_state["auth_token"] = tok
                 
                 st.query_params.clear()
@@ -660,11 +684,11 @@ if hasattr(st, "query_params"):
                 st.toast(f"🎉 {db_user.get('name', '고객')}님 환영합니다! 구글 정회원 로그인이 완료되었습니다.", icon="✅")
                 st.rerun()
             else:
-                st.query_params.clear()
+                clear_nav_query_params()
                 st.toast("⚠️ 구글 계정 인증 정보를 불러오지 못했습니다. 다시 시도해 주세요.", icon="⚠️")
         except Exception as e:
             print(f"[OAuth Callback Error] {e}")
-            st.query_params.clear()
+            clear_nav_query_params()
 
 # URL 쿼리 파라미터 확인 (?nav=dashboard 또는 ?page=dashboard, ?menu=..., ?tab=...)
 target_page = None
@@ -719,17 +743,11 @@ if target_menu:
     elif any(k in tm for k in ["perf", "성과", "검증"]):
         st.session_state["active_nav_menu"] = "🏆 AI 성과 검증실 (적중률)"
         st.session_state["current_page"] = "dashboard"
-    try:
-        st.query_params.clear()
-    except Exception:
-        pass
+    clear_nav_query_params()
 elif target_page in ["intro", "home"]:
     st.session_state["current_page"] = "intro"
     st.session_state["active_nav_menu"] = "🏠 서비스 소개 & 실전 가이드"
-    try:
-        st.query_params.clear()
-    except Exception:
-        pass
+    clear_nav_query_params()
 else:
     # 기본 접속 시 항상 실시간 AI 대시보드로 진입
     if "current_page" not in st.session_state:
@@ -738,14 +756,6 @@ else:
         st.session_state["active_nav_menu"] = "🎯 오늘의 AI 추천주 (원픽 TOP 20)"
 
 is_dark = (st.session_state.get("theme_mode", "light") == "dark")
-
-
-def is_google_authenticated() -> bool:
-    """사용자가 구글 계정으로 공식 로그인한 상태인지 확인"""
-    if not st.session_state.get("is_authenticated", False):
-        return False
-    user_info = st.session_state.get("user_info") or {}
-    return user_info.get("provider") == "Google"
 
 
 def get_diagnosis_quota_status() -> tuple[bool, int]:
@@ -767,21 +777,31 @@ def record_diagnosis_usage():
 
 
 if is_google_authenticated():
-    u_email = (st.session_state.get("user_info") or {}).get("email", "")
+    u_info = st.session_state.get("user_info") or {}
+    u_email = u_info.get("email", "")
+    u_name = u_info.get("name", "")
+    u_pic = u_info.get("picture", "")
     if "user_watchlist" not in st.session_state:
         st.session_state["user_watchlist"] = load_user_watchlist(u_email)
     if "user_personality" not in st.session_state:
         st.session_state["user_personality"] = load_user_personality(u_email)
     from src.user_manager import generate_auth_token
-    cur_tok = st.session_state.get("auth_token") or generate_auth_token(u_email)
+    cur_tok = st.session_state.get("auth_token") or generate_auth_token(u_email, u_name, u_pic)
     st.session_state["auth_token"] = cur_tok
     if hasattr(st, "query_params") and not st.query_params.get("auth_tok"):
         st.query_params["auth_tok"] = cur_tok
-    st.html(f"""<script>
-        try {{
-            window.parent.postMessage({{ type: 'NSTOCK_AUTH_TOKEN', token: '{cur_tok}' }}, '*');
-        }} catch(e) {{}}
-    </script>""")
+    import streamlit.components.v1 as components
+    components.html(f"""
+        <script>
+            (function() {{
+                try {{
+                    const token = '{cur_tok}';
+                    if (window.top) window.top.postMessage({{ type: 'NSTOCK_AUTH_TOKEN', token: token }}, '*');
+                    if (window.parent) window.parent.postMessage({{ type: 'NSTOCK_AUTH_TOKEN', token: token }}, '*');
+                }} catch(e) {{}}
+            }})();
+        </script>
+    """, height=0, width=0)
 else:
     if "user_watchlist" not in st.session_state:
         st.session_state["user_watchlist"] = {}
@@ -805,7 +825,6 @@ if is_intro_view:
         }
     </style>""")
     render_landing_page(is_dark)
-    render_footer_legal_bar(is_dark=is_dark, key_prefix="intro_")
     st.stop()
 
 
@@ -975,11 +994,7 @@ with st.sidebar:
                 use_container_width=True,
             ):
                 st.session_state["active_nav_menu"] = opt
-                if hasattr(st, "query_params"):
-                    try:
-                        st.query_params.clear()
-                    except Exception:
-                        pass
+                clear_nav_query_params()
                 st.rerun()
 
         selected_menu = st.session_state["active_nav_menu"]
@@ -997,11 +1012,17 @@ with st.sidebar:
                 st.session_state["current_page"] = "dashboard"
                 if hasattr(st, "query_params"):
                     st.query_params.clear()
-                st.html("""<script>
-                    try {
-                        window.parent.postMessage({ type: 'NSTOCK_LOGOUT' }, '*');
-                    } catch(e) {}
-                </script>""")
+                import streamlit.components.v1 as components
+                components.html("""
+                    <script>
+                        (function() {
+                            try {
+                                if (window.top) window.top.postMessage({ type: 'NSTOCK_LOGOUT' }, '*');
+                                if (window.parent) window.parent.postMessage({ type: 'NSTOCK_LOGOUT' }, '*');
+                            } catch(e) {}
+                        })();
+                    </script>
+                """, height=0, width=0)
                 st.toast("정상적으로 로그아웃되었습니다.")
                 st.rerun()
 
@@ -3638,14 +3659,19 @@ def show_my_investment_lounge_dialog(is_dark: bool):
                     st.session_state["auth_token"] = None
                     st.session_state["show_delete_confirm"] = False
                     st.session_state["active_nav_menu"] = "🏠 서비스 소개 & 실전 가이드"
-                    st.session_state["current_page"] = "intro"
                     if hasattr(st, "query_params"):
                         st.query_params.clear()
-                    st.html("""<script>
-                        try {
-                            window.parent.postMessage({ type: 'NSTOCK_LOGOUT' }, '*');
-                        } catch(e) {}
-                    </script>""")
+                    import streamlit.components.v1 as components
+                    components.html("""
+                        <script>
+                            (function() {
+                                try {
+                                    if (window.top) window.top.postMessage({ type: 'NSTOCK_LOGOUT' }, '*');
+                                    if (window.parent) window.parent.postMessage({ type: 'NSTOCK_LOGOUT' }, '*');
+                                } catch(e) {}
+                            })();
+                        </script>
+                    """, height=0, width=0)
                     st.toast("회원 탈퇴 및 모든 개인 데이터 파기가 안전하게 완료되었습니다.")
                     st.rerun()
             with col_del2:
