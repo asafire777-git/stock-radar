@@ -6,3 +6,4 @@ __pycache__/
 .streamlit/secrets.toml
 data/model.pkl
 data/ga4_service_account.json
+data/users/

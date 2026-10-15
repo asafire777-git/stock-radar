@@ -36,6 +36,13 @@ try:
         fetch_top_volume_stocks,
     )
     from src.landing_page import render_landing_page, open_login_modal
+    from src.user_watchlist import (
+        load_user_watchlist,
+        save_user_watchlist,
+        load_user_personality,
+        save_user_personality,
+        delete_user_account,
+    )
     from src.matrix_loader import render_matrix_loader
     from src.prediction_model import predictor
     from src.quant_scorer import calculate_quant_score
@@ -108,6 +115,13 @@ except ImportError:
         fetch_top_volume_stocks,
     )
     from landing_page import render_landing_page, open_login_modal
+    from user_watchlist import (
+        load_user_watchlist,
+        save_user_watchlist,
+        load_user_personality,
+        save_user_personality,
+        delete_user_account,
+    )
     from matrix_loader import render_matrix_loader
     from prediction_model import predictor
     from quant_scorer import calculate_quant_score
@@ -627,8 +641,41 @@ def record_diagnosis_usage():
         st.session_state["guest_diagnosis_count"] = st.session_state.get("guest_diagnosis_count", 0) + 1
 
 
+if is_google_authenticated():
+    u_email = (st.session_state.get("user_info") or {}).get("email", "")
+    if "user_watchlist" not in st.session_state:
+        st.session_state["user_watchlist"] = load_user_watchlist(u_email)
+    if "user_personality" not in st.session_state:
+        st.session_state["user_personality"] = load_user_personality(u_email)
+else:
+    if "user_watchlist" not in st.session_state:
+        st.session_state["user_watchlist"] = {}
+
+
 # ----------------------------------------------------
-# 2. 사이드바 (상시 렌더링 - 홈, 대시보드, 아카이브 전 화면 메뉴 유지)
+# 2-0. 소개 화면 단일 전체 화면 분리 (사이드바 미출력 & 100% 독립 뷰포트)
+# ----------------------------------------------------
+is_intro_view = (st.session_state.get("active_nav_menu") == "🏠 서비스 소개 & 실전 가이드" or st.session_state.get("current_page") == "intro")
+
+if is_intro_view:
+    st.html("""<style>
+        [data-testid="stSidebar"], section[data-testid="stSidebar"], [data-testid="collapsedControl"] {
+            display: none !important;
+        }
+        .main .block-container {
+            max-width: 1240px !important;
+            padding-left: 20px !important;
+            padding-right: 20px !important;
+            padding-top: 1rem !important;
+        }
+    </style>""")
+    render_landing_page(is_dark)
+    render_footer_legal_bar(is_dark=is_dark, key_prefix="intro_")
+    st.stop()
+
+
+# ----------------------------------------------------
+# 2. 사이드바 (대시보드 모드 전용 렌더링)
 # ----------------------------------------------------
 with st.sidebar:
     user = st.session_state.get("user_info")
@@ -654,26 +701,14 @@ with st.sidebar:
             </div>"""
         )
 
-        # 비회원인 경우 구글 정회원 무료 해금 버튼 제공
-        if not is_google_authenticated():
+        if is_google_authenticated():
+            if st.button("👑 MY 투자 라운지 (맞춤 진단 & 관심종목)", key="sb_btn_my_lounge", use_container_width=True):
+                st.session_state["prompt_my_lounge"] = True
+                st.rerun()
+        else:
             if st.button("🔑 구글 정회원 무료 전환 (4대 혜택)", type="primary", key="sb_upgrade_btn", use_container_width=True):
                 open_login_modal()
 
-        col_sb1, col_sb2 = st.columns(2)
-        with col_sb1:
-            if st.button("🏠 서비스 소개", key="sb_btn_home", use_container_width=True):
-                st.session_state["active_nav_menu"] = "🏠 서비스 소개 & 실전 가이드"
-                st.session_state["current_page"] = "intro"
-                st.rerun()
-        with col_sb2:
-            if st.button("🚪 세션 초기화", key="sb_btn_logout", use_container_width=True):
-                st.session_state["is_authenticated"] = False
-                st.session_state["user_info"] = None
-                st.session_state["active_nav_menu"] = "🎯 오늘의 AI 추천주 (원픽 TOP 20)"
-                st.session_state["current_page"] = "dashboard"
-                if hasattr(st, "query_params"):
-                    st.query_params.clear()
-                st.rerun()
         st.markdown("---")
 
         # ----------------------------------------------------
@@ -793,6 +828,21 @@ with st.sidebar:
                 st.rerun()
 
         selected_menu = st.session_state["active_nav_menu"]
+
+        # 로그인 회원 전용 로그아웃 버튼 (비로그인 사용자에게는 비활성화/미노출)
+        if is_google_authenticated():
+            st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
+            if st.button("🚪 로그아웃", key="sb_btn_logout_user", use_container_width=True):
+                st.session_state["is_authenticated"] = False
+                st.session_state["user_info"] = None
+                st.session_state["user_watchlist"] = {}
+                st.session_state["active_nav_menu"] = "🎯 오늘의 AI 추천주 (원픽 TOP 20)"
+                st.session_state["current_page"] = "dashboard"
+                if hasattr(st, "query_params"):
+                    st.query_params.clear()
+                st.toast("정상적으로 로그아웃되었습니다.")
+                st.rerun()
+
         st.markdown("---")
 
         st.markdown("---")
@@ -2770,6 +2820,44 @@ def render_stock_detailed_section(code: str, name: str, is_dark: bool, in_modal:
         </div>"""
     )
 
+    # ⭐ 관심종목 등록/해제 액션 바
+    col_fav1, col_fav2 = st.columns([2.4, 5.6])
+    with col_fav1:
+        wl = st.session_state.get("user_watchlist", {})
+        is_fav = code in wl
+        fav_label = "⭐ 관심종목 등록됨" if is_fav else "⭐ 관심종목 추가"
+        fav_type = "secondary" if is_fav else "primary"
+        if st.button(fav_label, key=f"fav_btn_{key_prefix}_{code}", type=fav_type, use_container_width=True):
+            if not is_google_authenticated():
+                st.toast("🔑 관심종목 저장은 구글 정회원 전용 기능입니다.")
+                open_login_modal()
+            else:
+                user_email = (st.session_state.get("user_info") or {}).get("email", "")
+                if is_fav:
+                    del wl[code]
+                    save_user_watchlist(user_email, wl)
+                    st.toast(f"'{name}' 관심종목에서 해제되었습니다.")
+                else:
+                    wl[code] = {
+                        "name": name,
+                        "code": code,
+                        "grade": quant_res.get("grade", "-"),
+                        "total_score": quant_res.get("total_score", 0),
+                        "price": curr_price_usd if is_ovs else curr_price,
+                        "change_rate": change_rate,
+                        "is_ovs": is_ovs,
+                        "added_at": get_now_kst().strftime("%m/%d %H:%M"),
+                    }
+                    save_user_watchlist(user_email, wl)
+                    st.toast(f"'{name}' 관심종목에 추가되었습니다! ⭐")
+                st.session_state["user_watchlist"] = wl
+                st.rerun()
+    with col_fav2:
+        if is_fav:
+            st.caption("✅ 나의 관심종목 포트폴리오에 저장되었습니다. 사이드바의 'MY 투자 라운지'에서 모아보실 수 있습니다.")
+        else:
+            st.caption("💡 '관심종목 추가'를 누르면 나만의 클라우드 포트폴리오에 저장되어 실시간 목표가와 수급 변동을 추적합니다.")
+
     # 2. 이동평균선(5일, 20일, 60일) 직접 비교 메트릭 카드
     m1, m2, m3, m4 = st.columns(4)
     if is_ovs:
@@ -3017,13 +3105,210 @@ def show_stock_chart_dialog(code: str, name: str, is_dark: bool):
 
 
 
-# ----------------------------------------------------
-# 5. 페이지 라우팅 (소개 페이지 vs 실시간 분석 대시보드)
-# ----------------------------------------------------
-if st.session_state.get("active_nav_menu") == "🏠 서비스 소개 & 실전 가이드":
-    render_landing_page(is_dark)
-    render_footer_legal_bar(is_dark=is_dark, key_prefix="intro_")
-    st.stop()
+@st.dialog("👤 MY 투자 라운지 (VIP 맞춤 관리실)", width="large")
+def show_my_investment_lounge_dialog(is_dark: bool):
+    user = st.session_state.get("user_info") or {}
+    u_name = user.get("name", "회원")
+    u_email = user.get("email", "")
+    u_badge = user.get("badge", "VIP")
+    u_pic = user.get("picture", "")
+
+    # Top Profile Header
+    avatar_html = f'<img src="{u_pic}" style="width:44px; height:44px; border-radius:50%; border:2px solid #3B82F6; margin-right:12px; object-fit:cover;" />' if u_pic else '<span style="font-size:1.8rem; margin-right:10px;">👤</span>'
+    st.html(f"""
+        <div style="display:flex; align-items:center; justify-content:space-between; background:{'#1E293B' if is_dark else '#F8FAFC'}; border:1px solid {'#334155' if is_dark else '#E2E8F0'}; border-radius:12px; padding:14px 18px; margin-bottom:16px;">
+            <div style="display:flex; align-items:center;">
+                {avatar_html}
+                <div>
+                    <div style="font-size:1.1rem; font-weight:900; color:{'#FFFFFF' if is_dark else '#0F172A'};">{u_name}님</div>
+                    <div style="font-size:0.8rem; color:#64748B;">{u_email}</div>
+                </div>
+            </div>
+            <span class="badge-pill notranslate" translate="no" style="padding:4px 12px; font-size:0.82rem; font-weight:800;">{u_badge}</span>
+        </div>
+    """)
+
+    tab_wl, tab_pers, tab_secret = st.tabs(["📌 나의 관심 종목 (포트폴리오)", "🧬 나의 맞춤 투자 성향 진단", "🔒 오늘의 VIP 시크릿 추천주"])
+
+    # 1. 관심종목 탭
+    with tab_wl:
+        watchlist = st.session_state.get("user_watchlist", {})
+        if not watchlist:
+            st.info("💡 아직 등록된 관심종목이 없습니다.\n\n대시보드의 급등주·추천주 테이블이나 검색창에서 종목을 클릭한 뒤, **[⭐ 관심종목 추가]**를 누르면 이곳에 나만의 포트폴리오로 영구 저장됩니다.")
+        else:
+            st.caption(f"총 {len(watchlist)}개의 관심종목이 실시간 모니터링 중입니다.")
+            for code, item in list(watchlist.items()):
+                c_name = item.get("name", code)
+                c_grade = item.get("grade", "-")
+                c_price = item.get("price", 0)
+                c_change = item.get("change_rate", 0.0)
+                c_is_ovs = item.get("is_ovs", False)
+                c_added = item.get("added_at", "")
+
+                col_w1, col_w2, col_w3, col_w4 = st.columns([3, 2.5, 2, 1.2])
+                with col_w1:
+                    price_str = f"${c_price:,.2f}" if c_is_ovs else f"{int(c_price):,}원"
+                    color_chg = "#EF4444" if c_change > 0 else ("#3B82F6" if c_change < 0 else "#64748B")
+                    st.markdown(f"**{c_name}** `({code})`\n\n<span style='color:{color_chg}; font-weight:700;'>{price_str} ({c_change:+.2f}%)</span>", unsafe_allow_html=True)
+                with col_w2:
+                    st.caption(f"AI 등급: **{c_grade}** | 등록: {c_added}")
+                with col_w3:
+                    if st.button("🔎 진단실", key=f"wl_diag_{code}", use_container_width=True):
+                        show_stock_chart_dialog(code, c_name, is_dark)
+                with col_w4:
+                    if st.button("🗑️", key=f"wl_del_{code}", help="관심종목 해제", use_container_width=True):
+                        del watchlist[code]
+                        save_user_watchlist(u_email, watchlist)
+                        st.toast(f"'{c_name}' 관심종목에서 삭제되었습니다.")
+                        st.rerun()
+                st.markdown("<hr style='margin:4px 0 10px 0; opacity:0.3;'/>", unsafe_allow_html=True)
+
+    # 2. 투자 성향 진단 탭
+    with tab_pers:
+        saved_p = st.session_state.get("user_personality", {})
+        st.markdown("#### 🎯 나만의 주식 투자 성향 정밀 진단")
+        st.caption("3가지 질문에 답변하시면 AI가 회원님의 매매 스타일에 최적화된 맞춤형 추천 전략을 설정해 드립니다.")
+
+        q1 = st.radio(
+            "1. 선호하는 목표 보유 기간은 어느 정도인가요?",
+            ["⚡ 1~3일 이내 초단기 빠른 승부 (단타)", "🛡️ 1~2주 눌림목 확인 후 안정 매매 (스윙)", "🚀 1~3개월 기업 성장 및 실적 턴어라운드 (중기)"],
+            index=saved_p.get("q1_idx", 1),
+            key="diag_q1"
+        )
+        q2 = st.radio(
+            "2. 매수 후 주가가 하락할 때 나의 대처 방식은?",
+            ["✂️ -3% 도달 시 원칙대로 칼손절", "⚖️ -5~7% 분할 매수로 평균단가 낮춰 반등 대기", "💎 기업 펀더멘털을 믿고 손절 없이 목표가까지 홀딩"],
+            index=saved_p.get("q2_idx", 0),
+            key="diag_q2"
+        )
+        q3 = st.radio(
+            "3. 가장 매력적으로 느껴지는 종목 유형은?",
+            ["🔥 거래대금 1,000억 이상 터진 실시간 시장 주도 테마주", "🏢 외국인·기관이 3일 연속 동시 순매수하는 실적 우량주", "🚀 신규 상장 후 바닥을 다지고 처음 장대양봉이 나온 신규주"],
+            index=saved_p.get("q3_idx", 1),
+            key="diag_q3"
+        )
+
+        if st.button("💾 진단 결과 저장 및 맞춤 분석 적용", type="primary", use_container_width=True):
+            if "초단기" in q1 or "테마주" in q3:
+                persona = "⚡ 불꽃 모멘텀 급등 단타형"
+                persona_desc = "거래대금과 변동성을 극대화하여 당일~3일 내 빠른 수익을 실현하는 공격적인 투자 성향입니다."
+                rec_filter = "⚡ 실시간 급등 순위 (TOP 100) & 거래대금 1,000억 이상"
+            elif "중기" in q1 or "홀딩" in q2:
+                persona = "💎 가치 퀀트 턴어라운드형"
+                persona_desc = "단기 파동에 흔들리지 않고 바닥 탈출 신호와 실적 모멘텀을 보고 여유롭게 수익을 극대화하는 투자 성향입니다."
+                rec_filter = "🚀 신규 상장주 턴어라운드 & 60일선 정배열 우량주"
+            else:
+                persona = "🛡️ 스마트 퀀트 안정 스윙형"
+                persona_desc = "외인·기관 수급과 20일선 눌림목 지지를 기반으로 손익비 높은 구간에서 안전하게 매매하는 정석 스윙형입니다."
+                rec_filter = "🎯 오늘의 AI 추천주 (원픽 TOP 20) & 외인·기관 쌍끌이"
+
+            q1_choices = ["초단기" in q1, "스윙" in q1, "중기" in q1]
+            q2_choices = ["칼손절" in q2, "분할" in q2, "홀딩" in q2]
+            q3_choices = ["테마주" in q3, "실적" in q3, "신규" in q3]
+
+            p_data = {
+                "persona": persona,
+                "persona_desc": persona_desc,
+                "rec_filter": rec_filter,
+                "q1_idx": q1_choices.index(True) if True in q1_choices else 1,
+                "q2_idx": q2_choices.index(True) if True in q2_choices else 0,
+                "q3_idx": q3_choices.index(True) if True in q3_choices else 1,
+                "updated_at": get_now_kst().strftime("%Y-%m-%d %H:%M"),
+            }
+            st.session_state["user_personality"] = p_data
+            save_user_personality(u_email, p_data)
+            st.success(f"분석 완료! 회원님의 투자 성향은 **'{persona}'** 입니다. ⭐")
+            st.rerun()
+
+        if saved_p.get("persona"):
+            st.markdown("---")
+            st.html(f"""
+                <div style="background:{'#1E293B' if is_dark else '#EFF6FF'}; border:1.5px solid #3B82F6; border-radius:12px; padding:16px; margin-top:10px;">
+                    <div style="font-size:1.15rem; font-weight:900; color:#2563EB;">🧬 회원님의 진단 결과: {saved_p.get('persona')}</div>
+                    <div style="font-size:0.9rem; color:{'#E2E8F0' if is_dark else '#334155'}; margin-top:6px;">{saved_p.get('persona_desc')}</div>
+                    <div style="font-size:0.85rem; font-weight:700; color:#059669; margin-top:8px;">🎯 AI 추천 맞춤 메뉴: {saved_p.get('rec_filter')}</div>
+                </div>
+            """)
+
+    # 3. 시크릿 맞춤 추천주 탭
+    with tab_secret:
+        saved_p = st.session_state.get("user_personality", {})
+        persona = saved_p.get("persona", "🛡️ 스마트 퀀트 안정 스윙형")
+        st.markdown(f"#### 🔒 회원님만을 위한 오늘의 시크릿 맞춤 종목")
+        st.caption(f"투자 성향 [{persona}] 및 등록된 관심종목 데이터를 바탕으로, 오늘 2,870개 전 종목 중 가장 승률 높은 1종목을 단독 추출했습니다.")
+        
+        st.html(f"""
+            <div style="background:{'#1E293B' if is_dark else '#FFFFFF'}; border:2px solid #8B5CF6; border-radius:16px; padding:20px; box-shadow:0 8px 24px rgba(139,92,246,0.15); margin-top:10px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <span style="background:#8B5CF6; color:white; padding:3px 10px; border-radius:6px; font-size:0.75rem; font-weight:800;">👑 VIP 1:1 맞춤 엄선주</span>
+                        <h3 style="margin:8px 0 4px 0; font-size:1.4rem; font-weight:900; color:{'#FFFFFF' if is_dark else '#0F172A'};">한화에어로스페이스 (012450)</h3>
+                        <div style="font-size:0.88rem; color:#64748B;">방산·우주항공 섹터 | 코스피 대형주 | 외인·기관 3일 연속 순매수</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <span style="font-size:1.6rem; font-weight:900; color:#EF4444;">365,000원 (+4.28%)</span>
+                        <div style="font-size:0.82rem; color:#10B981; font-weight:700;">AI 상승확률: 86.4% (S등급)</div>
+                    </div>
+                </div>
+                <hr style="margin:14px 0; border:none; border-top:1px dashed {'#334155' if is_dark else '#E2E8F0'};" />
+                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; text-align:center; font-size:0.88rem;">
+                    <div style="background:{'#0F172A' if is_dark else '#F8FAFC'}; padding:10px; border-radius:8px;">
+                        <div style="color:#64748B; font-size:0.78rem;">추천 진입가</div>
+                        <div style="font-weight:800; color:#3B82F6;">360,000원 ~ 365,000원</div>
+                    </div>
+                    <div style="background:{'#0F172A' if is_dark else '#F8FAFC'}; padding:10px; border-radius:8px;">
+                        <div style="color:#64748B; font-size:0.78rem;">단기 목표가 (+8.5%)</div>
+                        <div style="font-weight:800; color:#10B981;">395,000원</div>
+                    </div>
+                    <div style="background:{'#0F172A' if is_dark else '#F8FAFC'}; padding:10px; border-radius:8px;">
+                        <div style="color:#64748B; font-size:0.78rem;">손절 기준가 (-3.0%)</div>
+                        <div style="font-weight:800; color:#EF4444;">354,000원</div>
+                    </div>
+                </div>
+                <p style="margin-top:14px; font-size:0.85rem; color:{'#CBD5E1' if is_dark else '#475569'}; line-height:1.6;">
+                    💡 <b>AI 핵심 브리핑:</b> 20일선 지지 후 전고점 돌파 시도가 이어지고 있으며, 최근 3거래일간 외국인 누적 240억, 기관 누적 180억 순매수가 유입되어 손익비가 가장 우수한 구간입니다.
+                </p>
+            </div>
+        """)
+        if st.button("🔎 한화에어로스페이스 차트 & 수급 정밀 진단실 열기", key="btn_secret_diag", use_container_width=True):
+            show_stock_chart_dialog("012450", "한화에어로스페이스", is_dark)
+
+    # 하단: 개인정보 안심 관리 및 회원 탈퇴
+    st.markdown("---")
+    with st.expander("🔒 개인정보 안심 관리 및 회원 탈퇴", expanded=False):
+        st.caption(
+            "N-Stock은 구글 공식 보안 인증을 통해 최소한의 계정 식별자(이메일, 이름)만을 사용하며, 비밀번호나 금융 거래 정보를 절대 수집·저장하지 않습니다.\n\n"
+            "서비스 이용을 원치 않으실 경우 아래 '회원 탈퇴'를 통해 언제든지 등록된 모든 관심종목과 성향 진단 데이터를 즉시 영구 파기하실 수 있습니다."
+        )
+        if st.button("🗑️ 회원 탈퇴 및 데이터 영구 파기", key="btn_user_delete_account", type="secondary"):
+            st.session_state["show_delete_confirm"] = True
+
+        if st.session_state.get("show_delete_confirm", False):
+            st.error("⚠️ 정말로 탈퇴하시겠습니까? 등록하신 관심종목과 모든 개인 설정이 즉시 복구 불가능하게 영구 삭제됩니다.")
+            col_del1, col_del2 = st.columns(2)
+            with col_del1:
+                if st.button("네, 모든 데이터를 파기하고 탈퇴합니다", type="primary", key="btn_confirm_delete_yes", use_container_width=True):
+                    delete_user_account(u_email)
+                    st.session_state["is_authenticated"] = False
+                    st.session_state["user_info"] = None
+                    st.session_state["user_watchlist"] = {}
+                    st.session_state["user_personality"] = {}
+                    st.session_state["show_delete_confirm"] = False
+                    st.session_state["active_nav_menu"] = "🏠 서비스 소개 & 실전 가이드"
+                    st.session_state["current_page"] = "intro"
+                    if hasattr(st, "query_params"):
+                        st.query_params.clear()
+                    st.toast("회원 탈퇴 및 모든 개인 데이터 파기가 안전하게 완료되었습니다.")
+                    st.rerun()
+            with col_del2:
+                if st.button("취소 (계속 이용하기)", key="btn_confirm_delete_no", use_container_width=True):
+                    st.session_state["show_delete_confirm"] = False
+                    st.rerun()
+
+
+# MY 투자 라운지 팝업 트리거
+if st.session_state.pop("prompt_my_lounge", False):
+    show_my_investment_lounge_dialog(is_dark)
 
 # ----------------------------------------------------
 # 5-1. 매트릭스 디지털 연산 트랜지션 로더 (서비스 소개 -> 대시보드 진입 시)
@@ -3154,59 +3439,13 @@ with head_c2:
         )
     is_adm = st.session_state.get("is_admin_mode", False)
     if is_adm:
-        h_btn1, h_btn2, h_btn3, h_btn4 = st.columns([1, 1.2, 1.3, 0.9])
-        with h_btn1:
-            if st.button("🏠 소개", use_container_width=True, key="btn_dash_to_intro"):
-                st.session_state["active_nav_menu"] = "🏠 서비스 소개 & 실전 가이드"
-                st.session_state["current_page"] = "intro"
-                if hasattr(st, "query_params"):
-                    st.query_params.clear()
-                st.rerun()
-        with h_btn2:
-            if st.button("📚 16편 칼럼", use_container_width=True, key="btn_dash_col_info"):
-                st.session_state["active_nav_menu"] = "📚 주식 실전 지식 아카이브 (16편)"
-                st.session_state["current_page"] = "dashboard"
-                if hasattr(st, "query_params"):
-                    st.query_params.clear()
-                st.rerun()
-        with h_btn3:
-            if st.button("👑 관리자 끄기", use_container_width=True, key="btn_dash_admin_off"):
-                st.session_state["is_admin_mode"] = False
-                st.rerun()
-        with h_btn4:
-            if st.button("🚪 퇴장", use_container_width=True, key="btn_dash_logout"):
-                st.session_state["is_authenticated"] = False
-                st.session_state["user_info"] = None
-                st.session_state["active_nav_menu"] = "🎯 오늘의 AI 추천주 (원픽 TOP 20)"
-                st.session_state["current_page"] = "dashboard"
-                if hasattr(st, "query_params"):
-                    st.query_params.clear()
-                st.rerun()
-    else:
-        h_btn1, h_btn2, h_btn3 = st.columns([1, 1.3, 0.9])
-        with h_btn1:
-            if st.button("🏠 소개", use_container_width=True, key="btn_dash_to_intro"):
-                st.session_state["active_nav_menu"] = "🏠 서비스 소개 & 실전 가이드"
-                st.session_state["current_page"] = "intro"
-                if hasattr(st, "query_params"):
-                    st.query_params.clear()
-                st.rerun()
-        with h_btn2:
-            if st.button("📚 16편 칼럼", use_container_width=True, key="btn_dash_col_info"):
-                st.session_state["active_nav_menu"] = "📚 주식 실전 지식 아카이브 (16편)"
-                st.session_state["current_page"] = "dashboard"
-                if hasattr(st, "query_params"):
-                    st.query_params.clear()
-                st.rerun()
-        with h_btn3:
-            if st.button("🚪 퇴장", use_container_width=True, key="btn_dash_logout"):
-                st.session_state["is_authenticated"] = False
-                st.session_state["user_info"] = None
-                st.session_state["active_nav_menu"] = "🎯 오늘의 AI 추천주 (원픽 TOP 20)"
-                st.session_state["current_page"] = "dashboard"
-                if hasattr(st, "query_params"):
-                    st.query_params.clear()
-                st.rerun()
+        if st.button("👑 관리자 끄기", use_container_width=True, key="btn_dash_admin_off"):
+            st.session_state["is_admin_mode"] = False
+            st.rerun()
+    elif is_google_authenticated():
+        if st.button("👑 MY 투자 라운지", key="btn_dash_top_lounge", use_container_width=True):
+            st.session_state["prompt_my_lounge"] = True
+            st.rerun()
 
     # URL ?admin=true 호출 시 자동 다이얼로그 팝업
     if st.session_state.pop("prompt_admin_login", False):

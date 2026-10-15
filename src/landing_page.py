@@ -180,8 +180,9 @@ def open_login_modal():
             }
             st.session_state["matrix_intro_transition"] = True
             st.session_state["current_page"] = "dashboard"
+            st.session_state["active_nav_menu"] = "🎯 오늘의 AI 추천주 (원픽 TOP 20)"
             if hasattr(st, "query_params"):
-                st.query_params["page"] = "dashboard"
+                st.query_params.clear()
             st.rerun()
 
     st.markdown("---")
@@ -547,11 +548,12 @@ def render_landing_page(is_dark: bool):
         with c_auth:
             if is_authed:
                 u_name = user.get("name", "회원")
-                if st.button(f"🚀 {u_name}님 입장", type="primary", key="top_enter_btn", use_container_width=True):
+                if st.button(f"🚀 {u_name}님 대시보드 입장", type="primary", key="top_enter_btn", use_container_width=True):
                     st.session_state["matrix_intro_transition"] = True
                     st.session_state["current_page"] = "dashboard"
+                    st.session_state["active_nav_menu"] = "🎯 오늘의 AI 추천주 (원픽 TOP 20)"
                     if hasattr(st, "query_params"):
-                        st.query_params["page"] = "dashboard"
+                        st.query_params.clear()
                     st.rerun()
             else:
                 if st.button("🔑 정회원 로그인", type="primary", key="top_login_btn", use_container_width=True):
@@ -612,14 +614,12 @@ def render_landing_page(is_dark: bool):
                 use_container_width=True,
                 key="hero_cta_btn",
             ):
-                if not is_authed:
-                    open_login_modal()
-                else:
-                    st.session_state["matrix_intro_transition"] = True
-                    st.session_state["current_page"] = "dashboard"
-                    if hasattr(st, "query_params"):
-                        st.query_params["page"] = "dashboard"
-                    st.rerun()
+                st.session_state["matrix_intro_transition"] = True
+                st.session_state["current_page"] = "dashboard"
+                st.session_state["active_nav_menu"] = "🎯 오늘의 AI 추천주 (원픽 TOP 20)"
+                if hasattr(st, "query_params"):
+                    st.query_params.clear()
+                st.rerun()
 
     # 핵심 신뢰 지표 4선
     st.markdown("<div style='height: 25px;'></div>", unsafe_allow_html=True)
@@ -1272,7 +1272,7 @@ def render_landing_page(is_dark: bool):
             st.session_state["active_nav_menu"] = "📚 주식 실전 지식 아카이브 (16편)"
             st.session_state["current_page"] = "dashboard"
             if hasattr(st, "query_params"):
-                st.query_params["page"] = "dashboard"
+                st.query_params.clear()
             st.rerun()
 
     # ----------------------------------------------------
@@ -1288,14 +1288,12 @@ def render_landing_page(is_dark: bool):
                 use_container_width=True,
                 key="bottom_cta_btn",
             ):
-                if not is_authed:
-                    open_login_modal()
-                else:
-                    st.session_state["matrix_intro_transition"] = True
-                    st.session_state["current_page"] = "dashboard"
-                    if hasattr(st, "query_params"):
-                        st.query_params["page"] = "dashboard"
-                    st.rerun()
+                st.session_state["matrix_intro_transition"] = True
+                st.session_state["current_page"] = "dashboard"
+                st.session_state["active_nav_menu"] = "🎯 오늘의 AI 추천주 (원픽 TOP 20)"
+                if hasattr(st, "query_params"):
+                    st.query_params.clear()
+                st.rerun()
 
 
     # ----------------------------------------------------
