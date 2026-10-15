@@ -319,33 +319,31 @@ def render_landing_page(is_dark: bool):
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 8px;
-            padding: 8px 14px;
+            flex-wrap: wrap;
+            gap: 6px;
+            padding: 8px 16px;
             margin: 6px auto 18px auto !important;
             width: fit-content !important;
-            max-width: 100% !important;
-            border-radius: 9999px;
-            overflow-x: auto;
-            white-space: nowrap;
-            -webkit-overflow-scrolling: touch;
-            scrollbar-width: none;
+            max-width: 98% !important;
+            border-radius: 16px;
+            box-sizing: border-box !important;
             background: {nav_bg} !important;
             border: {nav_border} !important;
             box-shadow: {shadow} !important;
         }}
-        .landing-anchor-nav::-webkit-scrollbar {{
-            display: none;
-        }}
         .nav-anchor-btn {{
             display: inline-flex;
             align-items: center;
-            gap: 5px;
-            padding: 7px 14px;
-            border-radius: 9999px;
-            font-size: 0.88rem;
+            gap: 4px;
+            padding: 6px 12px;
+            border-radius: 10px;
+            font-size: 0.82rem;
             font-weight: 700;
+            line-height: 1.2;
+            white-space: nowrap;
+            flex-shrink: 0;
             text-decoration: none !important;
-            transition: all 0.2s ease-in-out;
+            transition: all 0.15s ease-in-out;
             background: {btn_bg} !important;
             color: {btn_color} !important;
             border: {btn_border} !important;
@@ -569,11 +567,11 @@ def render_landing_page(is_dark: bool):
         <div class="landing-anchor-nav notranslate" translate="no" style="background: {nav_bg} !important; border: {nav_border} !important; box-shadow: {shadow} !important;">
             <a href="#section-hero" class="nav-anchor-btn" style="background: {btn_bg} !important; color: {btn_color} !important; border: {btn_border} !important;">🏠 홈</a>
             <a href="#section-features" class="nav-anchor-btn" style="background: {btn_bg} !important; color: {btn_color} !important; border: {btn_border} !important;">✨ 핵심 기능</a>
-            <a href="#section-charts" class="nav-anchor-btn" style="background: {btn_bg} !important; color: {btn_color} !important; border: {btn_border} !important;">📊 AI 차트 분석표</a>
+            <a href="#section-charts" class="nav-anchor-btn" style="background: {btn_bg} !important; color: {btn_color} !important; border: {btn_border} !important;">📊 AI 차트 분석</a>
             <a href="#section-guide" class="nav-anchor-btn" style="background: {btn_bg} !important; color: {btn_color} !important; border: {btn_border} !important;">🔰 실전 가이드</a>
             <a href="#section-strategy" class="nav-anchor-btn" style="background: {btn_bg} !important; color: {btn_color} !important; border: {btn_border} !important;">🎯 3대 매매 전략</a>
             <a href="#section-quant" class="nav-anchor-btn" style="background: {btn_bg} !important; color: {btn_color} !important; border: {btn_border} !important;">⚡ 100점 배점표</a>
-            <a href="#section-knowledge" class="nav-anchor-btn" style="background: rgba(37,99,235,0.12) !important; color: #2563EB !important; border: 1.5px solid rgba(37,99,235,0.35) !important; font-weight: 800 !important;">📚 투자 칼럼(16편)</a>
+            <a href="#section-knowledge" class="nav-anchor-btn" style="background: rgba(37,99,235,0.12) !important; color: #2563EB !important; border: 1.5px solid rgba(37,99,235,0.35) !important; font-weight: 800 !important;">📚 실전 칼럼(16편)</a>
             <a href="#section-policies" class="nav-anchor-btn" style="background: {btn_bg} !important; color: {btn_color} !important; border: {btn_border} !important;">📜 정책·면책</a>
             <a href="#section-cta" class="nav-anchor-btn" style="background: #2563EB !important; color: #FFFFFF !important; border: none !important; font-weight: 800 !important;">🚀 바로 입장</a>
         </div>
