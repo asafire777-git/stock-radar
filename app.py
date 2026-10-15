@@ -400,6 +400,77 @@ body:not(.dark-theme) div[class*="st-key-lnb_btn_"] button[kind="primary"] p {
     font-weight: 800 !important;
 }
 
+/* 🔑 구글 정회원 무료 전환 버튼 - 고대비 프리미엄 블루 & 선명한 흰색 굵은 글씨 최적화 */
+div[class*="st-key-sb_upgrade_btn"] {
+    margin-top: 4px !important;
+    margin-bottom: 8px !important;
+}
+
+div[class*="st-key-sb_upgrade_btn"] button,
+div[class*="st-key-sb_upgrade_btn"] button[kind="primary"],
+div[class*="st-key-sb_upgrade_btn"] button[data-testid="baseButton-primary"] {
+    background: linear-gradient(135deg, #1D4ED8 0%, #2563EB 50%, #3B82F6 100%) !important;
+    border: 1.5px solid #1E40AF !important;
+    border-radius: 10px !important;
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35) !important;
+    padding: 0 12px !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+div[class*="st-key-sb_upgrade_btn"] button *,
+div[class*="st-key-sb_upgrade_btn"] button p,
+div[class*="st-key-sb_upgrade_btn"] button div,
+div[class*="st-key-sb_upgrade_btn"] button span {
+    color: #FFFFFF !important;
+    -webkit-text-fill-color: #FFFFFF !important;
+    font-weight: 900 !important;
+    font-size: 0.95rem !important;
+    letter-spacing: -0.3px !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+}
+
+div[class*="st-key-sb_upgrade_btn"] button:hover {
+    background: linear-gradient(135deg, #1E40AF 0%, #1D4ED8 100%) !important;
+    border-color: #1E3A8A !important;
+    box-shadow: 0 6px 18px rgba(37, 99, 235, 0.45) !important;
+    transform: translateY(-1px) !important;
+}
+
+div[class*="st-key-sb_upgrade_btn"] button:hover *,
+div[class*="st-key-sb_upgrade_btn"] button:hover p {
+    color: #FFFFFF !important;
+    -webkit-text-fill-color: #FFFFFF !important;
+}
+
+/* 👑 MY 투자 라운지 버튼 */
+div[class*="st-key-sb_btn_my_lounge"] button {
+    background: linear-gradient(135deg, #4338CA 0%, #6366F1 100%) !important;
+    border: 1.5px solid #4F46E5 !important;
+    border-radius: 10px !important;
+    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.30) !important;
+    height: 44px !important;
+    min-height: 44px !important;
+}
+div[class*="st-key-sb_btn_my_lounge"] button *,
+div[class*="st-key-sb_btn_my_lounge"] button p {
+    color: #FFFFFF !important;
+    -webkit-text-fill-color: #FFFFFF !important;
+    font-weight: 900 !important;
+    font-size: 0.95rem !important;
+}
+
+/* 전역 Primary 버튼 고대비 흰색 텍스트 보장 (가독성 극대화) */
+div:not([class*="st-key-lnb_btn_"]) > button[kind="primary"] *,
+div:not([class*="st-key-lnb_btn_"]) > button[kind="primary"] p,
+div:not([class*="st-key-lnb_btn_"]) > button[data-testid="baseButton-primary"] *,
+div:not([class*="st-key-lnb_btn_"]) > button[data-testid="baseButton-primary"] p {
+    color: #FFFFFF !important;
+    -webkit-text-fill-color: #FFFFFF !important;
+    font-weight: 800 !important;
+}
+
 /* 테마 선택 라디오 버튼 스타일 */
 div[class*="st-key-sb_theme_radio"] div[data-testid="stRadio"] > div {
     gap: 8px !important;
@@ -706,6 +777,26 @@ with st.sidebar:
                 st.session_state["prompt_my_lounge"] = True
                 st.rerun()
         else:
+            st.html("""<style>
+                div[class*="st-key-sb_upgrade_btn"] button {
+                    background: #2563EB !important;
+                    background-color: #2563EB !important;
+                    border: 1.5px solid #1D4ED8 !important;
+                    border-radius: 10px !important;
+                    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35) !important;
+                    height: 44px !important;
+                }
+                div[class*="st-key-sb_upgrade_btn"] button *,
+                div[class*="st-key-sb_upgrade_btn"] button p,
+                div[class*="st-key-sb_upgrade_btn"] button div,
+                div[class*="st-key-sb_upgrade_btn"] button span {
+                    color: #FFFFFF !important;
+                    -webkit-text-fill-color: #FFFFFF !important;
+                    font-weight: 900 !important;
+                    font-size: 0.95rem !important;
+                    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35) !important;
+                }
+            </style>""")
             if st.button("🔑 구글 정회원 무료 전환 (4대 혜택)", type="primary", key="sb_upgrade_btn", use_container_width=True):
                 open_login_modal()
 
