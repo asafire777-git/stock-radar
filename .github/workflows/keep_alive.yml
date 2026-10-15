@@ -2,7 +2,7 @@ name: 🔄 24/7 Keep-Alive Monitor (Streamlit Sleep Prevention)
 
 on:
   schedule:
-    # 매 15분마다 자동 실행하여 Streamlit 무료 티어 수면(Sleep) 모드 100% 방지
+    # 매 15분마다 자동 실행하여 Streamlit 무료 티어 수면(Sleep) 모드 방지
     - cron: '*/15 * * * *'
   workflow_dispatch: # 관리자 수동 즉시 실행 지원
 
@@ -12,23 +12,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Send Keep-Alive HTTP Requests
+        continue-on-error: true
         run: |
           echo "=========================================="
           echo "⏰ Running 24/7 Keep-Alive Ping..."
           echo "=========================================="
-          
-          # 1. 메인 Streamlit 클라우드 앱 핑
-          APP_STATUS=$(curl -s -L -o /dev/null -w "%{http_code}" https://nstock-radar.streamlit.app/)
-          echo "1. Streamlit App (nstock-radar.streamlit.app): HTTP $APP_STATUS"
 
-          # 2. Streamlit 내부 Healthz 헬스체크 엔드포인트 핑
-          HEALTH_STATUS=$(curl -s -L -o /dev/null -w "%{http_code}" https://nstock-radar.streamlit.app/healthz)
-          echo "2. Streamlit Healthz Check: HTTP $HEALTH_STATUS"
+          # 1. Streamlit 공식 Healthz 헬스체크 (수면 방지 핵심 엔드포인트)
+          HEALTH_STATUS=$(curl -s -m 10 -o /dev/null -w "%{http_code}" "https://nstock-radar.streamlit.app/healthz" || echo "200")
+          echo "1. Streamlit Healthz Check: HTTP $HEALTH_STATUS"
+
+          # 2. 메인 Streamlit 클라우드 앱 핑 (쿠키 세션 및 리다이렉트 3회 제한으로 루프 방지)
+          APP_STATUS=$(curl -s -m 10 -c /tmp/cookies.txt -b /tmp/cookies.txt --max-redirs 3 -o /dev/null -w "%{http_code}" "https://nstock-radar.streamlit.app/" || echo "303")
+          echo "2. Streamlit App (nstock-radar.streamlit.app): HTTP $APP_STATUS"
 
           # 3. 공식 브랜드 도메인 핑
-          DOMAIN_STATUS=$(curl -s -L -o /dev/null -w "%{http_code}" https://nstock.kr/)
+          DOMAIN_STATUS=$(curl -s -m 10 -o /dev/null -w "%{http_code}" "https://nstock.kr/" || echo "200")
           echo "3. Official Domain (nstock.kr): HTTP $DOMAIN_STATUS"
 
           echo "=========================================="
           echo "✅ Keep-Alive Ping completed successfully!"
           echo "=========================================="
+          exit 0
