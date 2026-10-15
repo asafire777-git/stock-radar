@@ -102,3 +102,54 @@ def get_user_metrics() -> Dict:
         "today_active": today_active,
         "users_list": sorted(users, key=lambda x: str(x.get("last_login", "")), reverse=True)
     }
+
+
+def get_user_by_email(email: str) -> Optional[Dict]:
+    """이메일로 회원 정보 조회"""
+    if not email:
+        return None
+    users = load_all_users()
+    clean_email = str(email).strip().lower()
+    for u in users:
+        if str(u.get("email", "")).strip().lower() == clean_email:
+            return u
+    return None
+
+
+AUTH_SECRET = "nstock_secret_key_2026_quant_radar_auth"
+
+
+def generate_auth_token(email: str) -> str:
+    """새로고침 시 로그인 유지를 위한 안전한 HMAC 서명 토큰 생성"""
+    import hmac
+    import hashlib
+    import time
+    ts = int(time.time())
+    clean_email = str(email).strip().lower()
+    msg = f"{clean_email}:{ts}"
+    sig = hmac.new(AUTH_SECRET.encode(), msg.encode(), hashlib.sha256).hexdigest()[:24]
+    return f"{msg}:{sig}"
+
+
+def verify_auth_token(token: str) -> Optional[str]:
+    """인증 토큰 검증 후 유효한 이메일 반환 (30일 유효)"""
+    import hmac
+    import hashlib
+    import time
+    try:
+        parts = str(token).split(":")
+        if len(parts) != 3:
+            return None
+        email, ts_str, sig = parts
+        ts = int(ts_str)
+        # 최대 30일(2,592,000초) 유효
+        now = time.time()
+        if now - ts > 2592000 or now - ts < -3600:
+            return None
+        expected_sig = hmac.new(AUTH_SECRET.encode(), f"{email}:{ts}".encode(), hashlib.sha256).hexdigest()[:24]
+        if hmac.compare_digest(sig, expected_sig):
+            return email.lower().strip()
+    except Exception:
+        return None
+    return None
+
