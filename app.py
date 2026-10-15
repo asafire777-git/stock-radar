@@ -471,34 +471,6 @@ div[class*="st-key-sb_theme_radio"] div[data-testid="stRadio"] label {
         highlightTabs();
     });
     observer.observe(document.body, { childList: true, subtree: true, attributes: true });
-
-    // 📡 Parent <-> Streamlit SPA Navigation Bridge (Zero-Reload / Instant Tab Switch)
-    window.addEventListener("message", function(event) {
-        if (!event.data || event.data.type !== "NSTOCK_NAVIGATE") return;
-        const targetMenu = event.data.menu;
-        const menuKeywords = {
-            "picks": "AI 추천주",
-            "archive": "지식 아카이브",
-            "quant": "서비스 소개",
-            "intro": "서비스 소개",
-            "rising": "실시간 급등",
-            "new": "신규 상장",
-            "diag": "1초 종목",
-            "argon": "Argon",
-            "perf": "성과 검증"
-        };
-        const keyword = menuKeywords[targetMenu] || "AI 추천주";
-
-        const sidebar = document.querySelector('[data-testid="stSidebar"]');
-        if (!sidebar) return;
-        const buttons = sidebar.querySelectorAll('button');
-        for (let btn of buttons) {
-            if (btn.innerText && btn.innerText.includes(keyword)) {
-                btn.click();
-                break;
-            }
-        }
-    });
 })();
 </script>
 """)
@@ -813,10 +785,6 @@ with st.sidebar:
                 use_container_width=True,
             ):
                 st.session_state["active_nav_menu"] = opt
-                if "서비스 소개" in opt:
-                    st.session_state["current_page"] = "intro"
-                else:
-                    st.session_state["current_page"] = "dashboard"
                 if hasattr(st, "query_params"):
                     try:
                         st.query_params.clear()
@@ -825,20 +793,6 @@ with st.sidebar:
                 st.rerun()
 
         selected_menu = st.session_state["active_nav_menu"]
-
-        # 상위 웹페이지(nstock.kr) 상단 띠 배너 액티브 상태 비동기 실시간 동기화
-        st.html(f"""
-        <script>
-        try {{
-            if (window.parent && window.parent !== window) {{
-                window.parent.postMessage({{
-                    type: "NSTOCK_TAB_CHANGED",
-                    active_menu: "{selected_menu}"
-                }}, "*");
-            }}
-        }} catch(e) {{}}
-        </script>
-        """)
         st.markdown("---")
 
         st.markdown("---")
@@ -3067,15 +3021,9 @@ def show_stock_chart_dialog(code: str, name: str, is_dark: bool):
 # 5. 페이지 라우팅 (소개 페이지 vs 실시간 분석 대시보드)
 # ----------------------------------------------------
 if st.session_state.get("active_nav_menu") == "🏠 서비스 소개 & 실전 가이드":
-    if st.session_state.get("current_page") == "dashboard":
-        st.session_state["active_nav_menu"] = "🎯 오늘의 AI 추천주 (원픽 TOP 20)"
-    else:
-        st.session_state["current_page"] = "intro"
-        render_landing_page(is_dark)
-        render_footer_legal_bar(is_dark=is_dark, key_prefix="intro_")
-        st.stop()
-
-st.session_state["current_page"] = "dashboard"
+    render_landing_page(is_dark)
+    render_footer_legal_bar(is_dark=is_dark, key_prefix="intro_")
+    st.stop()
 
 # ----------------------------------------------------
 # 5-1. 매트릭스 디지털 연산 트랜지션 로더 (서비스 소개 -> 대시보드 진입 시)
@@ -3209,13 +3157,17 @@ with head_c2:
         h_btn1, h_btn2, h_btn3, h_btn4 = st.columns([1, 1.2, 1.3, 0.9])
         with h_btn1:
             if st.button("🏠 소개", use_container_width=True, key="btn_dash_to_intro"):
+                st.session_state["active_nav_menu"] = "🏠 서비스 소개 & 실전 가이드"
                 st.session_state["current_page"] = "intro"
                 if hasattr(st, "query_params"):
-                    st.query_params["page"] = "intro"
+                    st.query_params.clear()
                 st.rerun()
         with h_btn2:
             if st.button("📚 16편 칼럼", use_container_width=True, key="btn_dash_col_info"):
                 st.session_state["active_nav_menu"] = "📚 주식 실전 지식 아카이브 (16편)"
+                st.session_state["current_page"] = "dashboard"
+                if hasattr(st, "query_params"):
+                    st.query_params.clear()
                 st.rerun()
         with h_btn3:
             if st.button("👑 관리자 끄기", use_container_width=True, key="btn_dash_admin_off"):
@@ -3225,7 +3177,8 @@ with head_c2:
             if st.button("🚪 퇴장", use_container_width=True, key="btn_dash_logout"):
                 st.session_state["is_authenticated"] = False
                 st.session_state["user_info"] = None
-                st.session_state["current_page"] = "intro"
+                st.session_state["active_nav_menu"] = "🎯 오늘의 AI 추천주 (원픽 TOP 20)"
+                st.session_state["current_page"] = "dashboard"
                 if hasattr(st, "query_params"):
                     st.query_params.clear()
                 st.rerun()
@@ -3233,19 +3186,24 @@ with head_c2:
         h_btn1, h_btn2, h_btn3 = st.columns([1, 1.3, 0.9])
         with h_btn1:
             if st.button("🏠 소개", use_container_width=True, key="btn_dash_to_intro"):
+                st.session_state["active_nav_menu"] = "🏠 서비스 소개 & 실전 가이드"
                 st.session_state["current_page"] = "intro"
                 if hasattr(st, "query_params"):
-                    st.query_params["page"] = "intro"
+                    st.query_params.clear()
                 st.rerun()
         with h_btn2:
             if st.button("📚 16편 칼럼", use_container_width=True, key="btn_dash_col_info"):
                 st.session_state["active_nav_menu"] = "📚 주식 실전 지식 아카이브 (16편)"
+                st.session_state["current_page"] = "dashboard"
+                if hasattr(st, "query_params"):
+                    st.query_params.clear()
                 st.rerun()
         with h_btn3:
             if st.button("🚪 퇴장", use_container_width=True, key="btn_dash_logout"):
                 st.session_state["is_authenticated"] = False
                 st.session_state["user_info"] = None
-                st.session_state["current_page"] = "intro"
+                st.session_state["active_nav_menu"] = "🎯 오늘의 AI 추천주 (원픽 TOP 20)"
+                st.session_state["current_page"] = "dashboard"
                 if hasattr(st, "query_params"):
                     st.query_params.clear()
                 st.rerun()
