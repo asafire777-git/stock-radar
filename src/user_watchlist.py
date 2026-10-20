@@ -79,3 +79,41 @@ def delete_user_account(email: str) -> bool:
         return True
     except Exception:
         return False
+
+
+def encode_user_data_token(watchlist: Dict[str, Any], personality: Dict[str, Any]) -> str:
+    """관심종목과 투자성향을 브라우저 localStorage 동기화를 위한 안전한 base64 토큰으로 압축 인코딩"""
+    import base64
+    import json
+    try:
+        payload = {
+            "wl": watchlist or {},
+            "pers": personality or {}
+        }
+        json_str = json.dumps(payload, separators=(',', ':'), ensure_ascii=False)
+        return base64.urlsafe_b64encode(json_str.encode("utf-8")).decode("utf-8").rstrip("=")
+    except Exception as e:
+        print(f"[EncodeUserData Error] {e}")
+        return ""
+
+
+def decode_user_data_token(token: str) -> Dict[str, Any]:
+    """브라우저 localStorage로부터 전달받은 base64 토큰을 관심종목 및 투자성향 데이터로 디코딩"""
+    import base64
+    import json
+    if not token or not str(token).strip():
+        return {"wl": {}, "pers": {}}
+    try:
+        raw = str(token).strip()
+        rem = len(raw) % 4
+        padded = raw + ("=" * ((4 - rem) % 4))
+        json_str = base64.urlsafe_b64decode(padded.encode("utf-8")).decode("utf-8")
+        data = json.loads(json_str)
+        if isinstance(data, dict):
+            return {
+                "wl": data.get("wl", {}) if isinstance(data.get("wl"), dict) else {},
+                "pers": data.get("pers", {}) if isinstance(data.get("pers"), dict) else {}
+            }
+    except Exception as e:
+        print(f"[DecodeUserData Error] {e}")
+    return {"wl": {}, "pers": {}}

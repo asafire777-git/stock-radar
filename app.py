@@ -622,14 +622,17 @@ def is_google_authenticated() -> bool:
 
 
 def clear_nav_query_params():
-    """네비게이션 파라미터만 정리하되, 인증 토큰(auth_tok)은 철저히 보존하여 F5 새로고침 세션 유지"""
+    """네비게이션 파라미터만 정리하되, 인증 토큰(auth_tok)과 유저 데이터(udata)는 철저히 보존하여 F5 새로고침 세션 유지"""
     if not hasattr(st, "query_params"):
         return
     tok = st.session_state.get("auth_token") or st.query_params.get("auth_tok")
+    udata = st.query_params.get("udata")
     try:
         st.query_params.clear()
         if tok and is_google_authenticated():
             st.query_params["auth_tok"] = tok
+        if udata and is_google_authenticated():
+            st.query_params["udata"] = udata
     except Exception:
         pass
 
@@ -650,6 +653,31 @@ if hasattr(st, "query_params"):
                 st.session_state["user_personality"] = load_user_personality(verified_profile["email"])
         except Exception as e:
             print(f"[Auth Token Hydration Error] {e}")
+
+# 1-1-0-1. 브라우저 localStorage 연동 관심종목/투자성향 2중 영구 복원 엔진 (서버 재빌드 시에도 무손실 보존)
+if hasattr(st, "query_params"):
+    udata_param = st.query_params.get("udata")
+    if udata_param:
+        try:
+            from src.user_watchlist import decode_user_data_token, save_user_watchlist, save_user_personality
+            decoded_data = decode_user_data_token(udata_param)
+            u_email = (st.session_state.get("user_info") or {}).get("email", "")
+            if decoded_data.get("wl") and not st.session_state.get("user_watchlist"):
+                st.session_state["user_watchlist"] = decoded_data["wl"]
+                if u_email:
+                    save_user_watchlist(u_email, decoded_data["wl"])
+            elif decoded_data.get("wl") and isinstance(st.session_state.get("user_watchlist"), dict):
+                for k, v in decoded_data["wl"].items():
+                    if k not in st.session_state["user_watchlist"]:
+                        st.session_state["user_watchlist"][k] = v
+                if u_email:
+                    save_user_watchlist(u_email, st.session_state["user_watchlist"])
+            if decoded_data.get("pers") and not st.session_state.get("user_personality"):
+                st.session_state["user_personality"] = decoded_data["pers"]
+                if u_email:
+                    save_user_personality(u_email, decoded_data["pers"])
+        except Exception as e:
+            print(f"[UserData Hydration Error] {e}")
 
 # 1-1-1. Google OAuth 2.0 콜백 인증 처리 (?code=...)
 if hasattr(st, "query_params"):
@@ -790,14 +818,29 @@ if is_google_authenticated():
     st.session_state["auth_token"] = cur_tok
     if hasattr(st, "query_params") and not st.query_params.get("auth_tok"):
         st.query_params["auth_tok"] = cur_tok
+
+    from src.user_watchlist import encode_user_data_token
+    cur_wl = st.session_state.get("user_watchlist") or {}
+    cur_pers = st.session_state.get("user_personality") or {}
+    udata_str = encode_user_data_token(cur_wl, cur_pers)
+    if hasattr(st, "query_params") and udata_str and not st.query_params.get("udata"):
+        st.query_params["udata"] = udata_str
+
     import streamlit.components.v1 as components
     components.html(f"""
         <script>
             (function() {{
                 try {{
                     const token = '{cur_tok}';
-                    if (window.top) window.top.postMessage({{ type: 'NSTOCK_AUTH_TOKEN', token: token }}, '*');
-                    if (window.parent) window.parent.postMessage({{ type: 'NSTOCK_AUTH_TOKEN', token: token }}, '*');
+                    const udata = '{udata_str}';
+                    if (window.top) {{
+                        window.top.postMessage({{ type: 'NSTOCK_AUTH_TOKEN', token: token }}, '*');
+                        if (udata) window.top.postMessage({{ type: 'NSTOCK_SAVE_USER_DATA', udata: udata }}, '*');
+                    }}
+                    if (window.parent) {{
+                        window.parent.postMessage({{ type: 'NSTOCK_AUTH_TOKEN', token: token }}, '*');
+                        if (udata) window.parent.postMessage({{ type: 'NSTOCK_SAVE_USER_DATA', udata: udata }}, '*');
+                    }}
                 }} catch(e) {{}}
             }})();
         </script>
@@ -3037,6 +3080,11 @@ def render_stock_detailed_section(code: str, name: str, is_dark: bool, in_modal:
             if is_fav:
                 del wl[code]
                 save_user_watchlist(user_email, wl)
+                st.session_state["user_watchlist"] = wl
+                from src.user_watchlist import encode_user_data_token
+                cur_pers = st.session_state.get("user_personality") or {}
+                if hasattr(st, "query_params"):
+                    st.query_params["udata"] = encode_user_data_token(wl, cur_pers)
                 st.toast(f"'{name}' 관심종목에서 해제되었습니다.")
             else:
                 wl[code] = {
@@ -3050,8 +3098,12 @@ def render_stock_detailed_section(code: str, name: str, is_dark: bool, in_modal:
                     "added_at": get_now_kst().strftime("%m/%d %H:%M"),
                 }
                 save_user_watchlist(user_email, wl)
+                st.session_state["user_watchlist"] = wl
+                from src.user_watchlist import encode_user_data_token
+                cur_pers = st.session_state.get("user_personality") or {}
+                if hasattr(st, "query_params"):
+                    st.query_params["udata"] = encode_user_data_token(wl, cur_pers)
                 st.toast(f"🎉 '{name}' 관심종목에 추가되었습니다! [MY 투자 라운지]에서 확인하세요.", icon="⭐")
-            st.session_state["user_watchlist"] = wl
             st.rerun()
 
     # 2. 이동평균선(5일, 20일, 60일) 직접 비교 메트릭 카드
@@ -3463,6 +3515,11 @@ def show_my_investment_lounge_dialog(is_dark: bool):
                     if st.button("🗑️", key=f"wl_del_{code}", help="관심종목 해제", use_container_width=True):
                         del watchlist[code]
                         save_user_watchlist(u_email, watchlist)
+                        st.session_state["user_watchlist"] = watchlist
+                        from src.user_watchlist import encode_user_data_token
+                        cur_pers = st.session_state.get("user_personality") or {}
+                        if hasattr(st, "query_params"):
+                            st.query_params["udata"] = encode_user_data_token(watchlist, cur_pers)
                         st.toast(f"'{c_name}' 관심종목에서 삭제되었습니다.")
                         st.rerun()
                 st.markdown("<hr style='margin:4px 0 10px 0; opacity:0.3;'/>", unsafe_allow_html=True)
@@ -3525,6 +3582,10 @@ def show_my_investment_lounge_dialog(is_dark: bool):
                 }
                 st.session_state["user_personality"] = p_data
                 save_user_personality(u_email, p_data)
+                from src.user_watchlist import encode_user_data_token
+                cur_wl = st.session_state.get("user_watchlist") or {}
+                if hasattr(st, "query_params"):
+                    st.query_params["udata"] = encode_user_data_token(cur_wl, p_data)
                 saved_p = p_data
                 has_persona = True
                 st.toast(f"🎉 맞춤 진단 완료! 회원님의 투자 성향은 '{persona}' 입니다.", icon="✅")
