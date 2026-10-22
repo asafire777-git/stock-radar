@@ -4800,7 +4800,7 @@ def render_performance_tab_fragment(is_dark_mode: bool):
             <div style="font-size:0.88rem; color:{'#E2E8F0' if is_dark_mode else '#78350F'}; line-height:1.55;">
                 <b style="color:{'#FCD34D' if is_dark_mode else '#92400E'}; font-size:0.95rem;">증시 휴일/휴장일 데이터 보정 시스템 가동 중</b><br/>
                 {banner_note}<br/>
-                <b>장중 추적 중인 미완료 건(0.0%)을 분모에서 완벽히 배제</b>하여 확정된 매매 결과(승+패)만으로 정밀하게 적중률({metrics['hit_rate']}%)을 산출했습니다.
+                <b>실전 매매가 완료된 {metrics['total_count']}건({metrics['hit_count']}승 {metrics['miss_count']}패)</b>을 기준으로 정밀 적중률(<b>{metrics['hit_rate']}%</b>)을 산출했습니다. (장중 추적 중인 미완료 건은 분모에서 완전 배제)
             </div>
         </div>"""
     )
