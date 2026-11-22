@@ -1,0 +1,12 @@
+{
+  "name": "streamlit-keepalive",
+  "version": "1.0.0",
+  "description": "Smart keep-alive and auto-wakeup for Streamlit Cloud via Playwright",
+  "main": "keep_alive.js",
+  "scripts": {
+    "start": "node keep_alive.js"
+  },
+  "dependencies": {
+    "playwright": "^1.44.0"
+  }
+}

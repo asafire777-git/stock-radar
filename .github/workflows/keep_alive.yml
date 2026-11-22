@@ -1,36 +1,48 @@
-name: 🔄 24/7 Keep-Alive Monitor (Streamlit Sleep Prevention)
+name: 🔄 24/7 Smart Keep-Alive & Auto-Wakeup (Streamlit)
 
 on:
   schedule:
-    # 매 15분마다 자동 실행하여 Streamlit 무료 티어 수면(Sleep) 모드 방지
-    - cron: '*/15 * * * *'
+    # 2시간마다 실제 브라우저(Playwright)로 방문하여 웹소켓 세션 유지 및 자동 기상
+    - cron: '0 */2 * * *'
   workflow_dispatch: # 관리자 수동 즉시 실행 지원
 
+# 동시 실행 방지
+concurrency:
+  group: keep-alive-streamlit
+  cancel-in-progress: true
+
 jobs:
-  ping:
-    name: Ping Streamlit & nstock.kr
+  smart-keepalive:
+    name: 🌐 Real Browser Session & Auto-Wakeup
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+
     steps:
-      - name: Send Keep-Alive HTTP Requests
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: .github/workflows/package.json
+
+      - name: 📦 Install Playwright & Chromium
+        working-directory: .github/workflows
+        run: |
+          npm ci || npm install
+          npx playwright install chromium --with-deps
+
+      - name: 🚀 Run Smart Keep-Alive & Auto-Wakeup
+        run: node .github/workflows/keep_alive.js
+
+      - name: 🛡️ Prevent GitHub Actions 60-Day Inactivity Disablement
         continue-on-error: true
         run: |
-          echo "=========================================="
-          echo "⏰ Running 24/7 Keep-Alive Ping..."
-          echo "=========================================="
-
-          # 1. Streamlit 공식 Healthz 헬스체크 (수면 방지 핵심 엔드포인트)
-          HEALTH_STATUS=$(curl -s -m 10 -o /dev/null -w "%{http_code}" "https://nstock-radar.streamlit.app/healthz" || echo "200")
-          echo "1. Streamlit Healthz Check: HTTP $HEALTH_STATUS"
-
-          # 2. 메인 Streamlit 클라우드 앱 핑 (쿠키 세션 및 리다이렉트 3회 제한으로 루프 방지)
-          APP_STATUS=$(curl -s -m 10 -c /tmp/cookies.txt -b /tmp/cookies.txt --max-redirs 3 -o /dev/null -w "%{http_code}" "https://nstock-radar.streamlit.app/" || echo "303")
-          echo "2. Streamlit App (nstock-radar.streamlit.app): HTTP $APP_STATUS"
-
-          # 3. 공식 브랜드 도메인 핑
-          DOMAIN_STATUS=$(curl -s -m 10 -o /dev/null -w "%{http_code}" "https://nstock.kr/" || echo "200")
-          echo "3. Official Domain (nstock.kr): HTTP $DOMAIN_STATUS"
-
-          echo "=========================================="
-          echo "✅ Keep-Alive Ping completed successfully!"
-          echo "=========================================="
-          exit 0
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          echo "Last Keep-Alive Ping: $(date -u)" > .github/workflows/last_ping.txt
+          git add .github/workflows/last_ping.txt
+          git commit -m "chore(keep-alive): heartbeat [skip ci]" || echo "No changes to commit"
+          git push origin main || echo "Push skipped"
