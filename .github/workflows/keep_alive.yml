@@ -1,6 +1,8 @@
 name: 🔄 24/7 Smart Keep-Alive & Auto-Wakeup (Streamlit)
 
 on:
+  push:
+    branches: [main]
   schedule:
     # 2시간마다 실제 브라우저(Playwright)로 방문하여 웹소켓 세션 유지 및 자동 기상
     - cron: '0 */2 * * *'
