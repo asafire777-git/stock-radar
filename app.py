@@ -1041,10 +1041,9 @@ with st.sidebar:
             "🏆 AI 성과 검증실 (적중률)",
             "📚 주식 실전 지식 아카이브 (16편)",
         ]
-        if is_admin_active:
-            nav_options.append("👑 마스터 관리자 상세 통계실")
+        valid_menus = nav_options + (["👑 마스터 관리자 상세 통계실"] if is_admin_active else [])
 
-        if "active_nav_menu" not in st.session_state or st.session_state["active_nav_menu"] not in nav_options:
+        if "active_nav_menu" not in st.session_state or st.session_state["active_nav_menu"] not in valid_menus:
             st.session_state["active_nav_menu"] = "🎯 오늘의 AI 추천주 (원픽 TOP 20)"
 
         current_active = st.session_state["active_nav_menu"]
@@ -1129,16 +1128,25 @@ with st.sidebar:
             st.rerun()
 
         # ----------------------------------------------------
-        # 사이드바: 마스터 관리자 전용 배지 (asafire777@gmail.com 로그인 시에만 노출, 일반 방문자 완전 비노출)
+        # 사이드바 하단: 마스터 관리자 전용 영역 (asafire777@gmail.com 로그인 시에만 노출)
         # ----------------------------------------------------
         if st.session_state.get("is_admin_mode", False):
             st.markdown("---")
             st.html("""
-                <div style="padding: 10px; border-radius: 8px; background: rgba(245,158,11,0.18); border: 1.5px solid #F59E0B; color: #F59E0B; font-size: 0.82rem; font-weight: 800; text-align: center; margin-bottom: 6px;">
+                <div style="padding: 10px; border-radius: 8px; background: rgba(245,158,11,0.18); border: 1.5px solid #F59E0B; color: #F59E0B; font-size: 0.82rem; font-weight: 800; text-align: center; margin-bottom: 8px;">
                     👑 MASTER ADMIN 자동 인증됨
                 </div>
             """)
-            st.caption("좌측 관제 메뉴 맨 끝에 **'👑 마스터 관리자 상세 통계실'**이 자동 활성화되었습니다.")
+            is_admin_tab_active = (st.session_state.get("active_nav_menu") == "👑 마스터 관리자 상세 통계실")
+            if st.button(
+                "👑 마스터 관리자 상세 통계실",
+                key="sb_btn_master_admin_room",
+                type="primary" if is_admin_tab_active else "secondary",
+                use_container_width=True,
+            ):
+                st.session_state["active_nav_menu"] = "👑 마스터 관리자 상세 통계실"
+                clear_nav_query_params()
+                st.rerun()
 
         st.markdown("---")
         now_str = get_now_kst().strftime("%Y-%m-%d %H:%M:%S KST")
