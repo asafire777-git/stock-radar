@@ -458,26 +458,25 @@ div[class*="st-key-sb_upgrade_btn"] button:hover p {
     -webkit-text-fill-color: #FFFFFF !important;
 }
 
-/* 👑 MY 투자 라운지 버튼 - 여유로운 여백 및 통일된 2줄 줄바꿈 최적화 */
+/* 👑 MY 투자 라운지 & 🚪 로그아웃 버튼 - 계정 카드 내 풀폭 2단 정렬 */
 div[class*="st-key-sb_btn_my_lounge"] {
-    margin-top: 10px !important;
-    margin-bottom: 12px !important;
+    margin-top: 6px !important;
+    margin-bottom: 4px !important;
 }
 div[class*="st-key-sb_btn_my_lounge"] button {
     background: linear-gradient(135deg, #4338CA 0%, #6366F1 100%) !important;
     border: 1.5px solid #4F46E5 !important;
     border-radius: 10px !important;
-    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.30) !important;
-    height: auto !important;
-    min-height: 54px !important;
-    padding: 8px 12px !important;
-    line-height: 1.35 !important;
-    white-space: pre-line !important;
-    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.28) !important;
+    min-height: 42px !important;
+    height: 42px !important;
+    padding: 6px 12px !important;
+    line-height: 1.2 !important;
+    transition: all 0.18s ease !important;
 }
 div[class*="st-key-sb_btn_my_lounge"] button:hover {
     background: linear-gradient(135deg, #3730A3 0%, #4F46E5 100%) !important;
-    box-shadow: 0 6px 18px rgba(99, 102, 241, 0.45) !important;
+    box-shadow: 0 6px 16px rgba(99, 102, 241, 0.42) !important;
     transform: translateY(-1px) !important;
 }
 div[class*="st-key-sb_btn_my_lounge"] button *,
@@ -486,11 +485,22 @@ div[class*="st-key-sb_btn_my_lounge"] button div,
 div[class*="st-key-sb_btn_my_lounge"] button span {
     color: #FFFFFF !important;
     -webkit-text-fill-color: #FFFFFF !important;
-    font-weight: 900 !important;
+    font-weight: 800 !important;
     font-size: 0.90rem !important;
-    white-space: pre-line !important;
-    line-height: 1.35 !important;
+    line-height: 1.2 !important;
     text-align: center !important;
+}
+div[class*="st-key-sb_btn_logout_user"] {
+    margin-top: 0px !important;
+    margin-bottom: 2px !important;
+}
+div[class*="st-key-sb_btn_logout_user"] button {
+    min-height: 36px !important;
+    height: 36px !important;
+    padding: 4px 12px !important;
+    border-radius: 9px !important;
+    font-size: 0.84rem !important;
+    font-weight: 700 !important;
 }
 
 /* 전역 Primary 버튼 고대비 흰색 텍스트 보장 (가독성 극대화) */
@@ -920,36 +930,33 @@ with st.sidebar:
             )
 
             if is_google_authenticated():
-                col_acc1, col_acc2 = st.columns([1.85, 1.0])
-                with col_acc1:
-                    if st.button("👑 MY 라운지", key="sb_btn_my_lounge", help="맞춤 진단 & 관심종목 포트폴리오", use_container_width=True):
-                        st.session_state["prompt_my_lounge"] = True
-                        st.rerun()
-                with col_acc2:
-                    if st.button("로그아웃", key="sb_btn_logout_user", help="구글 계정 로그아웃", use_container_width=True):
-                        st.session_state["is_authenticated"] = False
-                        st.session_state["user_info"] = None
-                        st.session_state["user_watchlist"] = {}
-                        st.session_state["user_personality"] = {}
-                        st.session_state["auth_token"] = None
-                        st.session_state["is_admin_mode"] = False
-                        st.session_state["active_nav_menu"] = "🎯 오늘의 AI 추천주 (원픽 TOP 20)"
-                        st.session_state["current_page"] = "dashboard"
-                        if hasattr(st, "query_params"):
-                            st.query_params.clear()
-                        import streamlit.components.v1 as components
-                        components.html("""
-                            <script>
-                                (function() {
-                                    try {
-                                        if (window.top) window.top.postMessage({ type: 'NSTOCK_LOGOUT' }, '*');
-                                        if (window.parent) window.parent.postMessage({ type: 'NSTOCK_LOGOUT' }, '*');
-                                    } catch(e) {}
-                                })();
-                            </script>
-                        """, height=0, width=0)
-                        st.toast("정상적으로 로그아웃되었습니다.")
-                        st.rerun()
+                if st.button("👑 MY 투자 라운지 (관심종목·진단)", key="sb_btn_my_lounge", help="맞춤 진단 & 관심종목 포트폴리오", use_container_width=True):
+                    st.session_state["prompt_my_lounge"] = True
+                    st.rerun()
+                if st.button("🚪 로그아웃", key="sb_btn_logout_user", help="구글 계정 로그아웃", use_container_width=True):
+                    st.session_state["is_authenticated"] = False
+                    st.session_state["user_info"] = None
+                    st.session_state["user_watchlist"] = {}
+                    st.session_state["user_personality"] = {}
+                    st.session_state["auth_token"] = None
+                    st.session_state["is_admin_mode"] = False
+                    st.session_state["active_nav_menu"] = "🎯 오늘의 AI 추천주 (원픽 TOP 20)"
+                    st.session_state["current_page"] = "dashboard"
+                    if hasattr(st, "query_params"):
+                        st.query_params.clear()
+                    import streamlit.components.v1 as components
+                    components.html("""
+                        <script>
+                            (function() {
+                                try {
+                                    if (window.top) window.top.postMessage({ type: 'NSTOCK_LOGOUT' }, '*');
+                                    if (window.parent) window.parent.postMessage({ type: 'NSTOCK_LOGOUT' }, '*');
+                                } catch(e) {}
+                            })();
+                        </script>
+                    """, height=0, width=0)
+                    st.toast("정상적으로 로그아웃되었습니다.")
+                    st.rerun()
             else:
                 st.html("""<style>
                     div[class*="st-key-sb_upgrade_btn"] button {
