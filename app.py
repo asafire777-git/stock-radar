@@ -2881,6 +2881,51 @@ def display_investor_table(investor_df: pd.DataFrame, rows: int = 5):
     )
 
 
+def render_clickable_stock_table(df: pd.DataFrame, key: str):
+    """체크박스뿐 아니라 종목명·종목코드·현재가 등 행의 어느 셀을 클릭해도 즉시 반응하는 통합 종목 표"""
+    try:
+        return st.dataframe(
+            df,
+            use_container_width=True,
+            hide_index=True,
+            on_select="rerun",
+            selection_mode=["single-row", "single-cell"],
+            key=key,
+        )
+    except Exception:
+        return st.dataframe(
+            df,
+            use_container_width=True,
+            hide_index=True,
+            on_select="rerun",
+            selection_mode="single-row",
+            key=key,
+        )
+
+
+def extract_selected_row_idx(table_event):
+    """체크박스(rows) 또는 행 내부 아무 셀(cells) 클릭 시 (행 인덱스, 고유 선택 키) 반환"""
+    if not table_event or not getattr(table_event, "selection", None):
+        return None, None
+    sel = table_event.selection
+    rows = getattr(sel, "rows", None)
+    if rows is None and isinstance(sel, dict):
+        rows = sel.get("rows", [])
+    if rows:
+        idx = int(rows[0])
+        return idx, f"r_{idx}"
+    cells = getattr(sel, "cells", None)
+    if cells is None and isinstance(sel, dict):
+        cells = sel.get("cells", [])
+    if cells:
+        first_cell = cells[0]
+        if isinstance(first_cell, (list, tuple)) and len(first_cell) >= 2:
+            idx = int(first_cell[0])
+            col = str(first_cell[1])
+            return idx, f"c_{idx}_{col}"
+    return None, None
+
+
 def render_quantum_radar_loader(name: str, code: str, is_ovs: bool, is_dark: bool) -> str:
     market_text = "글로벌 나스닥·미국 기관 수급" if is_ovs else "코스피·코스닥 큰손 수급"
     bg = "#0F172A" if is_dark else "#F0FDF4"
@@ -4462,7 +4507,23 @@ def render_ai_picks_tab(candidates, preset_style, is_dark):
                 </div>"""
             )
 
-        st.dataframe(display_df, use_container_width=True, hide_index=True)
+        st.caption("💡 **Tip:** 표에서 종목명·종목코드·현재가 등 원하는 줄의 아무 항목이나 클릭하시면 즉시 AI 정밀 차트·진단 팝업이 열립니다.")
+        ai_table_event = render_clickable_stock_table(display_df, key="ai_top20_stock_table")
+        ai_idx, ai_sig = extract_selected_row_idx(ai_table_event)
+        if ai_idx is not None and 0 <= ai_idx < len(display_df):
+            target_ai_row = display_df.iloc[ai_idx]
+            t_ai_rank = int(target_ai_row["순위"])
+            t_ai_code = str(target_ai_row["종목코드"])
+            t_ai_name = str(target_ai_row["종목명"])
+            ai_key_tag = f"ai_{t_ai_code}_{ai_sig}"
+            if st.session_state.get("last_ai_top20_row") != ai_key_tag:
+                st.session_state["last_ai_top20_row"] = ai_key_tag
+                if (not is_google) and t_ai_rank >= 4:
+                    open_login_modal()
+                else:
+                    show_stock_chart_dialog(t_ai_code, t_ai_name, is_dark)
+        else:
+            st.session_state["last_ai_top20_row"] = None
 
         if not is_google:
             col_tbl1, col_tbl2, col_tbl3 = st.columns([1, 2, 1])
@@ -4520,20 +4581,13 @@ def render_rising_tab_fragment(disp_df: pd.DataFrame, is_dark_mode: bool):
             else:
                 st.session_state["last_rising_us_sel"] = None
 
-            table_us_event = st.dataframe(
-                df_us_table,
-                use_container_width=True,
-                hide_index=True,
-                on_select="rerun",
-                selection_mode="single-row",
-                key="rising_us_stock_table",
-            )
-            if table_us_event and table_us_event.selection and table_us_event.selection.rows:
-                active_idx = table_us_event.selection.rows[0]
+            table_us_event = render_clickable_stock_table(df_us_table, key="rising_us_stock_table")
+            active_idx, sel_sig = extract_selected_row_idx(table_us_event)
+            if active_idx is not None and 0 <= active_idx < len(df_us_table):
                 target_row = df_us_table.iloc[active_idx]
                 t_code = str(target_row["티커"])
                 t_name = str(target_row["종목명"])
-                key_tag = f"us_{t_code}_{active_idx}"
+                key_tag = f"us_{t_code}_{sel_sig}"
                 if st.session_state.get("last_rising_us_row") != key_tag:
                     st.session_state["last_rising_us_row"] = key_tag
                     show_stock_chart_dialog(t_code, t_name, is_dark_mode)
@@ -4568,21 +4622,13 @@ def render_rising_tab_fragment(disp_df: pd.DataFrame, is_dark_mode: bool):
     else:
         st.session_state["last_rising_sel"] = None
 
-    table_event = st.dataframe(
-        disp_df,
-        use_container_width=True,
-        hide_index=True,
-        on_select="rerun",
-        selection_mode="single-row",
-        key="rising_stock_table",
-    )
-
-    if table_event and table_event.selection and table_event.selection.rows:
-        active_idx = table_event.selection.rows[0]
+    table_event = render_clickable_stock_table(disp_df, key="rising_stock_table")
+    active_idx, sel_sig = extract_selected_row_idx(table_event)
+    if active_idx is not None and 0 <= active_idx < len(disp_df):
         target_row = disp_df.iloc[active_idx]
         t_code = str(target_row["종목코드"])
         t_name = str(target_row["종목명"])
-        key_tag = f"{t_code}_{active_idx}"
+        key_tag = f"{t_code}_{sel_sig}"
         if st.session_state.get("last_rising_row") != key_tag:
             st.session_state["last_rising_row"] = key_tag
             show_stock_chart_dialog(t_code, t_name, is_dark_mode)
@@ -4662,20 +4708,13 @@ def render_new_listings_tab_fragment(new_disp: pd.DataFrame, is_dark_mode: bool)
             else:
                 st.session_state["last_new_us_sel"] = None
 
-            table_us_n_event = st.dataframe(
-                df_us_new_table,
-                use_container_width=True,
-                hide_index=True,
-                on_select="rerun",
-                selection_mode="single-row",
-                key="new_us_stock_table",
-            )
-            if table_us_n_event and table_us_n_event.selection and table_us_n_event.selection.rows:
-                active_idx = table_us_n_event.selection.rows[0]
+            table_us_n_event = render_clickable_stock_table(df_us_new_table, key="new_us_stock_table")
+            active_idx, sel_sig = extract_selected_row_idx(table_us_n_event)
+            if active_idx is not None and 0 <= active_idx < len(df_us_new_table):
                 target_row = df_us_new_table.iloc[active_idx]
                 t_code = str(target_row["티커"])
                 t_name = str(target_row["종목명"])
-                key_tag = f"us_n_{t_code}_{active_idx}"
+                key_tag = f"us_n_{t_code}_{sel_sig}"
                 if st.session_state.get("last_new_us_row") != key_tag:
                     st.session_state["last_new_us_row"] = key_tag
                     show_stock_chart_dialog(t_code, t_name, is_dark_mode)
@@ -4710,21 +4749,13 @@ def render_new_listings_tab_fragment(new_disp: pd.DataFrame, is_dark_mode: bool)
     else:
         st.session_state["last_new_sel"] = None
 
-    new_table_event = st.dataframe(
-        new_disp,
-        use_container_width=True,
-        hide_index=True,
-        on_select="rerun",
-        selection_mode="single-row",
-        key="new_stock_table",
-    )
-
-    if new_table_event and new_table_event.selection and new_table_event.selection.rows:
-        active_new_idx = new_table_event.selection.rows[0]
+    new_table_event = render_clickable_stock_table(new_disp, key="new_stock_table")
+    active_new_idx, sel_new_sig = extract_selected_row_idx(new_table_event)
+    if active_new_idx is not None and 0 <= active_new_idx < len(new_disp):
         target_new_row = new_disp.iloc[active_new_idx]
         tn_code = str(target_new_row["종목코드"])
         tn_name = str(target_new_row["종목명"])
-        key_tag = f"{tn_code}_{active_new_idx}"
+        key_tag = f"{tn_code}_{sel_new_sig}"
         if st.session_state.get("last_new_row") != key_tag:
             st.session_state["last_new_row"] = key_tag
             show_stock_chart_dialog(tn_code, tn_name, is_dark_mode)
