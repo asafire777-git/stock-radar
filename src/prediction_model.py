@@ -3,7 +3,6 @@ import pickle
 from typing import Dict, Any, List, Optional
 import numpy as np
 import pandas as pd
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 
 
 MODEL_CACHE_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "model.pkl")
@@ -31,11 +30,13 @@ def extract_features_from_df(df: pd.DataFrame) -> Optional[np.ndarray]:
 
 class StockPredictor:
     def __init__(self):
+        # 지연 초기화(Lazy Loading): 앱 콜드스타트 시 무거운 scikit-learn 임포트 및 학습 지연 제거
         self.model = None
-        self._load_or_initialize_model()
 
     def _load_or_initialize_model(self):
         """저장된 모델이 있으면 로드하고, 없으면 벤치마크 앙상블 모델을 구성합니다."""
+        if self.model is not None:
+            return
         if os.path.exists(MODEL_CACHE_PATH):
             try:
                 with open(MODEL_CACHE_PATH, "rb") as f:
@@ -43,6 +44,8 @@ class StockPredictor:
                     return
             except Exception:
                 pass
+
+        from sklearn.ensemble import GradientBoostingClassifier
 
         # 휴리스틱 기반 초기 학습기 생성 (KOSPI/KOSDAQ 역사적 패턴 기반 규칙 가중치)
         clf = GradientBoostingClassifier(n_estimators=50, random_state=42)
@@ -80,8 +83,10 @@ class StockPredictor:
                 "confidence": "보통",
             }
 
-        # 머신러닝 모델 예측 확률 (0.0 ~ 1.0)
+        # 머신러닝 모델 예측 확률 (0.0 ~ 1.0) — 최초 호출 시 1회 지연 로드
         try:
+            if self.model is None:
+                self._load_or_initialize_model()
             prob_ml = float(self.model.predict_proba(feat)[0][1]) * 100.0
         except Exception:
             prob_ml = 50.0

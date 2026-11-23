@@ -1,7 +1,20 @@
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 import pandas as pd
-import FinanceDataReader as fdr
+
+
+class _LazyFDR:
+    """FinanceDataReader 지연 임포트 프록시 (앱 초기 콜드스타트 속도 최적화)"""
+    _mod = None
+
+    def __getattr__(self, name):
+        if self._mod is None:
+            import FinanceDataReader as _fdr
+            self._mod = _fdr
+        return getattr(self._mod, name)
+
+
+fdr = _LazyFDR()
 
 
 def _clean_numeric(series, fill_val=0):

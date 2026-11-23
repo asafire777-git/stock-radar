@@ -93,7 +93,6 @@ try:
         render_argon_market_intelligence_html,
     )
     from src.analytics_tracker import log_search_event
-    from src.admin_dashboard import render_admin_dashboard
     from src.stock_legal_policies import (
         render_footer_legal_bar,
         show_disclaimer_dialog,
@@ -172,7 +171,6 @@ except ImportError:
         render_argon_market_intelligence_html,
     )
     from analytics_tracker import log_search_event
-    from admin_dashboard import render_admin_dashboard
     from stock_legal_policies import (
         render_footer_legal_bar,
         show_disclaimer_dialog,
@@ -181,6 +179,15 @@ except ImportError:
         render_sidebar_policy_button,
     )
     from stock_knowledge_hub import render_stock_knowledge_tab
+
+
+def render_admin_dashboard(*args, **kwargs):
+    """관리자 대시보드 지연 임포트 래퍼 (일반 방문자 초기 로딩 시 plotly.express/관리자 모듈 로드 생략)"""
+    try:
+        from src.admin_dashboard import render_admin_dashboard as _render
+    except ImportError:
+        from admin_dashboard import render_admin_dashboard as _render
+    return _render(*args, **kwargs)
 
 
 
