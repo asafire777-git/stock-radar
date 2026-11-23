@@ -1521,6 +1521,35 @@ div[data-testid="stTextInput"] input:focus {
     margin-bottom: 12px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
+/* ⭐ 관심종목 추가 전용 시그니처 골든-앰버 버튼 (라이트 모드) */
+div[class*="st-key-wl_add_"] button {
+    background: linear-gradient(135deg, #F59E0B 0%, #EA580C 100%) !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    border-radius: 10px !important;
+    font-weight: 800 !important;
+    letter-spacing: -0.2px !important;
+    box-shadow: 0 4px 14px rgba(245, 158, 11, 0.36) !important;
+    transition: all 0.18s ease !important;
+}
+div[class*="st-key-wl_add_"] button:hover {
+    background: linear-gradient(135deg, #D97706 0%, #C2410C 100%) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 6px 18px rgba(234, 88, 12, 0.45) !important;
+}
+div[class*="st-key-wl_saved_"] button {
+    background: #FFFBEB !important;
+    color: #B45309 !important;
+    border: 2px solid #F59E0B !important;
+    border-radius: 10px !important;
+    font-weight: 800 !important;
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.16) !important;
+    transition: all 0.18s ease !important;
+}
+div[class*="st-key-wl_saved_"] button:hover {
+    background: #FEF3C7 !important;
+    border-color: #D97706 !important;
+}
 .stock-title {
     color: #0F172A !important;
     font-size: 1.2rem;
@@ -1870,6 +1899,33 @@ div[data-testid="stTextInput"] input:focus {
     border-radius: 10px;
     padding: 14px 18px;
     margin-bottom: 12px;
+}
+/* ⭐ 관심종목 추가 전용 시그니처 골든-앰버 버튼 (다크 모드) */
+div[class*="st-key-wl_add_"] button {
+    background: linear-gradient(135deg, #F59E0B 0%, #EA580C 100%) !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    border-radius: 10px !important;
+    font-weight: 800 !important;
+    letter-spacing: -0.2px !important;
+    box-shadow: 0 4px 16px rgba(245, 158, 11, 0.38) !important;
+    transition: all 0.18s ease !important;
+}
+div[class*="st-key-wl_add_"] button:hover {
+    background: linear-gradient(135deg, #D97706 0%, #C2410C 100%) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 6px 20px rgba(234, 88, 12, 0.50) !important;
+}
+div[class*="st-key-wl_saved_"] button {
+    background: rgba(245, 158, 11, 0.16) !important;
+    color: #FCD34D !important;
+    border: 2px solid #F59E0B !important;
+    border-radius: 10px !important;
+    font-weight: 800 !important;
+    transition: all 0.18s ease !important;
+}
+div[class*="st-key-wl_saved_"] button:hover {
+    background: rgba(245, 158, 11, 0.26) !important;
 }
 .stock-title {
     color: #FFFFFF !important;
@@ -2926,6 +2982,65 @@ def extract_selected_row_idx(table_event):
     return None, None
 
 
+def render_watchlist_action_button(
+    code: str,
+    name: str,
+    price: float,
+    change_rate: float,
+    grade: str = "-",
+    total_score: float = 0,
+    is_ovs: bool = False,
+    key_suffix: str = "default",
+    compact: bool = False,
+):
+    """어디서든 한 번에 관심종목 추가/해제가 가능한 전용 시그니처 골든-앰버 버튼"""
+    wl = st.session_state.get("user_watchlist", {})
+    code_str = str(code)
+    is_fav = code_str in wl
+
+    container_key = f"wl_saved_{key_suffix}_{code_str}" if is_fav else f"wl_add_{key_suffix}_{code_str}"
+    if compact:
+        label = "★ 관심종목 등록됨 (해제)" if is_fav else "⭐ 관심종목 추가"
+    else:
+        label = f"★ '{name}' 관심종목 보관 중 (클릭 시 해제)" if is_fav else f"⭐ '{name}' 관심종목에 바로 추가하기"
+
+    with st.container(key=container_key):
+        if st.button(label, key=f"btn_{container_key}", use_container_width=True):
+            if not is_google_authenticated():
+                st.toast("🔑 관심종목 저장은 구글 정회원 전용 기능입니다.")
+                open_login_modal()
+            else:
+                user_email = (st.session_state.get("user_info") or {}).get("email", "")
+                if is_fav:
+                    del wl[code_str]
+                    save_user_watchlist(user_email, wl)
+                    st.session_state["user_watchlist"] = wl
+                    from src.user_watchlist import encode_user_data_token
+                    cur_pers = st.session_state.get("user_personality") or {}
+                    if hasattr(st, "query_params"):
+                        st.query_params["udata"] = encode_user_data_token(wl, cur_pers)
+                    st.toast(f"'{name}' 관심종목에서 해제되었습니다.")
+                else:
+                    wl[code_str] = {
+                        "name": name,
+                        "code": code_str,
+                        "grade": grade,
+                        "total_score": total_score,
+                        "price": price,
+                        "change_rate": change_rate,
+                        "is_ovs": is_ovs,
+                        "added_at": get_now_kst().strftime("%m/%d %H:%M"),
+                    }
+                    save_user_watchlist(user_email, wl)
+                    st.session_state["user_watchlist"] = wl
+                    from src.user_watchlist import encode_user_data_token
+                    cur_pers = st.session_state.get("user_personality") or {}
+                    if hasattr(st, "query_params"):
+                        st.query_params["udata"] = encode_user_data_token(wl, cur_pers)
+                    st.toast(f"🎉 '{name}' 관심종목에 추가되었습니다! [MY 투자 라운지]에서 확인하세요.", icon="⭐")
+                st.rerun()
+
+
 def render_quantum_radar_loader(name: str, code: str, is_ovs: bool, is_dark: bool) -> str:
     market_text = "글로벌 나스닥·미국 기관 수급" if is_ovs else "코스피·코스닥 큰손 수급"
     bg = "#0F172A" if is_dark else "#F0FDF4"
@@ -3103,60 +3218,31 @@ def render_stock_detailed_section(code: str, name: str, is_dark: bool, in_modal:
     is_fav = code in wl
     
     st.html(f"""
-        <div style="background: {'#1E293B' if is_dark else '#F0FDF4' if is_fav else '#EFF6FF'}; 
-                    border: 1.5px solid {'#10B981' if is_fav else '#3B82F6'}; 
-                    border-radius: 12px; padding: 12px 18px; margin: 10px 0 12px 0;">
+        <div style="background: {'rgba(245, 158, 11, 0.10)' if is_dark else '#FFFBEB'}; 
+                    border: 1.5px solid {'#F59E0B' if is_fav else '#FBBF24'}; 
+                    border-radius: 12px; padding: 12px 18px; margin: 10px 0 10px 0;">
             <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
-                <div style="font-weight: 800; font-size: 0.95rem; color: {'#34D399' if is_fav else '#1D4ED8'};">
-                    {'⭐ [관심종목 저장 완료] 나의 MY 포트폴리오에 등록되어 실시간 추적 중입니다.' if is_fav else '⭐ [관심종목 등록 안내] 버튼을 누르면 나만의 클라우드 포트폴리오에 즉시 저장됩니다.'}
+                <div style="font-weight: 800; font-size: 0.95rem; color: {'#FCD34D' if is_dark else '#B45309'};">
+                    {'★ [관심종목 저장 완료] 나의 MY 라운지에서 실시간 추적 중입니다.' if is_fav else '⭐ [관심종목 등록] 아래 골드 버튼을 눌러 MY 라운지에 즉시 담아보세요.'}
                 </div>
-                <span style="font-size: 0.80rem; font-weight: 700; background: {'#065F46' if is_fav else '#DBEAFE'}; color: {'#A7F3D0' if is_fav else '#1E40AF'}; padding: 2px 10px; border-radius: 6px;">
+                <span style="font-size: 0.80rem; font-weight: 700; background: {'rgba(245, 158, 11, 0.25)' if is_dark else '#FEF3C7'}; color: {'#FDE68A' if is_dark else '#92400E'}; padding: 3px 10px; border-radius: 999px;">
                     {'👑 MY 라운지 보관 중' if is_fav else '💡 MY 라운지 연동'}
                 </span>
             </div>
-            <div style="font-size: 0.84rem; color: {'#94A3B8' if is_dark else '#475569'}; margin-top: 4px; line-height: 1.5;">
-                등록된 관심종목은 좌측 사이드바의 <b>[👑 MY 투자 라운지]</b>에서 실시간 등락률, AI 점수, 목표가 및 맞춤 시크릿 전략과 함께 언제든지 확인 및 관리하실 수 있습니다.
-            </div>
         </div>
     """)
-    
-    fav_label = f"⭐ '{name}' 관심종목에서 해제하기" if is_fav else f"⭐ '{name}' 관심종목에 추가하기 (MY 라운지 보관)"
-    fav_type = "secondary" if is_fav else "primary"
-    
-    if st.button(fav_label, key=f"fav_btn_{key_prefix}_{code}", type=fav_type, use_container_width=True):
-        if not is_google_authenticated():
-            st.toast("🔑 관심종목 저장은 구글 정회원 전용 기능입니다.")
-            open_login_modal()
-        else:
-            user_email = (st.session_state.get("user_info") or {}).get("email", "")
-            if is_fav:
-                del wl[code]
-                save_user_watchlist(user_email, wl)
-                st.session_state["user_watchlist"] = wl
-                from src.user_watchlist import encode_user_data_token
-                cur_pers = st.session_state.get("user_personality") or {}
-                if hasattr(st, "query_params"):
-                    st.query_params["udata"] = encode_user_data_token(wl, cur_pers)
-                st.toast(f"'{name}' 관심종목에서 해제되었습니다.")
-            else:
-                wl[code] = {
-                    "name": name,
-                    "code": code,
-                    "grade": quant_res.get("grade", "-"),
-                    "total_score": quant_res.get("total_score", 0),
-                    "price": curr_price_usd if is_ovs else curr_price,
-                    "change_rate": change_rate,
-                    "is_ovs": is_ovs,
-                    "added_at": get_now_kst().strftime("%m/%d %H:%M"),
-                }
-                save_user_watchlist(user_email, wl)
-                st.session_state["user_watchlist"] = wl
-                from src.user_watchlist import encode_user_data_token
-                cur_pers = st.session_state.get("user_personality") or {}
-                if hasattr(st, "query_params"):
-                    st.query_params["udata"] = encode_user_data_token(wl, cur_pers)
-                st.toast(f"🎉 '{name}' 관심종목에 추가되었습니다! [MY 투자 라운지]에서 확인하세요.", icon="⭐")
-            st.rerun()
+
+    render_watchlist_action_button(
+        code=code,
+        name=name,
+        price=curr_price_usd if is_ovs else curr_price,
+        change_rate=change_rate,
+        grade=quant_res.get("grade", "-"),
+        total_score=quant_res.get("total_score", 0),
+        is_ovs=is_ovs,
+        key_suffix=f"detail_{key_prefix}",
+        compact=False,
+    )
 
     # 2. 이동평균선(5일, 20일, 60일) 직접 비교 메트릭 카드
     m1, m2, m3, m4 = st.columns(4)
@@ -4310,6 +4396,24 @@ def render_ai_picks_tab(candidates, preset_style, is_dark):
             </div>"""
         )
 
+        # ⭐ 원픽 1위 전용 원클릭 관심종목 추가 & 정밀 진단 액션 바
+        col_top1_act1, col_top1_act2 = st.columns([1.2, 1])
+        with col_top1_act1:
+            render_watchlist_action_button(
+                code=str(top1["code"]),
+                name=str(top1["name"]),
+                price=float(top1["price"]),
+                change_rate=float(top1["change_rate"]),
+                grade=str(top1["grade"]),
+                total_score=float(top1["total_score"]),
+                is_ovs=False,
+                key_suffix="top1_pick",
+                compact=False,
+            )
+        with col_top1_act2:
+            if st.button(f"🔍 '{top1['name']}' AI 정밀 진단 팝업 열기", key=f"open_modal_top1_{top1['code']}", use_container_width=True):
+                show_stock_chart_dialog(str(top1["code"]), str(top1["name"]), is_dark)
+
         with st.expander(f"📈 [원픽 1위] {top1['name']} ({top1['code']}) - 실시간 캔들 차트(5일·20일선) & 초보자 상세 매매 가이드 펼치기", expanded=True):
             col_t1, col_t2 = st.columns([1.1, 1.9])
             top1_code = str(top1['code'])
@@ -4436,6 +4540,24 @@ def render_ai_picks_tab(candidates, preset_style, is_dark):
                             </div>
                         </div>"""
                     )
+
+                    # ⭐ 추천 TOP 2~5 원클릭 관심종목 추가 & 정밀 진단 액션 바
+                    col_r_act1, col_r_act2 = st.columns([1.15, 1])
+                    with col_r_act1:
+                        render_watchlist_action_button(
+                            code=r_code,
+                            name=str(r["name"]),
+                            price=float(r["price"]),
+                            change_rate=float(r["change_rate"]),
+                            grade=str(r["grade"]),
+                            total_score=float(r["total_score"]),
+                            is_ovs=False,
+                            key_suffix=f"top{r_rank}",
+                            compact=True,
+                        )
+                    with col_r_act2:
+                        if st.button(f"🔍 '{r['name']}' AI 정밀 진단 팝업", key=f"open_modal_top{r_rank}_{r_code}", use_container_width=True):
+                            show_stock_chart_dialog(r_code, str(r["name"]), is_dark)
 
                     with st.expander(f"🔰 [추천 #{r['rank']}] {r['name']} ({r_code}) - 초보자 실전 매매 가이드 & 캔들 차트 펼치기", expanded=False):
                         col_rg1, col_rg2 = st.columns([1.1, 1.9])
