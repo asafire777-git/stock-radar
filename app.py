@@ -731,12 +731,6 @@ target_menu = None
 if hasattr(st, "query_params"):
     target_page = st.query_params.get("page") or st.query_params.get("nav")
     target_menu = st.query_params.get("menu") or st.query_params.get("tab")
-    admin_param = str(st.query_params.get("admin", "")).strip()
-    if admin_param:
-        if verify_admin_password(admin_param):
-            st.session_state["is_admin_mode"] = True
-        elif admin_param.lower() in ["true", "1", "login", "open"]:
-            st.session_state["prompt_admin_login"] = True
 
 # 항상 유효한 세션 및 체험 유저 프로필 유지
 st.session_state["is_authenticated"] = True
@@ -747,6 +741,11 @@ if not st.session_state.get("user_info"):
         "provider": "Guest",
         "badge": "🟢 체험 회원",
     }
+
+# 🛡️ 마스터 관리자 RBAC 자동 판별 (오로지 asafire777@gmail.com 구글 정회원 로그인 시에만 활성화)
+MASTER_ADMIN_EMAILS = {"asafire777@gmail.com"}
+_cur_email = str((st.session_state.get("user_info") or {}).get("email", "")).strip().lower()
+st.session_state["is_admin_mode"] = bool(is_google_authenticated() and _cur_email in MASTER_ADMIN_EMAILS)
 
 # URL ?menu=... 또는 ?tab=... 파라미터가 있는 경우 즉각 1회성 관제 메뉴 전환 및 소거
 if target_menu:
@@ -1116,32 +1115,16 @@ with st.sidebar:
             st.rerun()
 
         # ----------------------------------------------------
-        # 사이드바: 관리자 상태 제어 (보안 인증)
+        # 사이드바: 마스터 관리자 전용 배지 (asafire777@gmail.com 로그인 시에만 노출, 일반 방문자 완전 비노출)
         # ----------------------------------------------------
         if st.session_state.get("is_admin_mode", False):
             st.markdown("---")
             st.html("""
-                <div style="padding: 10px; border-radius: 8px; background: rgba(245,158,11,0.18); border: 1.5px solid #F59E0B; color: #F59E0B; font-size: 0.82rem; font-weight: 800; text-align: center; margin-bottom: 8px;">
-                    👑 MASTER ADMIN 활성화됨
+                <div style="padding: 10px; border-radius: 8px; background: rgba(245,158,11,0.18); border: 1.5px solid #F59E0B; color: #F59E0B; font-size: 0.82rem; font-weight: 800; text-align: center; margin-bottom: 6px;">
+                    👑 MASTER ADMIN 자동 인증됨
                 </div>
             """)
-            st.caption("좌측 관제 메뉴 맨 끝에 **'👑 마스터 관리자 상세 통계실'**이 활성화되었습니다.")
-            if st.button("🔒 관리자 모드 종료", key="btn_admin_lock", use_container_width=True):
-                st.session_state["is_admin_mode"] = False
-                st.rerun()
-        else:
-            with st.expander("🔒 운영자 인증", expanded=False):
-                col_sb_pin, col_sb_btn = st.columns([1.6, 1.4])
-                with col_sb_pin:
-                    sb_admin_pw = st.text_input("비밀번호", type="password", key="admin_pwd_input", placeholder="비밀번호 입력", label_visibility="collapsed")
-                with col_sb_btn:
-                    if st.button("인증", key="btn_admin_unlock", use_container_width=True):
-                        if verify_admin_password(sb_admin_pw):
-                            st.session_state["is_admin_mode"] = True
-                            st.success("인증 완료!")
-                            st.rerun()
-                        else:
-                            st.error("비밀번호 불일치")
+            st.caption("좌측 관제 메뉴 맨 끝에 **'👑 마스터 관리자 상세 통계실'**이 자동 활성화되었습니다.")
 
         st.markdown("---")
         now_str = get_now_kst().strftime("%Y-%m-%d %H:%M:%S KST")
@@ -4079,31 +4062,6 @@ if show_matrix:
     st.session_state["matrix_intro_transition"] = False
 
 # ----------------------------------------------------
-@st.dialog("👑 마스터 관리자 인증 관제실", width="small")
-def open_admin_auth_dialog():
-    st.markdown("""
-        <div style="text-align:center; margin-bottom:12px;">
-            <div style="font-size:1.6rem;">🔒</div>
-            <div style="font-weight:900; font-size:1.1rem; color:#F59E0B;">마스터 관리자 통계실 인증</div>
-            <div style="font-size:0.82rem; color:#64748B;">실시간 쿼리 분석, 트래픽 로그 및 사용자 행동 관제실에 접속합니다.</div>
-        </div>
-    """, unsafe_allow_html=True)
-    admin_pw = st.text_input("마스터 비밀번호", type="password", key="dlg_admin_pw", placeholder="비밀번호를 입력하세요")
-    c1, c2 = st.columns(2)
-    with c1:
-        if st.button("👑 인증 확인", key="dlg_btn_admin_confirm", use_container_width=True):
-            if verify_admin_password(admin_pw):
-                st.session_state["is_admin_mode"] = True
-                st.success("인증 완료! 마스터 관리자 모드가 활성화되었습니다.")
-                st.rerun()
-            else:
-                st.error("비밀번호가 올바르지 않습니다.")
-    with c2:
-        if st.button("닫기", key="dlg_btn_admin_cancel", use_container_width=True):
-            st.rerun()
-
-
-# ----------------------------------------------------
 # [대시보드] 상단 헤더 및 회원 상태 바
 # ----------------------------------------------------
 head_c1, head_c2 = st.columns([5, 3.4])
@@ -4132,19 +4090,10 @@ with head_c2:
                 <span class="badge-pill notranslate" translate="no" style="margin-left: 6px; padding: 2px 8px; font-size: 0.75rem;">{u_badge}</span>
             </div>"""
         )
-    is_adm = st.session_state.get("is_admin_mode", False)
-    if is_adm:
-        if st.button("👑 관리자 끄기", use_container_width=True, key="btn_dash_admin_off"):
-            st.session_state["is_admin_mode"] = False
-            st.rerun()
-    elif is_google_authenticated():
+    if is_google_authenticated():
         if st.button("👑 MY 투자 라운지", key="btn_dash_top_lounge", use_container_width=True):
             st.session_state["prompt_my_lounge"] = True
             st.rerun()
-
-    # URL ?admin=true 호출 시 자동 다이얼로그 팝업
-    if st.session_state.pop("prompt_admin_login", False):
-        open_admin_auth_dialog()
 
 # ----------------------------------------------------
 # 🔍 국내·해외 통합 프리미엄 AI 즉시 검색기 (상단 고정 배치)
