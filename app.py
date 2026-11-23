@@ -905,48 +905,74 @@ with st.sidebar:
             avatar_html = f'<img src="{u_pic}" style="width:36px; height:36px; border-radius:50%; border:2px solid #3B82F6; margin-right:10px; vertical-align:middle; object-fit:cover;" />'
         else:
             avatar_html = '<span style="font-size:1.4rem; margin-right:8px; vertical-align:middle;">👤</span>'
-        st.html(
-            f"""<div class="user-profile-card">
-                <div style="display:flex; align-items:center; margin-bottom:6px;">
-                    {avatar_html}
-                    <div style="overflow:hidden;">
-                        <div style="font-size: 1.0rem; font-weight: 800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{u_name}님</div>
-                        <div style="font-size: 0.75rem; opacity: 0.75; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{u_email}</div>
+        with st.container(border=True):
+            st.html(
+                f"""<div style="padding: 2px 2px 6px 2px;">
+                    <div style="display:flex; align-items:center; margin-bottom:8px;">
+                        {avatar_html}
+                        <div style="overflow:hidden; flex:1;">
+                            <div style="font-size: 0.98rem; font-weight: 800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{u_name}님</div>
+                            <div style="font-size: 0.74rem; opacity: 0.75; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{u_email}</div>
+                        </div>
                     </div>
-                </div>
-                <span class="badge-pill notranslate" translate="no" style="padding: 2px 8px; font-size: 0.72rem; margin-bottom: 0;">{u_badge}</span>
-            </div>"""
-        )
+                    <span class="badge-pill notranslate" translate="no" style="padding: 2px 9px; font-size: 0.72rem; margin-bottom: 0;">{u_badge}</span>
+                </div>"""
+            )
 
-        if is_google_authenticated():
-            if st.button("👑 MY 투자 라운지\n(맞춤 진단 & 관심종목)", key="sb_btn_my_lounge", use_container_width=True):
-                st.session_state["prompt_my_lounge"] = True
-                st.rerun()
-        else:
-            st.html("""<style>
-                div[class*="st-key-sb_upgrade_btn"] button {
-                    background: #2563EB !important;
-                    background-color: #2563EB !important;
-                    border: 1.5px solid #1D4ED8 !important;
-                    border-radius: 10px !important;
-                    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35) !important;
-                    height: 44px !important;
-                }
-                div[class*="st-key-sb_upgrade_btn"] button *,
-                div[class*="st-key-sb_upgrade_btn"] button p,
-                div[class*="st-key-sb_upgrade_btn"] button div,
-                div[class*="st-key-sb_upgrade_btn"] button span {
-                    color: #FFFFFF !important;
-                    -webkit-text-fill-color: #FFFFFF !important;
-                    font-weight: 900 !important;
-                    font-size: 0.95rem !important;
-                    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35) !important;
-                }
-            </style>""")
-            if st.button("🔑 구글 정회원 무료 전환 (4대 혜택)", type="primary", key="sb_upgrade_btn", use_container_width=True):
-                open_login_modal()
-
-        st.markdown("---")
+            if is_google_authenticated():
+                col_acc1, col_acc2 = st.columns([1.85, 1.0])
+                with col_acc1:
+                    if st.button("👑 MY 라운지", key="sb_btn_my_lounge", help="맞춤 진단 & 관심종목 포트폴리오", use_container_width=True):
+                        st.session_state["prompt_my_lounge"] = True
+                        st.rerun()
+                with col_acc2:
+                    if st.button("로그아웃", key="sb_btn_logout_user", help="구글 계정 로그아웃", use_container_width=True):
+                        st.session_state["is_authenticated"] = False
+                        st.session_state["user_info"] = None
+                        st.session_state["user_watchlist"] = {}
+                        st.session_state["user_personality"] = {}
+                        st.session_state["auth_token"] = None
+                        st.session_state["is_admin_mode"] = False
+                        st.session_state["active_nav_menu"] = "🎯 오늘의 AI 추천주 (원픽 TOP 20)"
+                        st.session_state["current_page"] = "dashboard"
+                        if hasattr(st, "query_params"):
+                            st.query_params.clear()
+                        import streamlit.components.v1 as components
+                        components.html("""
+                            <script>
+                                (function() {
+                                    try {
+                                        if (window.top) window.top.postMessage({ type: 'NSTOCK_LOGOUT' }, '*');
+                                        if (window.parent) window.parent.postMessage({ type: 'NSTOCK_LOGOUT' }, '*');
+                                    } catch(e) {}
+                                })();
+                            </script>
+                        """, height=0, width=0)
+                        st.toast("정상적으로 로그아웃되었습니다.")
+                        st.rerun()
+            else:
+                st.html("""<style>
+                    div[class*="st-key-sb_upgrade_btn"] button {
+                        background: #2563EB !important;
+                        background-color: #2563EB !important;
+                        border: 1.5px solid #1D4ED8 !important;
+                        border-radius: 10px !important;
+                        box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35) !important;
+                        height: 42px !important;
+                    }
+                    div[class*="st-key-sb_upgrade_btn"] button *,
+                    div[class*="st-key-sb_upgrade_btn"] button p,
+                    div[class*="st-key-sb_upgrade_btn"] button div,
+                    div[class*="st-key-sb_upgrade_btn"] button span {
+                        color: #FFFFFF !important;
+                        -webkit-text-fill-color: #FFFFFF !important;
+                        font-weight: 900 !important;
+                        font-size: 0.92rem !important;
+                        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35) !important;
+                    }
+                </style>""")
+                if st.button("🔑 구글 정회원 무료 전환", type="primary", key="sb_upgrade_btn", use_container_width=True):
+                    open_login_modal()
 
         # ----------------------------------------------------
         # 🎯 1. 나의 투자 스타일 (초보자 원클릭 탭 바 - 최상단 배치)
@@ -1060,35 +1086,6 @@ with st.sidebar:
                 st.rerun()
 
         selected_menu = st.session_state["active_nav_menu"]
-
-        # 로그인 회원 전용 로그아웃 버튼 (비로그인 사용자에게는 비활성화/미노출)
-        if is_google_authenticated():
-            st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
-            if st.button("🚪 로그아웃", key="sb_btn_logout_user", use_container_width=True):
-                st.session_state["is_authenticated"] = False
-                st.session_state["user_info"] = None
-                st.session_state["user_watchlist"] = {}
-                st.session_state["user_personality"] = {}
-                st.session_state["auth_token"] = None
-                st.session_state["active_nav_menu"] = "🎯 오늘의 AI 추천주 (원픽 TOP 20)"
-                st.session_state["current_page"] = "dashboard"
-                if hasattr(st, "query_params"):
-                    st.query_params.clear()
-                import streamlit.components.v1 as components
-                components.html("""
-                    <script>
-                        (function() {
-                            try {
-                                if (window.top) window.top.postMessage({ type: 'NSTOCK_LOGOUT' }, '*');
-                                if (window.parent) window.parent.postMessage({ type: 'NSTOCK_LOGOUT' }, '*');
-                            } catch(e) {}
-                        })();
-                    </script>
-                """, height=0, width=0)
-                st.toast("정상적으로 로그아웃되었습니다.")
-                st.rerun()
-
-        st.markdown("---")
 
         st.markdown("---")
         with st.expander("💡 AI 퀀트 점수가 무엇인가요?", expanded=False):
