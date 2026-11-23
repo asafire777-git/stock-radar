@@ -1550,6 +1550,17 @@ div[class*="st-key-wl_saved_"] button:hover {
     background: #FEF3C7 !important;
     border-color: #D97706 !important;
 }
+/* 🛡️ 표 더블클릭 시 Glide Data Grid 셀 오버레이(#portal)가 모달 팝업 위로 뚫고 나오는 z-index 깨짐 원천 차단 */
+div[data-testid="stDialog"],
+div[data-baseweb="modal"] {
+    z-index: 1000050 !important;
+}
+body:has(div[role="dialog"]) #portal,
+body:has(div[data-testid="stDialog"]) #portal {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
 .stock-title {
     color: #0F172A !important;
     font-size: 1.2rem;
@@ -1926,6 +1937,17 @@ div[class*="st-key-wl_saved_"] button {
 }
 div[class*="st-key-wl_saved_"] button:hover {
     background: rgba(245, 158, 11, 0.26) !important;
+}
+/* 🛡️ 표 더블클릭 시 Glide Data Grid 셀 오버레이(#portal)가 모달 팝업 위로 뚫고 나오는 z-index 깨짐 원천 차단 */
+div[data-testid="stDialog"],
+div[data-baseweb="modal"] {
+    z-index: 1000050 !important;
+}
+body:has(div[role="dialog"]) #portal,
+body:has(div[data-testid="stDialog"]) #portal {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
 }
 .stock-title {
     color: #FFFFFF !important;
