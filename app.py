@@ -649,15 +649,29 @@ if hasattr(st, "query_params"):
     auth_tok = st.query_params.get("auth_tok")
     if auth_tok and (not st.session_state.get("user_info") or st.session_state.get("user_info", {}).get("provider") == "Guest"):
         try:
-            from src.user_manager import verify_auth_token
+            from src.user_manager import verify_auth_token, generate_auth_token
             verified_profile = verify_auth_token(auth_tok)
             if verified_profile and isinstance(verified_profile, dict) and verified_profile.get("email"):
                 st.session_state["is_authenticated"] = True
                 st.session_state["user_info"] = verified_profile
-                st.session_state["auth_token"] = auth_tok
+                # 슬라이딩 세션 갱신: 유효 토큰 복원 시 최신 타임스탬프로 자동 연장
+                fresh_tok = generate_auth_token(
+                    verified_profile["email"],
+                    verified_profile.get("name", ""),
+                    verified_profile.get("picture", ""),
+                )
+                st.session_state["auth_token"] = fresh_tok
                 from src.user_watchlist import load_user_watchlist, load_user_personality
                 st.session_state["user_watchlist"] = load_user_watchlist(verified_profile["email"])
                 st.session_state["user_personality"] = load_user_personality(verified_profile["email"])
+            else:
+                # 만료/무효 토큰인 경우 부모 창(radar.html) 상단 바 불일치 방지를 위해 즉시 동기화 해제 신호 전송
+                import streamlit.components.v1 as _comp
+                _comp.html(
+                    "<script>try{if(window.top)window.top.postMessage({type:'NSTOCK_LOGOUT'},'*');}catch(e){}</script>",
+                    height=0,
+                    width=0,
+                )
         except Exception as e:
             print(f"[Auth Token Hydration Error] {e}")
 

@@ -164,7 +164,8 @@ def verify_auth_token(token: str) -> Optional[Dict]:
             email = str(data.get("email", "")).strip().lower()
             ts = int(data.get("ts", 0))
             now = time.time()
-            if now - ts > 2592000 or now - ts < -3600:
+            # 180일(15,552,000초) 장기 세션 유지
+            if now - ts > 15552000 or now - ts < -86400:
                 return None
 
             return {
