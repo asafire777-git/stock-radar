@@ -1927,6 +1927,12 @@ div[class*="st-key-wl_add_"] button:hover {
     transform: translateY(-1px) !important;
     box-shadow: 0 6px 20px rgba(234, 88, 12, 0.50) !important;
 }
+div[class*="st-key-wl_add_"] button,
+div[class*="st-key-wl_add_"] button p,
+div[class*="st-key-wl_add_"] button span {
+    color: #FFFFFF !important;
+    -webkit-text-fill-color: #FFFFFF !important;
+}
 div[class*="st-key-wl_saved_"] button {
     background: rgba(245, 158, 11, 0.16) !important;
     color: #FCD34D !important;
@@ -1935,8 +1941,95 @@ div[class*="st-key-wl_saved_"] button {
     font-weight: 800 !important;
     transition: all 0.18s ease !important;
 }
+div[class*="st-key-wl_saved_"] button p,
+div[class*="st-key-wl_saved_"] button span {
+    color: #FCD34D !important;
+}
 div[class*="st-key-wl_saved_"] button:hover {
     background: rgba(245, 158, 11, 0.26) !important;
+}
+/* 🌙 밤 모드 전역 버튼·세그먼트·셀렉트·표·모달 시인성 최적화 */
+button[kind="secondary"],
+button[data-testid="stBaseButton-secondary"],
+button[data-testid="stBaseButton-secondaryFormSubmit"] {
+    background-color: #1E293B !important;
+    border: 1px solid #334155 !important;
+    color: #F1F5F9 !important;
+}
+button[kind="secondary"] p,
+button[kind="secondary"] span,
+button[data-testid="stBaseButton-secondary"] p,
+button[data-testid="stBaseButton-secondary"] span {
+    color: #F1F5F9 !important;
+}
+button[kind="secondary"]:hover,
+button[data-testid="stBaseButton-secondary"]:hover {
+    background-color: #273549 !important;
+    border-color: #38BDF8 !important;
+    color: #FFFFFF !important;
+}
+button[kind="primary"] p,
+button[kind="primary"] span,
+button[data-testid="stBaseButton-primary"] p,
+button[data-testid="stBaseButton-primary"] span {
+    color: #FFFFFF !important;
+}
+/* 사이드바·본문 세그먼트/필 버튼(안정 스윙·급등 단타·신규 상장 등) 다크 대비 보정 */
+div[data-testid="stButtonGroup"] button,
+div[data-baseweb="button-group"] button,
+button[kind="pills"],
+button[kind="segmented_control"] {
+    background-color: #1E293B !important;
+    border: 1px solid #334155 !important;
+    color: #CBD5E1 !important;
+}
+div[data-testid="stButtonGroup"] button p,
+div[data-testid="stButtonGroup"] button span,
+div[data-baseweb="button-group"] button p,
+div[data-baseweb="button-group"] button span,
+button[kind="pills"] p,
+button[kind="segmented_control"] p {
+    color: #CBD5E1 !important;
+}
+div[data-testid="stButtonGroup"] button[aria-pressed="true"],
+div[data-baseweb="button-group"] button[aria-pressed="true"],
+button[kind="pillsActive"],
+button[kind="segmented_controlActive"] {
+    background-color: #1D4ED8 !important;
+    border-color: #38BDF8 !important;
+    color: #FFFFFF !important;
+}
+div[data-testid="stButtonGroup"] button[aria-pressed="true"] p,
+div[data-baseweb="button-group"] button[aria-pressed="true"] p,
+button[kind="pillsActive"] p,
+button[kind="segmented_controlActive"] p {
+    color: #FFFFFF !important;
+    font-weight: 700 !important;
+}
+/* 다크 모드 셀렉트박스·익스팬더·모달 팝업 배경 통일 */
+div[data-baseweb="select"] > div {
+    background-color: #151A23 !important;
+    border: 1px solid #334155 !important;
+    color: #F1F5F9 !important;
+}
+div[data-testid="stExpander"] {
+    background-color: #151A23 !important;
+    border: 1px solid #242D3D !important;
+    border-radius: 10px !important;
+}
+div[data-testid="stDialog"] div[role="dialog"] {
+    background-color: #0F172A !important;
+    border: 1px solid #334155 !important;
+    color: #F1F5F9 !important;
+}
+/* 다크 모드 종목 순위표(st.dataframe) 눈부심 방지 다크 반전 필터 */
+div[data-testid="stDataFrame"] {
+    border: 1px solid #334155 !important;
+    border-radius: 12px !important;
+    overflow: hidden !important;
+}
+div[data-testid="stDataFrame"] > div {
+    filter: invert(0.91) hue-rotate(180deg) contrast(0.96) !important;
 }
 /* 🛡️ 표 더블클릭 시 Glide Data Grid 셀 오버레이(#portal)가 모달 팝업 위로 뚫고 나오는 z-index 깨짐 원천 차단 */
 div[data-testid="stDialog"],
