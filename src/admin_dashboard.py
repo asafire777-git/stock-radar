@@ -18,6 +18,7 @@ try:
         get_ga4_config,
         save_ga4_config,
         get_ga4_realtime_metrics,
+        get_ga4_dashboard_report,
         save_ga4_service_account_json
     )
     from src.user_manager import get_user_metrics
@@ -32,6 +33,7 @@ except ImportError:
         get_ga4_config,
         save_ga4_config,
         get_ga4_realtime_metrics,
+        get_ga4_dashboard_report,
         save_ga4_service_account_json
     )
     try:
@@ -141,35 +143,98 @@ def render_admin_dashboard(is_dark: bool = False):
         </div>
         """)
 
-    # 1-5. 🌐 Google Analytics 4 (Looker Studio) 공식 영구 트래픽 리포트 최상단 임베드
-    st.markdown("#### 🌐 Google Analytics 4 (GA4) 공식 영구 트래픽 리포트 (방문자·인기 칼럼·유입 경로)")
-    ls_c1, ls_c2, ls_c3 = st.columns([2.4, 1.0, 1.0])
-    with ls_c1:
-        st.caption(f"📡 측정 ID `{saved_ga4}` · 서버 재부팅과 무관하게 구글 GA4에 영구 누적된 전체 방문자·페이지뷰·인기 칼럼 통계를 표시합니다.")
-    with ls_c2:
-        st.link_button("↗ 리포트 크게 보기", "https://datastudio.google.com/reporting/43cfe019-16f2-4e00-af61-5477c2ed0357", use_container_width=True)
-    with ls_c3:
-        st.link_button("⚡ GA4 30분 실시간", f"https://analytics.google.com/analytics/web/#/p{saved_prop_id}/reports/realtime", use_container_width=True)
+    # 1-5. 🌐 Google Analytics 4 (GA4 Data API) N-Stock 자체 네이티브 KPI 카드 & 차트
+    ga4_rep = get_ga4_dashboard_report(saved_prop_id, selected_period)
+    st.markdown("#### 🌐 GA4 실시간 영구 웹 트래픽 (N-Stock 네이티브 관제)")
 
-    import streamlit.components.v1 as components
-    components.html(
-        """
-        <div style="width:100%; border-radius:12px; overflow:hidden; border:1px solid #CBD5E1; background:#FFFFFF;">
-            <iframe
-                width="100%"
-                height="860"
-                src="https://lookerstudio.google.com/embed/reporting/43cfe019-16f2-4e00-af61-5477c2ed0357/page/kIV1C"
-                frameborder="0"
-                style="border:0; display:block;"
-                allowfullscreen
-                sandbox="allow-storage-access-by-user-activation allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox">
-            </iframe>
+    if ga4_rep.get("api_available"):
+        rt_users = ga4_live.get("active_users_30m")
+        rt_disp = f"{rt_users:,}명" if rt_users is not None else "-"
+        avg_sec = int(ga4_rep.get("avg_session_sec", 0))
+        avg_disp = f"{avg_sec // 60}분 {avg_sec % 60}초" if avg_sec >= 60 else f"{avg_sec}초"
+
+        g1, g2, g3, g4, g5 = st.columns(5)
+        card_bg = "#1E293B" if is_dark else "#FFFFFF"
+        card_bd = "#334155" if is_dark else "#E2E8F0"
+        lbl_col = "#94A3B8" if is_dark else "#64748B"
+
+        ga_cards = [
+            ("⚡ 실시간 30분 접속자", rt_disp, "#10B981", "현재 활성 방문자"),
+            ("👥 조회 기간 방문자", f"{ga4_rep['active_users']:,}명", "#2563EB", f"기간: {selected_label}"),
+            ("🆕 신규 방문자", f"{ga4_rep['new_users']:,}명", "#8B5CF6", "최초 유입 사용자"),
+            ("📄 총 페이지뷰", f"{ga4_rep['pageviews']:,}회", "#F59E0B", "전체 페이지 조회"),
+            ("⏱️ 평균 체류시간", avg_disp, "#EC4899", "세션당 평균 머무름"),
+        ]
+        for col_w, (title_c, val_c, accent_c, sub_c) in zip([g1, g2, g3, g4, g5], ga_cards):
+            with col_w:
+                st.html(f"""
+                <div style="background:{card_bg}; border:1px solid {card_bd}; border-top:3px solid {accent_c}; border-radius:14px; padding:16px; box-shadow:0 2px 8px rgba(15,23,42,0.04);">
+                    <div style="font-size:0.8rem; font-weight:700; color:{lbl_col}; margin-bottom:6px;">{title_c}</div>
+                    <div style="font-size:1.65rem; font-weight:900; color:{accent_c}; line-height:1.15;">{val_c}</div>
+                    <div style="font-size:0.74rem; color:{lbl_col}; margin-top:6px;">{sub_c}</div>
+                </div>
+                """)
+
+        st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
+        gc1, gc2 = st.columns(2)
+        with gc1:
+            st.markdown("##### 🔥 GA4 인기 페이지 · 칼럼 TOP 10")
+            top_pages = ga4_rep.get("top_pages", [])
+            if top_pages:
+                df_tp = pd.DataFrame(top_pages)
+                fig_tp = px.bar(
+                    df_tp.iloc[::-1],
+                    x="views",
+                    y="path",
+                    orientation="h",
+                    text="views",
+                    labels={"views": "조회수", "path": "페이지 경로"},
+                    color_discrete_sequence=["#2563EB"],
+                )
+                fig_tp.update_layout(
+                    height=330,
+                    margin=dict(l=10, r=20, t=10, b=10),
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    font=dict(color="#E2E8F0" if is_dark else "#1E293B"),
+                    xaxis=dict(showgrid=True, gridcolor="#334155" if is_dark else "#E2E8F0"),
+                    yaxis=dict(title=""),
+                )
+                st.plotly_chart(fig_tp, use_container_width=True, key="admin_ga4_top_pages")
+            else:
+                st.info("선택한 기간의 페이지 조회 데이터를 집계 중입니다.")
+
+        with gc2:
+            st.markdown("##### ⏰ GA4 24시간대별 조회수 분포")
+            hourly_vals = ga4_rep.get("hourly", [0] * 24)
+            df_hr = pd.DataFrame({"시간": [f"{h:02d}시" for h in range(24)], "조회수": hourly_vals})
+            fig_hr = px.bar(
+                df_hr,
+                x="시간",
+                y="조회수",
+                color_discrete_sequence=["#10B981"],
+            )
+            fig_hr.update_layout(
+                height=330,
+                margin=dict(l=10, r=10, t=10, b=10),
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="#E2E8F0" if is_dark else "#1E293B"),
+                xaxis=dict(tickangle=-45),
+                yaxis=dict(showgrid=True, gridcolor="#334155" if is_dark else "#E2E8F0"),
+            )
+            st.plotly_chart(fig_hr, use_container_width=True, key="admin_ga4_hourly")
+    else:
+        st.html(f"""
+        <div style="background:{'#1E293B' if is_dark else '#EFF6FF'}; border:1.5px dashed {'#38BDF8' if is_dark else '#3B82F6'}; border-radius:12px; padding:14px 18px; margin:4px 0 14px 0; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <div style="font-size:0.86rem; color:{'#E2E8F0' if is_dark else '#1E293B'};">
+                📡 <b>GA4 Data API 키 연동 대기 중</b> ({ga4_rep.get('status_msg', '')})<br/>
+                <span style="font-size:0.8rem; color:{'#94A3B8' if is_dark else '#475569'};">Streamlit Cloud Secrets에 <code>[ga4_service_account]</code> 등록 시, 이 자리에 <b>N-Stock 전용 GA4 KPI 카드 5종 + 인기 칼럼 TOP 10 + 24시간 트래픽 차트</b>가 즉시 활성화됩니다.</span>
+            </div>
         </div>
-        """,
-        height=880,
-        scrolling=False,
-    )
-    st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
+        """)
+
+    st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
 
     # 2. 5대 핵심 KPI 메트릭 카드 Row
     st.markdown("#### 📊 실시간 핵심 성과 지표 (Real-time KPIs)")

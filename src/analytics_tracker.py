@@ -311,6 +311,142 @@ def get_ga4_realtime_metrics(property_id: str = "557310438") -> dict:
         }
 
 
+def get_ga4_dashboard_report(property_id: str = "557310438", period: str = "7d") -> dict:
+    """
+    GA4 Data API REST (:runReport)를 호출하여 N-Stock 자체 관리자 카드·차트용
+    핵심 KPI(방문자·신규·페이지뷰·체류시간), 인기 페이지 TOP 10, 24시간대별 트래픽 반환
+    """
+    prop_id = property_id or "557310438"
+    empty_res = {
+        "api_available": False,
+        "status_msg": "GA4 서비스 계정 JSON 키 등록 대기 중",
+        "active_users": 0,
+        "new_users": 0,
+        "pageviews": 0,
+        "avg_session_sec": 0.0,
+        "top_pages": [],
+        "hourly": [0] * 24,
+    }
+
+    secret_creds = None
+    try:
+        import streamlit as st
+        if hasattr(st, "secrets") and "ga4_service_account" in st.secrets:
+            secret_creds = dict(st.secrets["ga4_service_account"])
+    except Exception:
+        pass
+
+    creds_file = GA4_SERVICE_ACCOUNT_FILE if os.path.exists(GA4_SERVICE_ACCOUNT_FILE) else os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+    if not secret_creds and not (creds_file and os.path.exists(creds_file)):
+        return empty_res
+
+    date_map = {
+        "today": ("today", "today"),
+        "7d": ("7daysAgo", "today"),
+        "30d": ("30daysAgo", "today"),
+        "all": ("365daysAgo", "today"),
+    }
+    start_d, end_d = date_map.get(period, ("7daysAgo", "today"))
+
+    try:
+        from google.oauth2 import service_account
+        from google.auth.transport.requests import Request
+        import requests
+
+        scopes = ["https://www.googleapis.com/auth/analytics.readonly"]
+        if secret_creds:
+            credentials = service_account.Credentials.from_service_account_info(secret_creds, scopes=scopes)
+        else:
+            credentials = service_account.Credentials.from_service_account_file(creds_file, scopes=scopes)
+
+        credentials.refresh(Request())
+        headers = {
+            "Authorization": f"Bearer {credentials.token}",
+            "Content-Type": "application/json",
+        }
+        url = f"https://analyticsdata.googleapis.com/v1beta/properties/{prop_id}:runReport"
+
+        # 1. 기간 요약 KPI
+        r_sum = requests.post(
+            url,
+            headers=headers,
+            json={
+                "dateRanges": [{"startDate": start_d, "endDate": end_d}],
+                "metrics": [
+                    {"name": "activeUsers"},
+                    {"name": "newUsers"},
+                    {"name": "screenPageViews"},
+                    {"name": "averageSessionDuration"},
+                ],
+            },
+            timeout=6,
+        )
+        if r_sum.status_code != 200:
+            empty_res["status_msg"] = f"⚠️ GA4 API 오류 ({r_sum.status_code}): {r_sum.text[:120]}"
+            return empty_res
+
+        rows_sum = r_sum.json().get("rows", [])
+        if rows_sum:
+            mv = rows_sum[0].get("metricValues", [])
+            empty_res["active_users"] = int(float(mv[0].get("value", 0))) if len(mv) > 0 else 0
+            empty_res["new_users"] = int(float(mv[1].get("value", 0))) if len(mv) > 1 else 0
+            empty_res["pageviews"] = int(float(mv[2].get("value", 0))) if len(mv) > 2 else 0
+            empty_res["avg_session_sec"] = float(mv[3].get("value", 0.0)) if len(mv) > 3 else 0.0
+
+        # 2. 인기 페이지·칼럼 TOP 10
+        r_pages = requests.post(
+            url,
+            headers=headers,
+            json={
+                "dateRanges": [{"startDate": start_d, "endDate": end_d}],
+                "dimensions": [{"name": "pagePath"}],
+                "metrics": [{"name": "screenPageViews"}, {"name": "activeUsers"}],
+                "orderBys": [{"metric": {"metricName": "screenPageViews"}, "desc": True}],
+                "limit": 10,
+            },
+            timeout=6,
+        )
+        if r_pages.status_code == 200:
+            top_pages = []
+            for row in r_pages.json().get("rows", []):
+                path = row.get("dimensionValues", [{}])[0].get("value", "/")
+                mv = row.get("metricValues", [])
+                pv = int(float(mv[0].get("value", 0))) if len(mv) > 0 else 0
+                uv = int(float(mv[1].get("value", 0))) if len(mv) > 1 else 0
+                top_pages.append({"path": path, "views": pv, "users": uv})
+            empty_res["top_pages"] = top_pages
+
+        # 3. 24시간대별 트래픽 분포
+        r_hr = requests.post(
+            url,
+            headers=headers,
+            json={
+                "dateRanges": [{"startDate": start_d, "endDate": end_d}],
+                "dimensions": [{"name": "hour"}],
+                "metrics": [{"name": "screenPageViews"}],
+            },
+            timeout=6,
+        )
+        if r_hr.status_code == 200:
+            hourly = [0] * 24
+            for row in r_hr.json().get("rows", []):
+                try:
+                    h = int(row.get("dimensionValues", [{}])[0].get("value", 0))
+                    pv = int(float(row.get("metricValues", [{}])[0].get("value", 0)))
+                    if 0 <= h < 24:
+                        hourly[h] = pv
+                except Exception:
+                    pass
+            empty_res["hourly"] = hourly
+
+        empty_res["api_available"] = True
+        empty_res["status_msg"] = "🟢 GA4 Data API 실시간 직결 연동 중"
+        return empty_res
+    except Exception as e:
+        empty_res["status_msg"] = f"⚠️ GA4 API 연동 오류: {str(e)[:100]}"
+        return empty_res
+
+
 def get_analytics_metrics(period_filter: str = "all"):
     """
     관리자용 상세 분석 지표 산출
