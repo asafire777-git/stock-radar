@@ -3,6 +3,7 @@ Stock Radar - Stock Knowledge Hub & Educational Columns (E-E-A-T Compliant)
 구글 애드센스 YMYL 심사 통과용 전문 주식 교육 칼럼 16편 및 인터랙티브 허브 렌더러
 """
 
+import base64
 import json
 import os
 import re
@@ -13,6 +14,25 @@ _COLUMNS_FULL_PATH = os.path.join(
     "data",
     "columns_full.json",
 )
+
+
+def _embed_svgs_as_data_img(html_str: str, border_c: str = "#E2E8F0") -> str:
+    """Streamlit st.html()의 DOMPurify가 <svg>를 제거하는 문제를 우회하여 Base64 <img>로 100% 원본 그래프/다이어그램 표출"""
+    if not html_str or "<svg" not in html_str:
+        return html_str
+
+    def _repl(match):
+        svg_raw = match.group(0)
+        if "xmlns=" not in svg_raw:
+            svg_raw = svg_raw.replace("<svg", '<svg xmlns="http://www.w3.org/2000/svg"', 1)
+        b64 = base64.b64encode(svg_raw.encode("utf-8")).decode("ascii")
+        return (
+            f'<img src="data:image/svg+xml;base64,{b64}" alt="N-Stock 실전 차트 도식" '
+            f'style="width:100%;max-width:740px;height:auto;display:block;margin:16px auto;'
+            f'border-radius:12px;background:#FFFFFF;padding:10px;border:1px solid {border_c};box-shadow:0 4px 14px rgba(15,23,42,0.06);" />'
+        )
+
+    return re.sub(r"<svg\b[^>]*>.*?</svg>", _repl, html_str, flags=re.IGNORECASE | re.DOTALL)
 
 
 def _load_published_columns():
@@ -693,6 +713,7 @@ def show_column_detail_dialog(column: dict, is_dark: bool = False):
     """)
 
     if column.get("content_html"):
+        rendered_html = _embed_svgs_as_data_img(column["content_html"], border_c=border_c)
         st.html(f"""
         <style>
             .nstock-editorial-body {{
@@ -773,7 +794,7 @@ def show_column_detail_dialog(column: dict, is_dark: bool = False):
             }}
         </style>
         <div class="nstock-editorial-body">
-            {column["content_html"]}
+            {rendered_html}
         </div>
         """)
     else:

@@ -1236,12 +1236,19 @@ with st.sidebar:
 
                     function getScrollTargets() {{
                         var arr = [];
-                        var s1 = pdoc.querySelector('[data-testid="stMain"]');
-                        var s2 = pdoc.querySelector('section.main');
-                        var s3 = pdoc.querySelector('[data-testid="stAppViewContainer"]');
-                        if (s1) arr.push(s1);
-                        if (s2 && s2 !== s1) arr.push(s2);
-                        if (s3 && s3 !== s1 && s3 !== s2) arr.push(s3);
+                        var sels = [
+                            '[data-testid="stMain"]',
+                            'section.main',
+                            '[data-testid="stAppViewContainer"]',
+                            '[data-testid="stDialog"] [role="dialog"]',
+                            '[data-testid="stDialog"] [data-testid="stVerticalBlock"]',
+                            '[data-baseweb="modal"] [role="dialog"]'
+                        ];
+                        sels.forEach(function(sel) {{
+                            pdoc.querySelectorAll(sel).forEach(function(el) {{
+                                if (el && arr.indexOf(el) === -1) arr.push(el);
+                            }});
+                        }});
                         return arr;
                     }}
 
@@ -1321,15 +1328,22 @@ with st.sidebar:
                         }}
                     }}
 
-                    getScrollTargets().forEach(function(el) {{
-                        if (!el._nstockScrollBound) {{
-                            el.addEventListener('scroll', updateBtnVisibility, {{ passive: true }});
-                            el._nstockScrollBound = true;
-                        }}
-                    }});
+                    function bindAllScrolls() {{
+                        getScrollTargets().forEach(function(el) {{
+                            if (!el._nstockScrollBound) {{
+                                el.addEventListener('scroll', updateBtnVisibility, {{ passive: true }});
+                                el._nstockScrollBound = true;
+                            }}
+                        }});
+                    }}
+                    bindAllScrolls();
                     if (!window.parent._nstockScrollBound) {{
                         window.parent.addEventListener('scroll', updateBtnVisibility, {{ passive: true }});
                         window.parent._nstockScrollBound = true;
+                        setInterval(function() {{
+                            bindAllScrolls();
+                            updateBtnVisibility();
+                        }}, 900);
                     }}
                     updateBtnVisibility();
                 }} catch(err) {{}}
@@ -3249,12 +3263,31 @@ def display_investor_table(investor_df: pd.DataFrame, rows: int = 5):
 
 
 def render_clickable_stock_table(df: pd.DataFrame, key: str):
-    """체크박스뿐 아니라 종목명·종목코드·현재가 등 행의 어느 셀을 클릭해도 즉시 반응하는 통합 종목 표"""
+    """체크박스뿐 아니라 종목명·종목코드·현재가 등 행의 어느 셀을 클릭해도 즉시 반응하는 통합 종목 표 (텍스트 잘림 방지 자동 컬럼 폭 최적화)"""
+    col_cfg = {}
+    if df is not None and not df.empty:
+        for col in df.columns:
+            c_str = str(col)
+            if c_str in ("종목명", "종목"):
+                try:
+                    col_cfg[col] = st.column_config.TextColumn(c_str, width="medium", pinned=True)
+                except Exception:
+                    col_cfg[col] = st.column_config.TextColumn(c_str, width="medium")
+            elif any(k in c_str for k in ("핵심 포착신호", "포착신호", "추천 근거", "분석 요약", "선정 사유", "사유")):
+                try:
+                    col_cfg[col] = st.column_config.TextColumn(c_str, width=560)
+                except Exception:
+                    col_cfg[col] = st.column_config.TextColumn(c_str, width="large")
+            elif any(k in c_str for k in ("예측방향", "추세", "상태")):
+                col_cfg[col] = st.column_config.TextColumn(c_str, width="medium")
+            elif c_str in ("시장", "AI등급", "등급", "순위", "종목코드", "코드"):
+                col_cfg[col] = st.column_config.TextColumn(c_str, width="small")
     try:
         return st.dataframe(
             df,
             use_container_width=True,
             hide_index=True,
+            column_config=col_cfg if col_cfg else None,
             on_select="rerun",
             selection_mode=["single-row", "single-cell"],
             key=key,
