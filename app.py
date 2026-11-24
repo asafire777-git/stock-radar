@@ -656,12 +656,15 @@ def clear_nav_query_params():
         return
     tok = st.session_state.get("auth_token") or st.query_params.get("auth_tok")
     udata = st.query_params.get("udata")
+    cur_view = st.query_params.get("view")
     try:
         st.query_params.clear()
         if tok and is_google_authenticated():
             st.query_params["auth_tok"] = tok
         if udata and is_google_authenticated():
             st.query_params["udata"] = udata
+        if cur_view:
+            st.query_params["view"] = cur_view
     except Exception:
         pass
 
@@ -827,11 +830,33 @@ elif target_page in ["intro", "home"]:
     st.session_state["active_nav_menu"] = "🏠 서비스 소개 & 실전 가이드"
     clear_nav_query_params()
 else:
-    # 기본 접속 시 항상 실시간 AI 대시보드로 진입
-    if "current_page" not in st.session_state:
-        st.session_state["current_page"] = "dashboard"
+    # 새로고침(F5) 시 ?view=<슬러그> 파라미터로 전체 9개 메뉴 상태 완벽 복원
+    _INIT_VIEW_MAP = {
+        "intro": ("🏠 서비스 소개 & 실전 가이드", "intro"),
+        "picks": ("🎯 오늘의 AI 추천주 (원픽 TOP 20)", "dashboard"),
+        "rising": ("⚡ 실시간 급등 순위 (TOP 100)", "dashboard"),
+        "ipo": ("🚀 신규 상장주 모니터링", "dashboard"),
+        "diagnosis": ("🩺 1초 종목 종합 정밀 진단실", "dashboard"),
+        "argon": ("🤖 Gemini 4 Argon 1:1 AI 투자 비서", "dashboard"),
+        "performance": ("🏆 AI 성과 검증실 (적중률)", "dashboard"),
+        "knowledge": ("📚 주식 실전 지식 아카이브 (16편)", "dashboard"),
+        "admin": ("👑 마스터 관리자 상세 통계실", "dashboard"),
+    }
+    _qp_view_init = str(st.query_params.get("view", "")).strip().lower() if hasattr(st, "query_params") else ""
     if "active_nav_menu" not in st.session_state:
-        st.session_state["active_nav_menu"] = "🎯 오늘의 AI 추천주 (원픽 TOP 20)"
+        if _qp_view_init == "admin" and st.session_state.get("is_admin_mode", False):
+            st.session_state["active_nav_menu"] = "👑 마스터 관리자 상세 통계실"
+            st.session_state["current_page"] = "dashboard"
+        elif _qp_view_init in _INIT_VIEW_MAP and _qp_view_init != "admin":
+            _m_name, _p_name = _INIT_VIEW_MAP[_qp_view_init]
+            st.session_state["active_nav_menu"] = _m_name
+            st.session_state["current_page"] = _p_name
+        else:
+            st.session_state["active_nav_menu"] = "🎯 오늘의 AI 추천주 (원픽 TOP 20)"
+            if "current_page" not in st.session_state:
+                st.session_state["current_page"] = "dashboard"
+    elif "current_page" not in st.session_state:
+        st.session_state["current_page"] = "dashboard"
 
 is_dark = (st.session_state.get("theme_mode", "light") == "dark")
 
