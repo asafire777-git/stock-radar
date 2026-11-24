@@ -77,42 +77,30 @@ def render_admin_dashboard(is_dark: bool = False):
     </div>
     """)
 
-    # 컨트롤 바 (기간 선택 + 실시간 동기화 + 데이터 초기화)
-    col_ctrl1, col_ctrl2, col_ctrl3 = st.columns([3.2, 1, 1.2])
-    with col_ctrl1:
-        period_map = {
-            "🔥 전체 누적": "all",
-            "⚡ 오늘 실시간": "today",
-            "📅 최근 7일": "7d",
-            "📊 최근 30일": "30d"
-        }
-        current_period = st.session_state.get("admin_period_filter", "all")
-        current_idx = 0
-        for i, val in enumerate(period_map.values()):
-            if val == current_period:
-                current_idx = i
-                break
+    # 조회 기간 선택 바 (GA4 영구 데이터 + 세션 실측 자동 연동)
+    period_map = {
+        "🔥 전체 누적": "all",
+        "⚡ 오늘 실시간": "today",
+        "📅 최근 7일": "7d",
+        "📊 최근 30일": "30d"
+    }
+    current_period = st.session_state.get("admin_period_filter", "all")
+    current_idx = 0
+    for i, val in enumerate(period_map.values()):
+        if val == current_period:
+            current_idx = i
+            break
 
-        selected_label = st.radio(
-            "조회 기간 선택",
-            list(period_map.keys()),
-            index=current_idx,
-            horizontal=True,
-            label_visibility="collapsed",
-            key="admin_period_radio_selector"
-        )
-        selected_period = period_map[selected_label]
-        st.session_state["admin_period_filter"] = selected_period
-
-    with col_ctrl2:
-        if st.button("🔄 즉시 동기화", key="admin_sync_btn", use_container_width=True):
-            st.rerun(scope="fragment")
-
-    with col_ctrl3:
-        if st.button("🧹 순수 실측 리셋", key="admin_reset_btn", use_container_width=True, help="기존 검색 로그를 0건으로 비우고, 순수 실측 모드로 새롭게 기록을 시작합니다."):
-            reset_analytics_logs()
-            st.toast("🧹 초기화 완료! 이제부터 실제 사용자 검색 로그만 0건부터 순수 집계됩니다.", icon="✅")
-            st.rerun(scope="fragment")
+    selected_label = st.radio(
+        "조회 기간 선택",
+        list(period_map.keys()),
+        index=current_idx,
+        horizontal=True,
+        label_visibility="collapsed",
+        key="admin_period_radio_selector"
+    )
+    selected_period = period_map[selected_label]
+    st.session_state["admin_period_filter"] = selected_period
 
     # 데이터 로드
     metrics = get_analytics_metrics(selected_period)
@@ -126,22 +114,6 @@ def render_admin_dashboard(is_dark: bool = False):
 
     total_cnt = metrics.get("total_searches", 0)
     period_cnt = metrics.get("period_searches", 0)
-
-    # 데이터 성격 안내 배너
-    if total_cnt == 0:
-        st.html(f"""
-        <div style="background:{'#064E3B' if is_dark else '#ECFDF5'}; border:1px solid {'#059669' if is_dark else '#A7F3D0'}; border-radius:12px; padding:10px 16px; margin: 4px 0 16px 0; font-size:0.83rem; color:{'#A7F3D0' if is_dark else '#065F46'}; display:flex; justify-content:space-between; align-items:center;">
-            <span>🟢 <b>순수 실측 모드 가동 중</b>: 가상 더미 데이터가 완전히 초기화되었습니다. 현재 실제 방문자의 실시간 검색 및 진단 로그를 0건부터 순수 수집 중입니다.</span>
-            <span style="font-weight:700; color:#10B981;">실측 대기 중 (0건)</span>
-        </div>
-        """)
-    else:
-        st.html(f"""
-        <div style="background:{'#1E293B' if is_dark else '#F8FAFC'}; border:1px solid {'#334155' if is_dark else '#E2E8F0'}; border-radius:12px; padding:10px 16px; margin: 4px 0 16px 0; font-size:0.83rem; color:{'#94A3B8' if is_dark else '#475569'}; display:flex; justify-content:space-between; align-items:center;">
-            <span>🟢 <b>순수 실측 데이터 연동 중</b>: 누적 <b>{total_cnt:,}건</b>의 실제 사용자 이벤트가 실시간 반영되고 있습니다. (언제든 우측 '순수 실측 리셋'으로 0건 초기화 가능)</span>
-            <span style="font-weight:700; color:#3B82F6;">실시간 연동 중</span>
-        </div>
-        """)
 
     # 1-5. 🌐 Google Analytics 4 (GA4 Data API) N-Stock 자체 네이티브 KPI 카드 & 차트
     ga4_rep = get_ga4_dashboard_report(saved_prop_id, selected_period)
