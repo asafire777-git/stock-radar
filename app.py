@@ -1121,21 +1121,16 @@ with st.sidebar:
 
         st.markdown("---")
         with st.expander("💡 AI 퀀트 점수가 무엇인가요?", expanded=False):
-            st.caption(
-                "AI가 복잡한 주식 빅데이터를 분석해 100점 만점으로 매긴 점수입니다:\n\n"
-                "• **🚀 상승 추진력(30점)**: 시장의 관심이 지금 이 종목에 얼마나 쏠려있는가?\n"
-                "• **💰 큰손 수급(20점)**: 개미만 사는 게 아니라 외국인·기관이 진짜 돈을 넣었는가?\n"
-                "• **📈 차트 안전성(25점)**: 5일선 위에 안착하여 바닥을 탄탄히 다지고 올라가는가?\n"
-                "• **🔥 거래대금(25점)**: 내가 팔고 싶을 때 바로 팔릴 만큼 거래가 활발한가?"
+            st.markdown(
+                """<div style="font-size:0.8rem; line-height:1.65;">
+                AI가 주식 빅데이터를 분석해 <b>100점 만점</b>으로 매긴 점수입니다:<br/><br/>
+                • <b>🚀 상승 추진력 (30점)</b>: 시장의 관심이 얼마나 쏠려있는가?<br/>
+                • <b>💰 큰손 수급 (20점)</b>: 외국인·기관이 실제로 돈을 넣었는가?<br/>
+                • <b>📈 차트 안전성 (25점)</b>: 5일선 위에 안착해 바닥을 다졌는가?<br/>
+                • <b>🔥 거래대금 (25점)</b>: 원할 때 바로 팔릴 만큼 활발한가?
+                </div>""",
+                unsafe_allow_html=True,
             )
-
-        if st.button("🔄 실시간 데이터 새로고침", use_container_width=True):
-            st.cache_data.clear()
-            for k in list(st.session_state.keys()):
-                if str(k).startswith("cached_cand_"):
-                    del st.session_state[k]
-            st.session_state["matrix_intro_transition"] = True
-            st.rerun()
 
         # ----------------------------------------------------
         # 사이드바 하단: 화면 테마 (낮/밤 모드)
