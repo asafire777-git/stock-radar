@@ -181,13 +181,25 @@ except ImportError:
     from stock_knowledge_hub import render_stock_knowledge_tab
 
 
+_ADMIN_MOD_MTIMES = {}
+
 def render_admin_dashboard(*args, **kwargs):
-    """관리자 대시보드 지연 임포트 래퍼 (일반 방문자 초기 로딩 시 plotly.express/관리자 모듈 로드 생략)"""
+    """관리자 대시보드 지연 임포트 래퍼 (코드 배포 시 stale 모듈 캐시 자동 리로드)"""
+    import importlib
     try:
-        from src.admin_dashboard import render_admin_dashboard as _render
+        import src.analytics_tracker as _at_mod
+        import src.admin_dashboard as _ad_mod
     except ImportError:
-        from admin_dashboard import render_admin_dashboard as _render
-    return _render(*args, **kwargs)
+        import analytics_tracker as _at_mod
+        import admin_dashboard as _ad_mod
+    for _m in (_at_mod, _ad_mod):
+        _f = getattr(_m, "__file__", None)
+        if _f and os.path.exists(_f):
+            _mt = os.path.getmtime(_f)
+            if _ADMIN_MOD_MTIMES.get(_f) != _mt:
+                importlib.reload(_m)
+                _ADMIN_MOD_MTIMES[_f] = _mt
+    return _ad_mod.render_admin_dashboard(*args, **kwargs)
 
 
 
@@ -1085,7 +1097,10 @@ with st.sidebar:
         valid_menus = nav_options + (["👑 마스터 관리자 상세 통계실"] if is_admin_active else [])
 
         if "active_nav_menu" not in st.session_state or st.session_state["active_nav_menu"] not in valid_menus:
-            st.session_state["active_nav_menu"] = "🎯 오늘의 AI 추천주 (원픽 TOP 20)"
+            if is_admin_active and str(st.query_params.get("view", "")).strip().lower() == "admin":
+                st.session_state["active_nav_menu"] = "👑 마스터 관리자 상세 통계실"
+            else:
+                st.session_state["active_nav_menu"] = "🎯 오늘의 AI 추천주 (원픽 TOP 20)"
 
         current_active = st.session_state["active_nav_menu"]
         for idx, opt in enumerate(nav_options):
@@ -1098,6 +1113,8 @@ with st.sidebar:
             ):
                 st.session_state["active_nav_menu"] = opt
                 clear_nav_query_params()
+                if "view" in st.query_params:
+                    del st.query_params["view"]
                 st.rerun()
 
         selected_menu = st.session_state["active_nav_menu"]
@@ -1158,7 +1175,14 @@ with st.sidebar:
             ):
                 st.session_state["active_nav_menu"] = "👑 마스터 관리자 상세 통계실"
                 clear_nav_query_params()
+                st.query_params["view"] = "admin"
                 st.rerun()
+            try:
+                import streamlit.components.v1 as _view_comp
+                _cur_view = "admin" if is_admin_tab_active else "main"
+                _view_comp.html(f"<script>try{{window.parent.postMessage({{type:'NSTOCK_VIEW',view:'{_cur_view}'}},'*');}}catch(e){{}}</script>", height=0)
+            except Exception:
+                pass
 
         st.markdown("---")
         now_str = get_now_kst().strftime("%Y-%m-%d %H:%M:%S KST")
