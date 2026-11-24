@@ -141,6 +141,24 @@ def render_admin_dashboard(is_dark: bool = False):
         </div>
         """)
 
+    # 1-5. 🌐 Google Analytics 4 (Looker Studio) 공식 영구 트래픽 리포트 최상단 임베드
+    st.markdown("#### 🌐 Google Analytics 4 (GA4) 공식 영구 트래픽 리포트 (방문자·인기 칼럼·유입 경로)")
+    ls_c1, ls_c2, ls_c3 = st.columns([2.4, 1.0, 1.0])
+    with ls_c1:
+        st.caption(f"📡 측정 ID `{saved_ga4}` · 서버 재부팅과 무관하게 구글 GA4에 영구 누적된 전체 방문자·페이지뷰·인기 칼럼 통계를 표시합니다.")
+    with ls_c2:
+        st.link_button("↗ 리포트 크게 보기", "https://datastudio.google.com/reporting/43cfe019-16f2-4e00-af61-5477c2ed0357", use_container_width=True)
+    with ls_c3:
+        st.link_button("⚡ GA4 30분 실시간", f"https://analytics.google.com/analytics/web/#/p{saved_prop_id}/reports/realtime", use_container_width=True)
+
+    import streamlit.components.v1 as components
+    components.iframe(
+        "https://lookerstudio.google.com/embed/reporting/43cfe019-16f2-4e00-af61-5477c2ed0357",
+        height=760,
+        scrolling=True,
+    )
+    st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
+
     # 2. 5대 핵심 KPI 메트릭 카드 Row
     st.markdown("#### 📊 실시간 핵심 성과 지표 (Real-time KPIs)")
     kpi_cols = st.columns(5)
