@@ -664,6 +664,14 @@ if hasattr(st, "query_params"):
             if verified_profile and isinstance(verified_profile, dict) and verified_profile.get("email"):
                 st.session_state["is_authenticated"] = True
                 st.session_state["user_info"] = verified_profile
+                # 자동 로그인 세션 최초 진입 시 최근 접속일시·누적 로그인 수 정확히 1회 갱신
+                if not st.session_state.get("login_recorded"):
+                    try:
+                        from src.user_manager import save_or_update_user
+                        save_or_update_user(verified_profile)
+                        st.session_state["login_recorded"] = True
+                    except Exception:
+                        pass
                 # 슬라이딩 세션 갱신: 유효 토큰 복원 시 최신 타임스탬프로 자동 연장
                 fresh_tok = generate_auth_token(
                     verified_profile["email"],

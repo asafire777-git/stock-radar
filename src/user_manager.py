@@ -94,7 +94,7 @@ def get_user_metrics() -> Dict:
     """관리자 센터용 회원 통계 지표 산출"""
     users = load_all_users()
     total_users = len(users)
-    today_str = datetime.now().strftime("%Y-%m-%d")
+    today_str = _get_now_kst_str()[:10]
     today_active = sum(1 for u in users if str(u.get("last_login", "")).startswith(today_str))
 
     return {
