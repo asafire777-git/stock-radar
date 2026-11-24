@@ -3264,6 +3264,7 @@ def display_investor_table(investor_df: pd.DataFrame, rows: int = 5):
 
 def render_clickable_stock_table(df: pd.DataFrame, key: str):
     """체크박스뿐 아니라 종목명·종목코드·현재가 등 행의 어느 셀을 클릭해도 즉시 반응하는 통합 종목 표 (텍스트 잘림 원천 방지)"""
+    import re
     view_df = df.copy() if (df is not None and not df.empty) else df
     col_cfg = {}
     if view_df is not None and not view_df.empty:
