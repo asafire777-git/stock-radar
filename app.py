@@ -1456,7 +1456,7 @@ section[data-testid="stMain"] > div:first-child {
     padding-top: 1.2rem !important;
     padding-left: 1.5rem !important;
     padding-right: 1.5rem !important;
-    padding-bottom: 3.5rem !important;
+    padding-bottom: 4.5rem !important;
     width: 100% !important;
     box-sizing: border-box !important;
 }
@@ -4047,116 +4047,151 @@ if st.session_state.pop("open_stock_detail_modal", False):
         show_stock_chart_dialog(m_code, m_name, is_dark)
 
 # ----------------------------------------------------
-# 5-1. 매트릭스 디지털 연산 트랜지션 로더 (서비스 소개 -> 대시보드 진입 시)
+# 5-0. 독립 전용 메뉴 조기 분기 라우팅 (메뉴 완전 분리 & 초고속 전환 최적화)
 # ----------------------------------------------------
-show_matrix = st.session_state.get("matrix_intro_transition", False)
-matrix_holder = st.empty()
-if show_matrix:
-    matrix_holder.html(render_matrix_loader(is_dark))
-    matrix_start_time = time.time()
+_cur_sel_menu = st.session_state.get("active_nav_menu", "🎯 오늘의 AI 추천주 (원픽 TOP 20)")
+_cur_is_admin = st.session_state.get("is_admin_mode", False)
 
-# 메인 데이터 병렬 로드 (급등주 + 거래량주 + 신규상장주 동시 수집)
-if not show_matrix:
-    with st.spinner("최신 주식 시장 데이터를 초고속 병렬 수집 및 분석 중입니다..."):
-        df_rising, df_volume, df_new = load_all_market_base_data(months=new_listing_months)
-else:
-    df_rising, df_volume, df_new = load_all_market_base_data(months=new_listing_months)
+if _cur_is_admin and "마스터 관리자" in _cur_sel_menu:
+    st.session_state["matrix_intro_transition"] = False
+    render_admin_dashboard(is_dark=is_dark)
+    render_footer_legal_bar(is_dark=is_dark, key_prefix="app_")
+    st.stop()
 
-# 필터 적용
-if not df_rising.empty and market_filter != "전체 (KOSPI + KOSDAQ)":
-    df_rising_filtered = df_rising[df_rising["market"] == market_filter]
-else:
-    df_rising_filtered = df_rising
+if "지식 아카이브" in _cur_sel_menu or "16편" in _cur_sel_menu:
+    st.session_state["matrix_intro_transition"] = False
+    render_stock_knowledge_tab(is_dark=is_dark, key_prefix="app_")
+    render_footer_legal_bar(is_dark=is_dark, key_prefix="app_")
+    st.stop()
 
-if not df_rising_filtered.empty:
-    df_rising_filtered = df_rising_filtered[df_rising_filtered["change_rate"] >= min_change_rate]
+_is_market_scan_menu = any(k in _cur_sel_menu for k in ("오늘의 AI 추천주", "실시간 급등", "신규 상장주"))
 
-# 🎯 AI 추천 종목 풀 구성 및 사전 연산 (매트릭스 화면이 떠 있는 동안 완전 선행 연산)
-if "신규상장" in preset_style:
-    strategy_key = "신규상장"
-    if not df_new.empty:
-        pool = df_new[df_new["price"] > 0].sort_values(by="trade_value_억", ascending=False).head(30)
-    else:
-        pool = pd.DataFrame()
-elif "단타" in preset_style or "실시간" in analysis_period:
-    strategy_key = "단타"
-    hot_rise = df_rising[df_rising["change_rate"] >= 5.0].head(25) if not df_rising.empty else pd.DataFrame()
-    pool = pd.concat([hot_rise, df_volume.head(25)]).drop_duplicates(subset=["code"]).head(35)
-elif "1주일" in analysis_period:
-    strategy_key = "스윙"
-    swing_rise = df_rising[(df_rising["change_rate"] >= 1.5) & (df_rising["change_rate"] <= 10.0)].head(25) if not df_rising.empty else pd.DataFrame()
-    pool = pd.concat([swing_rise, df_volume.head(20)]).drop_duplicates(subset=["code"]).head(35)
-else:
-    strategy_key = "스윙"
-    swing_rise = df_rising[(df_rising["change_rate"] >= 2.0) & (df_rising["change_rate"] <= 14.0)].head(25) if not df_rising.empty else pd.DataFrame()
-    pool = pd.concat([swing_rise, df_volume.head(20)]).drop_duplicates(subset=["code"]).head(35)
+# ----------------------------------------------------
+# 5-1. 매트릭스 디지털 연산 트랜지션 로더 (시장 스캔 메뉴에서만 실행)
+# ----------------------------------------------------
+df_rising = pd.DataFrame()
+df_volume = pd.DataFrame()
+df_new = pd.DataFrame()
+df_rising_filtered = pd.DataFrame()
+candidates = []
 
-cand_cache_key = f"cached_cand_{strategy_key}_{market_filter}_{min_change_rate}_{new_listing_months}_{analysis_period}"
-candidates = st.session_state.get(cand_cache_key, [])
+if _is_market_scan_menu:
+    show_matrix = st.session_state.get("matrix_intro_transition", False)
+    matrix_holder = st.empty()
+    if show_matrix:
+        matrix_holder.html(render_matrix_loader(is_dark))
+        matrix_start_time = time.time()
 
-if not candidates and not pool.empty:
-    pool_subset = pool.head(20)
-    pool_records = pool_subset.to_dict("records")
+    # 메인 데이터 병렬 로드 (급등주 + 거래량주 + 신규상장주 동시 수집)
     if not show_matrix:
-        with st.spinner(f"⚡ [{preset_style}] AI 퀀트 및 머신러닝 상승 확률 정밀 분석 중..."):
-            candidates = evaluate_candidates(pool_records, strategy_key)
+        with st.spinner("최신 주식 시장 데이터를 초고속 병렬 수집 및 분석 중입니다..."):
+            df_rising, df_volume, df_new = load_all_market_base_data(months=new_listing_months)
     else:
-        candidates = evaluate_candidates(pool_records, strategy_key)
+        df_rising, df_volume, df_new = load_all_market_base_data(months=new_listing_months)
 
-    # 당일 AI 추천 종목 성과 추적 데이터베이스 자동 로깅 (중복 방지)
-    if candidates:
-        st.session_state[cand_cache_key] = candidates
-        try:
-            log_new_predictions(candidates, strategy=strategy_key)
-        except Exception:
-            pass
+    # 필터 적용
+    if not df_rising.empty and market_filter != "전체 (KOSPI + KOSDAQ)":
+        df_rising_filtered = df_rising[df_rising["market"] == market_filter]
+    else:
+        df_rising_filtered = df_rising
 
-# 매트릭스 디지털 레인 애니메이션 최소 0.75초 임팩트 연출 후 즉시 해제 (기존 2.2초 -> 0.75초로 대폭 단축)
-if show_matrix:
-    elapsed = time.time() - matrix_start_time
-    if elapsed < 0.75:
-        time.sleep(0.75 - elapsed)
-    matrix_holder.empty()
+    if not df_rising_filtered.empty:
+        df_rising_filtered = df_rising_filtered[df_rising_filtered["change_rate"] >= min_change_rate]
+
+    # 🎯 AI 추천 종목 풀 구성 및 사전 연산 (오늘의 AI 추천주 메뉴일 때만 ML 연산 수행)
+    if "오늘의 AI 추천주" in _cur_sel_menu:
+        if "신규상장" in preset_style:
+            strategy_key = "신규상장"
+            if not df_new.empty:
+                pool = df_new[df_new["price"] > 0].sort_values(by="trade_value_억", ascending=False).head(30)
+            else:
+                pool = pd.DataFrame()
+        elif "단타" in preset_style or "실시간" in analysis_period:
+            strategy_key = "단타"
+            hot_rise = df_rising[df_rising["change_rate"] >= 5.0].head(25) if not df_rising.empty else pd.DataFrame()
+            pool = pd.concat([hot_rise, df_volume.head(25)]).drop_duplicates(subset=["code"]).head(35)
+        elif "1주일" in analysis_period:
+            strategy_key = "스윙"
+            swing_rise = df_rising[(df_rising["change_rate"] >= 1.5) & (df_rising["change_rate"] <= 10.0)].head(25) if not df_rising.empty else pd.DataFrame()
+            pool = pd.concat([swing_rise, df_volume.head(20)]).drop_duplicates(subset=["code"]).head(35)
+        else:
+            strategy_key = "스윙"
+            swing_rise = df_rising[(df_rising["change_rate"] >= 2.0) & (df_rising["change_rate"] <= 14.0)].head(25) if not df_rising.empty else pd.DataFrame()
+            pool = pd.concat([swing_rise, df_volume.head(20)]).drop_duplicates(subset=["code"]).head(35)
+
+        cand_cache_key = f"cached_cand_{strategy_key}_{market_filter}_{min_change_rate}_{new_listing_months}_{analysis_period}"
+        candidates = st.session_state.get(cand_cache_key, [])
+
+        if not candidates and not pool.empty:
+            pool_subset = pool.head(20)
+            pool_records = pool_subset.to_dict("records")
+            if not show_matrix:
+                with st.spinner(f"⚡ [{preset_style}] AI 퀀트 및 머신러닝 상승 확률 정밀 분석 중..."):
+                    candidates = evaluate_candidates(pool_records, strategy_key)
+            else:
+                candidates = evaluate_candidates(pool_records, strategy_key)
+
+            # 당일 AI 추천 종목 성과 추적 데이터베이스 자동 로깅 (중복 방지)
+            if candidates:
+                st.session_state[cand_cache_key] = candidates
+                try:
+                    log_new_predictions(candidates, strategy=strategy_key)
+                except Exception:
+                    pass
+
+    # 매트릭스 디지털 레인 애니메이션 최소 0.75초 임팩트 연출 후 즉시 해제
+    if show_matrix:
+        elapsed = time.time() - matrix_start_time
+        if elapsed < 0.75:
+            time.sleep(0.75 - elapsed)
+        matrix_holder.empty()
+        st.session_state["matrix_intro_transition"] = False
+else:
     st.session_state["matrix_intro_transition"] = False
 
 # ----------------------------------------------------
-# [대시보드] 상단 헤더 및 회원 상태 바
+# [대시보드] 상단 헤더 및 회원 상태 바 (시장 스캔 메뉴에서만 표시)
 # ----------------------------------------------------
-head_c1, head_c2 = st.columns([5, 3.4])
-with head_c1:
-    st.html(
-        """<div style="display:flex; align-items:center; gap:10px; margin-bottom:0.2rem;">
-            <span style="font-size:2.2rem; line-height:1; display:inline-block; vertical-align:middle;">📈</span>
-            <span class="main-title notranslate" translate="no" style="margin-bottom:0; display:inline-block;">Stock Radar : AI 급등주 & 신규상장 분석기</span>
-        </div>"""
-    )
-    st.html('<div class="sub-title">어려운 차트 공부 없이, 큰손(외인·기관) 수급과 상승 확률 높은 종목만 한눈에 확인하세요!</div>')
-with head_c2:
-    user = st.session_state.get("user_info")
-    if user:
-        u_name = user.get("name", "회원")
-        u_badge = user.get("badge", "VIP")
-        u_pic = user.get("picture", "")
-        if u_pic:
-            head_avatar = f'<img src="{u_pic}" style="width:24px; height:24px; border-radius:50%; border:1.5px solid #3B82F6; margin-right:6px; vertical-align:middle; object-fit:cover;" />'
-        else:
-            head_avatar = '<span style="font-size:1.05rem; margin-right:5px; vertical-align:middle;">👤</span>'
+if _is_market_scan_menu:
+    head_c1, head_c2 = st.columns([5, 3.4])
+    with head_c1:
         st.html(
-            f"""<div style="text-align: right; padding-top: 2px; margin-bottom: 6px; display:flex; align-items:center; justify-content:flex-end;">
-                {head_avatar}
-                <span style="font-weight: 800; font-size: 0.95rem;">{u_name}님</span>
-                <span class="badge-pill notranslate" translate="no" style="margin-left: 6px; padding: 2px 8px; font-size: 0.75rem;">{u_badge}</span>
+            """<div style="display:flex; align-items:center; gap:10px; margin-bottom:0.2rem;">
+                <span style="font-size:2.2rem; line-height:1; display:inline-block; vertical-align:middle;">📈</span>
+                <span class="main-title notranslate" translate="no" style="margin-bottom:0; display:inline-block;">Stock Radar : AI 급등주 & 신규상장 분석기</span>
             </div>"""
         )
-    if is_google_authenticated():
-        if st.button("👑 MY 투자 라운지", key="btn_dash_top_lounge", use_container_width=True):
-            st.session_state["prompt_my_lounge"] = True
-            st.rerun()
+        st.html('<div class="sub-title">어려운 차트 공부 없이, 큰손(외인·기관) 수급과 상승 확률 높은 종목만 한눈에 확인하세요!</div>')
+    with head_c2:
+        user = st.session_state.get("user_info")
+        if user:
+            u_name = user.get("name", "회원")
+            u_badge = user.get("badge", "VIP")
+            u_pic = user.get("picture", "")
+            if u_pic:
+                head_avatar = f'<img src="{u_pic}" style="width:24px; height:24px; border-radius:50%; border:1.5px solid #3B82F6; margin-right:6px; vertical-align:middle; object-fit:cover;" />'
+            else:
+                head_avatar = '<span style="font-size:1.05rem; margin-right:5px; vertical-align:middle;">👤</span>'
+            st.html(
+                f"""<div style="text-align: right; padding-top: 2px; margin-bottom: 6px; display:flex; align-items:center; justify-content:flex-end;">
+                    {head_avatar}
+                    <span style="font-weight: 800; font-size: 0.95rem;">{u_name}님</span>
+                    <span class="badge-pill notranslate" translate="no" style="margin-left: 6px; padding: 2px 8px; font-size: 0.75rem;">{u_badge}</span>
+                </div>"""
+            )
+        if is_google_authenticated():
+            if st.button("👑 MY 투자 라운지", key="btn_dash_top_lounge", use_container_width=True):
+                st.session_state["prompt_my_lounge"] = True
+                st.rerun()
 
 # ----------------------------------------------------
-# 🔍 국내·해외 통합 프리미엄 AI 즉시 검색기 (상단 고정 배치)
+# 🔍 국내·해외 통합 프리미엄 AI 즉시 검색기 (필요 메뉴에서만 종목 리스트 로드)
 # ----------------------------------------------------
-all_options, code_map, all_stocks_df = load_all_stocks()
+_needs_stock_list = _is_market_scan_menu or ("1초 종목" in _cur_sel_menu) or ("Gemini 4 Argon" in _cur_sel_menu) or ("AI 투자 비서" in _cur_sel_menu)
+if _needs_stock_list:
+    all_options, code_map, all_stocks_df = load_all_stocks()
+else:
+    all_options, code_map, all_stocks_df = [], {}, pd.DataFrame()
 
 
 @st.fragment
@@ -4363,91 +4398,92 @@ div[data-testid="stFormSubmitButton"] button:not([kind*="primary"]):hover * {{
         render_stock_detailed_section(search_code, search_name, is_dark, in_modal=False, key_prefix="search_main", preloaded_data=(s_ohlcv, s_detail, s_inv))
 
 
-render_search_section_fragment(all_stocks_df, code_map, is_dark)
-st.markdown("---")
+if _is_market_scan_menu:
+    render_search_section_fragment(all_stocks_df, code_map, is_dark)
+    st.markdown("---")
 
-# 📡 실시간 데이터 연동 상태 뱃지 (한국장 + 미국장 + 서머타임 실시간 통합 연동)
-integrated_market = get_integrated_market_status()
-krx_st = integrated_market["krx"]
-us_st = integrated_market["us"]
+    # 📡 실시간 데이터 연동 상태 뱃지 (한국장 + 미국장 + 서머타임 실시간 통합 연동)
+    integrated_market = get_integrated_market_status()
+    krx_st = integrated_market["krx"]
+    us_st = integrated_market["us"]
 
-krx_badge_bg = "#064E3B" if (is_dark and krx_st["is_open"]) else ("#1E293B" if is_dark else krx_st["badge_bg"])
-krx_badge_color = "#4ADE80" if (is_dark and krx_st["is_open"]) else krx_st["badge_color"]
+    krx_badge_bg = "#064E3B" if (is_dark and krx_st["is_open"]) else ("#1E293B" if is_dark else krx_st["badge_bg"])
+    krx_badge_color = "#4ADE80" if (is_dark and krx_st["is_open"]) else krx_st["badge_color"]
 
-us_badge_bg = "#064E3B" if (is_dark and us_st["is_open"]) else ("#1E293B" if is_dark else us_st["badge_bg"])
-us_badge_color = "#4ADE80" if (is_dark and us_st["is_open"]) else us_st["badge_color"]
+    us_badge_bg = "#064E3B" if (is_dark and us_st["is_open"]) else ("#1E293B" if is_dark else us_st["badge_bg"])
+    us_badge_color = "#4ADE80" if (is_dark and us_st["is_open"]) else us_st["badge_color"]
 
-banner_bg = "#0F172A" if is_dark else "#F8FAFC"
-banner_border = "#334155" if is_dark else "#CBD5E1"
+    banner_bg = "#0F172A" if is_dark else "#F8FAFC"
+    banner_border = "#334155" if is_dark else "#CBD5E1"
 
-st.html(
-    f"""<div style="background:{banner_bg}; border:1.5px solid {banner_border}; border-radius:12px; padding:12px 18px; margin-bottom:14px; box-shadow:0 3px 12px rgba(0,0,0,0.06);">
-        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-            <div style="display:flex; align-items:center; flex-wrap:wrap; gap:10px;">
-                <div style="display:inline-flex; align-items:center; gap:6px; background:{krx_badge_bg}; padding:6px 12px; border-radius:8px; border:1.5px solid {krx_st['badge_border']};">
-                    <span style="font-size:1.05rem;">🇰🇷</span>
-                    <span style="font-weight:900; font-size:0.88rem; color:{krx_badge_color};">한국장: {krx_st['title']}</span>
+    st.html(
+        f"""<div style="background:{banner_bg}; border:1.5px solid {banner_border}; border-radius:12px; padding:12px 18px; margin-bottom:14px; box-shadow:0 3px 12px rgba(0,0,0,0.06);">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                <div style="display:flex; align-items:center; flex-wrap:wrap; gap:10px;">
+                    <div style="display:inline-flex; align-items:center; gap:6px; background:{krx_badge_bg}; padding:6px 12px; border-radius:8px; border:1.5px solid {krx_st['badge_border']};">
+                        <span style="font-size:1.05rem;">🇰🇷</span>
+                        <span style="font-weight:900; font-size:0.88rem; color:{krx_badge_color};">한국장: {krx_st['title']}</span>
+                    </div>
+                    <div style="display:inline-flex; align-items:center; gap:6px; background:{us_badge_bg}; padding:6px 12px; border-radius:8px; border:1.5px solid {us_st['badge_border']};">
+                        <span style="font-size:1.05rem;">🇺🇸</span>
+                        <span style="font-weight:900; font-size:0.88rem; color:{us_badge_color};">미국장: {us_st['title']}</span>
+                        <span style="background:{'#059669' if us_st['dst_active'] else '#2563EB'}; color:white; font-size:0.75rem; font-weight:700; padding:2px 7px; border-radius:4px; margin-left:3px;">{us_st['dst_badge']}</span>
+                    </div>
                 </div>
-                <div style="display:inline-flex; align-items:center; gap:6px; background:{us_badge_bg}; padding:6px 12px; border-radius:8px; border:1.5px solid {us_st['badge_border']};">
-                    <span style="font-size:1.05rem;">🇺🇸</span>
-                    <span style="font-weight:900; font-size:0.88rem; color:{us_badge_color};">미국장: {us_st['title']}</span>
-                    <span style="background:{'#059669' if us_st['dst_active'] else '#2563EB'}; color:white; font-size:0.75rem; font-weight:700; padding:2px 7px; border-radius:4px; margin-left:3px;">{us_st['dst_badge']}</span>
+                <div style="font-size:0.82rem; color:{'#CBD5E1' if is_dark else '#475569'}; text-align:right; line-height:1.45;">
+                    <div>⏰ <b>KST (한국):</b> <span style="font-weight:bold; color:{'#38BDF8' if is_dark else '#0284C7'};">{integrated_market['kst_full_str']}</span></div>
+                    <div style="font-size:0.78rem; color:{'#94A3B8' if is_dark else '#64748B'};">🗽 <b>NY (미국동부):</b> {integrated_market['us_full_str']} (정규장 개장: 한국 {us_st['kst_open_str']})</div>
                 </div>
             </div>
-            <div style="font-size:0.82rem; color:{'#CBD5E1' if is_dark else '#475569'}; text-align:right; line-height:1.45;">
-                <div>⏰ <b>KST (한국):</b> <span style="font-weight:bold; color:{'#38BDF8' if is_dark else '#0284C7'};">{integrated_market['kst_full_str']}</span></div>
-                <div style="font-size:0.78rem; color:{'#94A3B8' if is_dark else '#64748B'};">🗽 <b>NY (미국동부):</b> {integrated_market['us_full_str']} (정규장 개장: 한국 {us_st['kst_open_str']})</div>
+            <div style="margin-top:8px; padding-top:8px; border-top:1px dashed {'#334155' if is_dark else '#E2E8F0'}; font-size:0.82rem; color:{'#94A3B8' if is_dark else '#64748B'}; display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px;">
+                <div>• <b>국내 증시:</b> {krx_st['desc']}</div>
+                <div>• <b>해외 증시:</b> {us_st['desc']}</div>
             </div>
-        </div>
-        <div style="margin-top:8px; padding-top:8px; border-top:1px dashed {'#334155' if is_dark else '#E2E8F0'}; font-size:0.82rem; color:{'#94A3B8' if is_dark else '#64748B'}; display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px;">
-            <div>• <b>국내 증시:</b> {krx_st['desc']}</div>
-            <div>• <b>해외 증시:</b> {us_st['desc']}</div>
-        </div>
-    </div>"""
-)
-
-# 초보자 3초 투자 가이드 배너
-with st.expander("🔰 초보자를 위한 3초 투자 가이드 (처음 오셨다면 꼭 읽어보세요!)", expanded=False):
-    st.markdown(
-        """
-        1. **1단계 (종목 확인)**: 아래 **`🏆 오늘의 AI 강력 추천 1위 (원픽)`** 또는 **`TOP 5 추천 목록`**에서 **S등급** 또는 **A등급** 종목을 확인합니다.
-        2. **2단계 (이유 확인)**: 추천 이유에 **'외인·기관 동시 매수'**나 **'상승 궤도 안착'** 신호가 켜져 있는지 봅니다.
-        3. **3단계 (매매 가이드)**: 욕심부리지 말고 AI가 제안하는 **목표 수익률(+5% ~ +8%)**에 도달하면 분할 매도하고, **-3% 손절 기준**을 지키면 가장 안전합니다!
-        """
+        </div>"""
     )
 
-# 상단 요약 지표 카드
-c1, c2, c3, c4 = st.columns(4)
-with c1:
-    count_rise = len(df_rising_filtered) if not df_rising_filtered.empty else 0
-    st.metric("포착 급등주", f"{count_rise} 개", delta=f"+{min_change_rate}% 이상")
-with c2:
-    count_new = len(df_new) if not df_new.empty else 0
-    st.metric("신규상장주", f"{count_new} 개", delta=f"최근 {new_listing_months}개월")
-with c3:
-    max_stock = df_rising.iloc[0]["name"] if not df_rising.empty else "-"
-    max_rate = df_rising.iloc[0]["change_rate"] if not df_rising.empty else 0.0
-    st.metric("당일 최고 급등주", max_stock, delta=f"+{max_rate:.2f}%")
-with c4:
-    top_vol_stock = df_volume.iloc[0]["name"] if not df_volume.empty else "-"
-    top_vol_val = df_volume.iloc[0].get("trade_value_억", 0) if not df_volume.empty else 0
-    st.metric("거래대금 1위", top_vol_stock, delta=f"{top_vol_val:,} 억원")
+    # 초보자 3초 투자 가이드 배너
+    with st.expander("🔰 초보자를 위한 3초 투자 가이드 (처음 오셨다면 꼭 읽어보세요!)", expanded=False):
+        st.markdown(
+            """
+            1. **1단계 (종목 확인)**: 아래 **`🏆 오늘의 AI 강력 추천 1위 (원픽)`** 또는 **`TOP 5 추천 목록`**에서 **S등급** 또는 **A등급** 종목을 확인합니다.
+            2. **2단계 (이유 확인)**: 추천 이유에 **'외인·기관 동시 매수'**나 **'상승 궤도 안착'** 신호가 켜져 있는지 봅니다.
+            3. **3단계 (매매 가이드)**: 욕심부리지 말고 AI가 제안하는 **목표 수익률(+5% ~ +8%)**에 도달하면 분할 매도하고, **-3% 손절 기준**을 지키면 가장 안전합니다!
+            """
+        )
 
-selected_menu = st.session_state.get("active_nav_menu", "🎯 오늘의 AI 추천주 (원픽 TOP 20)")
-st.html(
-    f"""<div style="background:{'#151A23' if is_dark else '#F8FAFC'}; border:1.5px solid {'rgba(59,130,246,0.35)' if is_dark else '#CBD5E1'}; border-radius:12px; padding:12px 20px; margin: 10px 0 16px 0; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; box-shadow:0 3px 10px rgba(0,0,0,0.03);">
-        <div style="font-size:0.95rem; color:{'#F8FAFC' if is_dark else '#0F172A'}; font-weight:800; display:flex; align-items:center; gap:8px;">
-            <span style="display:inline-block; width:9px; height:9px; border-radius:50%; background:#22C55E; box-shadow:0 0 8px #22C55E;"></span>
-            <span>현재 관제 화면:</span>
-            <span style="color:#2563EB; font-weight:900;">{selected_menu}</span>
-        </div>
-        <div style="font-size:0.82rem; color:{'#94A3B8' if is_dark else '#64748B'};">
-            ⚡ 좌측 사이드바 <b>[📌 레이더 관제 메뉴]</b>에서 원하는 분석 화면으로 즉각 전환할 수 있습니다.
-        </div>
-    </div>"""
-)
+    # 상단 요약 지표 카드
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        count_rise = len(df_rising_filtered) if not df_rising_filtered.empty else 0
+        st.metric("포착 급등주", f"{count_rise} 개", delta=f"+{min_change_rate}% 이상")
+    with c2:
+        count_new = len(df_new) if not df_new.empty else 0
+        st.metric("신규상장주", f"{count_new} 개", delta=f"최근 {new_listing_months}개월")
+    with c3:
+        max_stock = df_rising.iloc[0]["name"] if not df_rising.empty else "-"
+        max_rate = df_rising.iloc[0]["change_rate"] if not df_rising.empty else 0.0
+        st.metric("당일 최고 급등주", max_stock, delta=f"+{max_rate:.2f}%")
+    with c4:
+        top_vol_stock = df_volume.iloc[0]["name"] if not df_volume.empty else "-"
+        top_vol_val = df_volume.iloc[0].get("trade_value_억", 0) if not df_volume.empty else 0
+        st.metric("거래대금 1위", top_vol_stock, delta=f"{top_vol_val:,} 억원")
 
-st.markdown("---")
+    selected_menu = st.session_state.get("active_nav_menu", "🎯 오늘의 AI 추천주 (원픽 TOP 20)")
+    st.html(
+        f"""<div style="background:{'#151A23' if is_dark else '#F8FAFC'}; border:1.5px solid {'rgba(59,130,246,0.35)' if is_dark else '#CBD5E1'}; border-radius:12px; padding:12px 20px; margin: 10px 0 16px 0; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; box-shadow:0 3px 10px rgba(0,0,0,0.03);">
+            <div style="font-size:0.95rem; color:{'#F8FAFC' if is_dark else '#0F172A'}; font-weight:800; display:flex; align-items:center; gap:8px;">
+                <span style="display:inline-block; width:9px; height:9px; border-radius:50%; background:#22C55E; box-shadow:0 0 8px #22C55E;"></span>
+                <span>현재 관제 화면:</span>
+                <span style="color:#2563EB; font-weight:900;">{selected_menu}</span>
+            </div>
+            <div style="font-size:0.82rem; color:{'#94A3B8' if is_dark else '#64748B'};">
+                ⚡ 좌측 사이드바 <b>[📌 레이더 관제 메뉴]</b>에서 원하는 분석 화면으로 즉각 전환할 수 있습니다.
+            </div>
+        </div>"""
+    )
+
+    st.markdown("---")
 
 
 

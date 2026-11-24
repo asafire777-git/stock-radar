@@ -86,6 +86,23 @@ def log_search_event(query: str, stock_name: str = "", stock_code: str = "", mar
     except Exception as e:
         print(f"[Analytics] Log error: {e}")
 
+    # GA4 영구 커스텀 이벤트 송신 (nstock.kr/radar 부모 프레임의 gtag로 전달)
+    try:
+        import streamlit.components.v1 as _ga_comp
+        _ev_name = "stock_diagnose" if event_type == "diagnosis" else "stock_search"
+        _ev_payload = json.dumps({
+            "type": "NSTOCK_GA_EVENT",
+            "name": _ev_name,
+            "params": {
+                "stock_name": log_entry["stock_name"][:40],
+                "stock_code": log_entry["stock_code"][:20],
+                "market": log_entry["market"][:20],
+            },
+        }, ensure_ascii=False)
+        _ga_comp.html(f"<script>try{{window.parent.postMessage({_ev_payload},'*');}}catch(e){{}}</script>", height=0)
+    except Exception:
+        pass
+
 
 def reset_analytics_logs():
     """분석 로그 초기화 (가상 데이터 삭제 및 순수 실측 0건부터 기록)"""
@@ -326,6 +343,10 @@ def get_ga4_dashboard_report(property_id: str = "557310438", period: str = "7d")
         "avg_session_sec": 0.0,
         "top_pages": [],
         "hourly": [0] * 24,
+        "events": [],
+        "ga4_search_count": 0,
+        "ga4_diagnose_count": 0,
+        "ga4_total_events": 0,
     }
 
     secret_creds = None
@@ -438,6 +459,34 @@ def get_ga4_dashboard_report(property_id: str = "557310438", period: str = "7d")
                 except Exception:
                     pass
             empty_res["hourly"] = hourly
+
+        # 4. 누적 이벤트별 호출수 (page_view, user_engagement, stock_search, stock_diagnose 등)
+        r_ev = requests.post(
+            url,
+            headers=headers,
+            json={
+                "dateRanges": [{"startDate": start_d, "endDate": end_d}],
+                "dimensions": [{"name": "eventName"}],
+                "metrics": [{"name": "eventCount"}],
+                "orderBys": [{"metric": {"metricName": "eventCount"}, "desc": True}],
+                "limit": 12,
+            },
+            timeout=6,
+        )
+        if r_ev.status_code == 200:
+            ev_list = []
+            total_ev = 0
+            for row in r_ev.json().get("rows", []):
+                ev_name = row.get("dimensionValues", [{}])[0].get("value", "")
+                cnt = int(float(row.get("metricValues", [{}])[0].get("value", 0)))
+                total_ev += cnt
+                ev_list.append({"event": ev_name, "count": cnt})
+                if ev_name == "stock_search":
+                    empty_res["ga4_search_count"] = cnt
+                elif ev_name == "stock_diagnose":
+                    empty_res["ga4_diagnose_count"] = cnt
+            empty_res["events"] = ev_list
+            empty_res["ga4_total_events"] = total_ev
 
         empty_res["api_available"] = True
         empty_res["status_msg"] = "🟢 GA4 Data API 실시간 직결 연동 중"

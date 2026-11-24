@@ -236,16 +236,22 @@ def render_admin_dashboard(is_dark: bool = False):
 
     st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
 
-    # 2. 5대 핵심 KPI 메트릭 카드 Row
-    st.markdown("#### 📊 실시간 핵심 성과 지표 (Real-time KPIs)")
+    # 2. 5대 핵심 KPI 메트릭 카드 Row (GA4 영구 누적 이벤트 + 세션 실측 통합)
+    st.markdown("#### 📊 실시간 핵심 성과 지표 (GA4 영구 누적 + 세션 실측)")
+    ga4_total_ev = ga4_rep.get("ga4_total_events", 0) if ga4_rep.get("api_available") else 0
+    ga4_search_ev = ga4_rep.get("ga4_search_count", 0) if ga4_rep.get("api_available") else 0
+    ga4_diag_ev = ga4_rep.get("ga4_diagnose_count", 0) if ga4_rep.get("api_available") else 0
+    combined_search_cnt = ga4_search_ev + period_cnt
+    combined_diag_cnt = ga4_diag_ev + metrics.get("diagnosis_count", 0)
+
     kpi_cols = st.columns(5)
 
     with kpi_cols[0]:
         st.html(f"""
         <div style="background:{card_bg}; border:1px solid {border_color}; border-radius:16px; padding:18px 20px; box-shadow:0 4px 14px rgba(0,0,0,0.04); text-align:left;">
-            <div style="font-size:0.75rem; color:{text_secondary}; font-weight:700; margin-bottom:4px;">🎯 조회 기간 검색수</div>
-            <div style="font-size:1.65rem; font-weight:900; color:#3B82F6;">{period_cnt:,}회</div>
-            <div style="font-size:0.68rem; color:#3B82F6; font-weight:600; margin-top:4px;">(전체 누적 {total_cnt:,}건)</div>
+            <div style="font-size:0.75rem; color:{text_secondary}; font-weight:700; margin-bottom:4px;">📡 GA4 누적 총 이벤트</div>
+            <div style="font-size:1.65rem; font-weight:900; color:#3B82F6;">{ga4_total_ev:,}회</div>
+            <div style="font-size:0.68rem; color:#3B82F6; font-weight:600; margin-top:4px;">조회·스크롤·참여 영구 누적</div>
         </div>
         """)
 
@@ -253,19 +259,18 @@ def render_admin_dashboard(is_dark: bool = False):
         today_cnt = metrics.get("today_searches", 0)
         st.html(f"""
         <div style="background:{card_bg}; border:1px solid rgba(16, 185, 129, 0.4); border-radius:16px; padding:18px 20px; box-shadow:0 4px 14px rgba(0,0,0,0.04); text-align:left;">
-            <div style="font-size:0.75rem; color:#10B981; font-weight:700; margin-bottom:4px;">⚡ 오늘 실시간 검색</div>
-            <div style="font-size:1.65rem; font-weight:900; color:#10B981;">{today_cnt:,}회</div>
-            <div style="font-size:0.68rem; color:#10B981; font-weight:600; margin-top:4px;">오늘 00시부터 실시간 집계</div>
+            <div style="font-size:0.75rem; color:#10B981; font-weight:700; margin-bottom:4px;">🔍 종목 검색 (누적+세션)</div>
+            <div style="font-size:1.65rem; font-weight:900; color:#10B981;">{combined_search_cnt:,}회</div>
+            <div style="font-size:0.68rem; color:#10B981; font-weight:600; margin-top:4px;">GA4 {ga4_search_ev:,}건 · 오늘 세션 {today_cnt:,}건</div>
         </div>
         """)
 
     with kpi_cols[2]:
-        diag_cnt = metrics.get("diagnosis_count", 0)
         st.html(f"""
         <div style="background:{card_bg}; border:1px solid {border_color}; border-radius:16px; padding:18px 20px; box-shadow:0 4px 14px rgba(0,0,0,0.04); text-align:left;">
             <div style="font-size:0.75rem; color:{text_secondary}; font-weight:700; margin-bottom:4px;">🩺 1초 정밀진단 호출</div>
-            <div style="font-size:1.65rem; font-weight:900; color:#8B5CF6;">{diag_cnt:,}회</div>
-            <div style="font-size:0.68rem; color:#8B5CF6; font-weight:600; margin-top:4px;">심층 차트·처방전 실행건</div>
+            <div style="font-size:1.65rem; font-weight:900; color:#8B5CF6;">{combined_diag_cnt:,}회</div>
+            <div style="font-size:0.68rem; color:#8B5CF6; font-weight:600; margin-top:4px;">GA4 {ga4_diag_ev:,}건 · 세션 {metrics.get('diagnosis_count', 0):,}건</div>
         </div>
         """)
 
@@ -290,50 +295,28 @@ def render_admin_dashboard(is_dark: bool = False):
 
     st.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
 
-    # 3. 2열 인터랙티브 차트 그리드
+    # 3. 2열 인터랙티브 차트 그리드 (GA4 영구 누적 데이터 자동 폴백으로 빈 화면 제거)
     col_chart1, col_chart2 = st.columns(2)
 
-    def render_empty_chart_card(title: str, message: str):
-        st.html(f"""
-        <div style="background:{card_bg}; border:1px dashed {border_color}; border-radius:14px; padding:28px 16px; text-align:center; color:{text_secondary}; height:320px; display:flex; flex-direction:column; justify-content:center; align-items:center;">
-            <div style="font-size:1.8rem; margin-bottom:8px;">📊</div>
-            <div style="font-size:0.95rem; font-weight:700; color:{text_primary}; margin-bottom:6px;">{title}</div>
-            <div style="font-size:0.80rem; line-height:1.5;">{message}</div>
-        </div>
-        """)
-
     with col_chart1:
-        st.markdown("##### 🔥 가장 많이 검색·진단된 종목 TOP 10")
-        df_top = metrics.get("df_top_stocks", pd.DataFrame())
-        if not df_top.empty and "검색수" in df_top.columns and len(df_top) > 0 and df_top["검색수"].sum() > 0:
-            df_plot = df_top.sort_values(by="검색수", ascending=True)
-            fig_top = px.bar(
-                df_plot,
-                x="검색수",
-                y="종목/검색어",
-                orientation="h",
-                text="검색수",
-                color="검색수",
-                color_continuous_scale=["#3B82F6", "#8B5CF6", "#EC4899"]
-            )
-            fig_top.update_layout(
-                margin=dict(l=10, r=10, t=10, b=10),
-                height=320,
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                font=dict(color=text_primary, size=11),
-                coloraxis_showscale=False,
-                xaxis=dict(showgrid=True, gridcolor="rgba(128,128,128,0.15)"),
-                yaxis=dict(showgrid=False)
-            )
-            st.plotly_chart(fig_top, use_container_width=True)
-        else:
-            render_empty_chart_card("실측 종목 검색 데이터 수집 대기 중", "사용자가 상단 검색창에 종목을 입력하거나 태그를 누르면<br/>실시간 인기 종목 랭킹 차트가 생성됩니다.")
-
-    with col_chart2:
-        st.markdown("##### ⏰ 주식 시장 맞춤 시간대별 트래픽 분포")
+        st.markdown("##### ⏰ 주식 시장 맞춤 시간대별 트래픽 분포 (GA4 영구 누적)")
         df_tz = metrics.get("df_timezone", pd.DataFrame())
-        if not df_tz.empty and "이용건수" in df_tz.columns and len(df_tz) > 0 and df_tz["이용건수"].sum() > 0:
+        if df_tz.empty or "이용건수" not in df_tz.columns or df_tz["이용건수"].sum() == 0:
+            # GA4 24시간 영구 데이터에서 한국장/미국장 맞춤 시간대 자동 집계
+            ga4_hrs = ga4_rep.get("hourly", [0] * 24) if ga4_rep.get("api_available") else [0] * 24
+            if sum(ga4_hrs) > 0:
+                pre_mkt = sum(ga4_hrs[7:9])
+                reg_mkt = sum(ga4_hrs[9:16])
+                after_mkt = sum(ga4_hrs[16:20])
+                night_us = sum(ga4_hrs[20:24]) + sum(ga4_hrs[0:7])
+                df_tz = pd.DataFrame([
+                    {"시장 시간대": "정규장 (09~15시)", "이용건수": reg_mkt},
+                    {"시장 시간대": "야간·미국장 (20~06시)", "이용건수": night_us},
+                    {"시장 시간대": "장후 시간외 (16~19시)", "이용건수": after_mkt},
+                    {"시장 시간대": "장전 시간외 (07~08시)", "이용건수": pre_mkt},
+                ])
+                df_tz = df_tz[df_tz["이용건수"] > 0]
+        if not df_tz.empty and "이용건수" in df_tz.columns and df_tz["이용건수"].sum() > 0:
             fig_tz = px.pie(
                 df_tz,
                 values="이용건수",
@@ -343,68 +326,84 @@ def render_admin_dashboard(is_dark: bool = False):
             )
             fig_tz.update_layout(
                 margin=dict(l=10, r=10, t=10, b=10),
-                height=320,
+                height=300,
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
                 font=dict(color=text_primary, size=11),
-                legend=dict(orientation="h", y=-0.1)
+                legend=dict(orientation="h", y=-0.12)
             )
-            st.plotly_chart(fig_tz, use_container_width=True)
+            st.plotly_chart(fig_tz, use_container_width=True, key="admin_mkt_tz_pie")
         else:
-            render_empty_chart_card("시간대별 트래픽 분포 수집 대기 중", "정규장, 장전 시간외, 장후 시간외, 야간/미국장 등<br/>시간대별 사용자 활동 분포가 실측 시 표시됩니다.")
+            st.info("시간대별 트래픽 데이터를 집계 중입니다.")
 
-    # 4. 기능별 호출수 및 24시간 활동 추이
-    col_chart3, col_chart4 = st.columns(2)
-
-    with col_chart3:
-        st.markdown("##### 🩺 기능별 이용 점유율")
+    with col_chart2:
+        st.markdown("##### 🩺 기능·이벤트별 누적 이용 현황 (GA4 영구 누적)")
         df_evt = metrics.get("df_events", pd.DataFrame())
-        if not df_evt.empty and "호출수" in df_evt.columns and len(df_evt) > 0 and df_evt["호출수"].sum() > 0:
+        if df_evt.empty or "호출수" not in df_evt.columns or df_evt["호출수"].sum() == 0:
+            ga4_ev_list = ga4_rep.get("events", []) if ga4_rep.get("api_available") else []
+            ev_label_map = {
+                "page_view": "페이지 조회",
+                "user_engagement": "사용자 참여",
+                "session_start": "세션 시작",
+                "scroll": "스크롤 탐색",
+                "first_visit": "신규 첫 방문",
+                "click": "링크 클릭",
+                "stock_search": "종목 검색",
+                "stock_diagnose": "1초 정밀진단",
+            }
+            if ga4_ev_list:
+                df_evt = pd.DataFrame([
+                    {"기능 유형": ev_label_map.get(e["event"], e["event"]), "호출수": e["count"]}
+                    for e in ga4_ev_list[:7]
+                ])
+        if not df_evt.empty and "호출수" in df_evt.columns and df_evt["호출수"].sum() > 0:
             fig_evt = px.bar(
                 df_evt,
                 x="기능 유형",
                 y="호출수",
                 text="호출수",
                 color="기능 유형",
-                color_discrete_sequence=["#3B82F6", "#8B5CF6", "#10B981"]
+                color_discrete_sequence=["#3B82F6", "#10B981", "#8B5CF6", "#F59E0B", "#EC4899", "#06B6D4", "#6366F1"]
             )
+            fig_evt.update_traces(textposition="outside")
             fig_evt.update_layout(
-                margin=dict(l=10, r=10, t=10, b=10),
-                height=260,
+                margin=dict(l=10, r=10, t=18, b=10),
+                height=300,
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
                 font=dict(color=text_primary, size=11),
                 showlegend=False,
                 yaxis=dict(showgrid=True, gridcolor="rgba(128,128,128,0.15)")
             )
-            st.plotly_chart(fig_evt, use_container_width=True)
+            st.plotly_chart(fig_evt, use_container_width=True, key="admin_ga4_events_bar")
         else:
-            render_empty_chart_card("기능별 이용 데이터 대기 중", "통합 검색, 1초 정밀진단, 추천 칩 클릭 등의<br/>기능별 점유율이 실시간으로 분류됩니다.")
+            st.info("기능별 이용 데이터를 집계 중입니다.")
 
-    with col_chart4:
-        st.markdown("##### 📈 24시간 시간대별 활동 추이 (00시~23시)")
-        df_hr = metrics.get("df_hourly", pd.DataFrame())
-        if not df_hr.empty and "호출수" in df_hr.columns and len(df_hr) > 0 and df_hr["호출수"].sum() > 0:
-            fig_hr = px.line(
-                df_hr,
-                x="시간",
-                y="호출수",
-                markers=True,
-                line_shape="spline"
-            )
-            fig_hr.update_traces(line_color="#10B981", line_width=3, marker=dict(size=6, color="#059669"))
-            fig_hr.update_layout(
-                margin=dict(l=10, r=10, t=10, b=10),
-                height=260,
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                font=dict(color=text_primary, size=11),
-                xaxis=dict(tickmode="linear", tick0=0, dtick=3, showgrid=True, gridcolor="rgba(128,128,128,0.15)"),
-                yaxis=dict(showgrid=True, gridcolor="rgba(128,128,128,0.15)")
-            )
-            st.plotly_chart(fig_hr, use_container_width=True)
-        else:
-            render_empty_chart_card("24시간 활동 추이 대기 중", "00시부터 23시까지의 시간대별 트래픽 볼륨 곡선이<br/>실제 사용자 이벤트 발생 시 시각화됩니다.")
+    # 실시간 세션 종목 검색 TOP 10 (데이터가 있을 때만 차트 표시, 없으면 깔끔한 안내 배너)
+    df_top = metrics.get("df_top_stocks", pd.DataFrame())
+    if not df_top.empty and "검색수" in df_top.columns and df_top["검색수"].sum() > 0:
+        st.markdown("##### 🔥 현재 세션 가장 많이 검색·진단된 종목 TOP 10")
+        df_plot = df_top.sort_values(by="검색수", ascending=True)
+        fig_top = px.bar(
+            df_plot,
+            x="검색수",
+            y="종목/검색어",
+            orientation="h",
+            text="검색수",
+            color="검색수",
+            color_continuous_scale=["#3B82F6", "#8B5CF6", "#EC4899"]
+        )
+        fig_top.update_layout(
+            margin=dict(l=10, r=10, t=10, b=10),
+            height=280,
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font=dict(color=text_primary, size=11),
+            coloraxis_showscale=False,
+            xaxis=dict(showgrid=True, gridcolor="rgba(128,128,128,0.15)"),
+            yaxis=dict(showgrid=False)
+        )
+        st.plotly_chart(fig_top, use_container_width=True, key="admin_top_stocks_bar")
 
     # 5. [신규 추가] 실시간 시장 운영 상태 & 시스템 API 인프라 관제탑
     st.markdown("---")
