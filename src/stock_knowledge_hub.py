@@ -3,8 +3,29 @@ Stock Radar - Stock Knowledge Hub & Educational Columns (E-E-A-T Compliant)
 구글 애드센스 YMYL 심사 통과용 전문 주식 교육 칼럼 16편 및 인터랙티브 허브 렌더러
 """
 
+import json
+import os
 import re
 import streamlit as st
+
+_COLUMNS_FULL_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "data",
+    "columns_full.json",
+)
+
+
+def _load_published_columns():
+    """nstock.kr 웹 매거진과 100% 동기화된 고품질 전문 칼럼 JSON 로드 (없으면 내장 폴백)"""
+    try:
+        if os.path.exists(_COLUMNS_FULL_PATH):
+            with open(_COLUMNS_FULL_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, list) and len(data) > 0:
+                return data
+    except Exception:
+        pass
+    return STOCK_COLUMNS
 
 STOCK_COLUMNS = [
     {
@@ -631,27 +652,148 @@ def _get_column_modals_html(columns: list, is_dark: bool = False) -> str:
 
 
 # ====================================================
-# 칼럼 상세 팝업 다이얼로그 (@st.dialog)
+# 칼럼 상세 팝업 다이얼로그 (@st.dialog - 프리미엄 에디토리얼 리더)
 # ====================================================
-@st.dialog("📚 주식 실전 지식 아카이브", width="large")
+@st.dialog("📚 N-Stock 프리미엄 주식 실전 칼럼", width="large")
 def show_column_detail_dialog(column: dict, is_dark: bool = False):
-    """칼럼 본문 읽기 팝업 다이얼로그 (100% Streamlit 네이티브)"""
-    st.markdown(f"### {column['title']}")
-    col1, col2 = st.columns([1, 1])
-    with col1:
-        st.caption(f"🏷️ **분류**: `{column['category']}`")
-    with col2:
-        st.caption(f"⏱️ **정독 소요**: `{column['read_time']}`")
-    st.info(f"💡 **요약**: {column['summary']}")
-    st.markdown("---")
-    st.markdown(column["content"])
-    st.warning("⚠️ **교육 및 참고용 고지**: 본 칼럼은 주식 초보 투자자의 기술적 분석 역량 향상을 위해 통계적 기법을 정리한 정보성 콘텐츠이며, 특정 종목에 대한 투자 권유나 추천이 아닙니다.")
-    if st.button("확인 및 닫기", key=f"dlg_close_col_{column['id']}", use_container_width=True, type="primary"):
-        st.rerun()
+    """웹 매거진(nstock.kr/columns)과 100% 동일한 심층 전문(도표·SVG·Q&A 포함) 리더 다이얼로그"""
+    bg_box = "#151A23" if is_dark else "#F8FAFC"
+    card_bg = "#1E293B" if is_dark else "#FFFFFF"
+    txt_main = "#F8FAFC" if is_dark else "#0F172A"
+    txt_sub = "#CBD5E1" if is_dark else "#334155"
+    txt_muted = "#94A3B8" if is_dark else "#64748B"
+    border_c = "#334155" if is_dark else "#E2E8F0"
+    accent_bg = "rgba(37, 99, 235, 0.16)" if is_dark else "#EFF6FF"
+    accent_border = "#3B82F6"
+    tbl_head_bg = "#0F172A" if is_dark else "#F1F5F9"
+
+    char_cnt = column.get("char_count") or len(column.get("content", ""))
+    web_url = column.get("web_url") or "https://nstock.kr/columns/"
+
+    st.html(f"""
+    <div style="margin-bottom:14px;">
+        <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:10px;">
+            <span style="background:{accent_bg}; color:#2563EB; font-size:0.78rem; font-weight:800; padding:4px 11px; border-radius:999px;">
+                🏷️ {column.get('category', '주식 실전')}
+            </span>
+            <span style="background:{bg_box}; border:1px solid {border_c}; color:{txt_muted}; font-size:0.76rem; font-weight:700; padding:3px 10px; border-radius:999px;">
+                ⏱️ 정독 {column.get('read_time', '8분')}
+            </span>
+            <span style="background:{bg_box}; border:1px solid {border_c}; color:{txt_muted}; font-size:0.76rem; font-weight:700; padding:3px 10px; border-radius:999px;">
+                📝 {char_cnt:,}자 심층 에디토리얼
+            </span>
+        </div>
+        <h2 style="margin:0 0 10px 0; font-size:1.38rem; font-weight:900; color:{txt_main}; line-height:1.4;">
+            {column['title']}
+        </h2>
+        <div style="background:{accent_bg}; border-left:4px solid {accent_border}; border-radius:8px; padding:12px 15px; font-size:0.88rem; color:{txt_sub}; line-height:1.6;">
+            <b>💡 핵심 요약:</b> {column.get('summary', '')}
+        </div>
+    </div>
+    """)
+
+    if column.get("content_html"):
+        st.html(f"""
+        <style>
+            .nstock-editorial-body {{
+                color: {txt_sub};
+                font-size: 0.94rem;
+                line-height: 1.82;
+                word-break: keep-all;
+            }}
+            .nstock-editorial-body h2 {{
+                color: {txt_main};
+                font-size: 1.16rem;
+                font-weight: 900;
+                margin: 26px 0 10px 0;
+                padding-bottom: 7px;
+                border-bottom: 2px solid {border_c};
+            }}
+            .nstock-editorial-body h3 {{
+                color: {txt_main};
+                font-size: 1.02rem;
+                font-weight: 800;
+                margin: 18px 0 8px 0;
+            }}
+            .nstock-editorial-body p {{
+                margin: 0 0 13px 0;
+            }}
+            .nstock-editorial-body ul, .nstock-editorial-body ol {{
+                margin: 8px 0 16px 0;
+                padding-left: 20px;
+            }}
+            .nstock-editorial-body li {{
+                margin-bottom: 7px;
+            }}
+            .nstock-editorial-body table {{
+                width: 100%;
+                border-collapse: collapse;
+                margin: 16px 0 20px 0;
+                font-size: 0.86rem;
+                border: 1px solid {border_c};
+                border-radius: 10px;
+                overflow: hidden;
+            }}
+            .nstock-editorial-body th {{
+                background: {tbl_head_bg};
+                color: {txt_main};
+                font-weight: 800;
+                padding: 10px 12px;
+                border-bottom: 1.5px solid {border_c};
+                text-align: left;
+            }}
+            .nstock-editorial-body td {{
+                background: {card_bg};
+                color: {txt_sub};
+                padding: 9px 12px;
+                border-bottom: 1px solid {border_c};
+            }}
+            .nstock-editorial-body .tip-box,
+            .nstock-editorial-body .highlight-box,
+            .nstock-editorial-body .callout-box,
+            .nstock-editorial-body .warning-box,
+            .nstock-editorial-body .qa-item,
+            .nstock-editorial-body .faq-item {{
+                background: {bg_box};
+                border: 1px solid {border_c};
+                border-left: 4px solid {accent_border};
+                border-radius: 10px;
+                padding: 14px 16px;
+                margin: 14px 0;
+            }}
+            .nstock-editorial-body svg {{
+                max-width: 100%;
+                height: auto;
+                display: block;
+                margin: 16px auto;
+                border-radius: 12px;
+                background: #FFFFFF;
+                padding: 8px;
+                border: 1px solid {border_c};
+            }}
+        </style>
+        <div class="nstock-editorial-body">
+            {column["content_html"]}
+        </div>
+        """)
+    else:
+        st.markdown(column.get("content", ""))
+
+    st.markdown("<div style='height:10px;'></div>", unsafe_allow_html=True)
+    st.warning("⚠️ **교육 및 참고용 고지**: 본 칼럼은 투자자의 기술적·재무적 분석 역량 향상을 위해 통계적 기법을 정리한 정보성 콘텐츠이며, 특정 종목에 대한 투자 권유나 추천이 아닙니다.")
+
+    act_c1, act_c2 = st.columns([1.2, 1])
+    with act_c1:
+        st.link_button("🌐 웹 매거진 전체 페이지로 보기", web_url, use_container_width=True)
+    with act_c2:
+        if st.button("확인 및 닫기", key=f"dlg_close_col_{column['id']}", use_container_width=True, type="primary"):
+            st.rerun()
 
 
 def render_stock_knowledge_tab(is_dark: bool = False, key_prefix: str = "", is_compact: bool = False):
-    """지식 아카이브 탭 렌더러 (네이티브 @st.dialog 적용)"""
+    """지식 아카이브 탭 렌더러 (nstock.kr/columns 100% 동기화 풀버전)"""
+    all_columns = _load_published_columns()
+    total_col_count = len(all_columns)
     card_bg = "#151A23" if is_dark else "#FFFFFF"
     border_color = "rgba(255, 255, 255, 0.12)" if is_dark else "#E2E8F0"
     text_primary = "#F8FAFC" if is_dark else "#0F172A"
@@ -667,26 +809,23 @@ def render_stock_knowledge_tab(is_dark: bool = False, key_prefix: str = "", is_c
         margin-bottom: 20px;
     ">
         <div style="display:inline-flex; align-items:center; gap:6px; background:rgba(59,130,246,0.18); color:#3B82F6; font-size:0.75rem; font-weight:800; padding:3px 10px; border-radius:20px; margin-bottom:8px;">
-            <span>📚 E-E-A-T 공인 주식 실전 지식 아카이브</span>
+            <span>📚 E-E-A-T 공인 주식 실전 지식 아카이브 · 총 {total_col_count}편 완비</span>
         </div>
         <h3 style="margin:0 0 6px 0; font-size:1.45rem; font-weight:900; color:{text_primary};">
             성공 투자를 위한 AI 퀀트 & 실전 차트 분석 마스터클래스
         </h3>
         <p style="margin:0; font-size:0.86rem; color:{text_secondary}; line-height:1.5;">
-            주식 시장의 20년 차 퀀트 트레이더와 금융 데이터 분석가가 정리한 16편의 고품질 실전 칼럼입니다. 감정을 배제하고 숫자로 시장을 이기는 법을 마스터하세요.
+            N-Stock 퀀트 리서치팀이 도표·실전 공식·체크리스트·Q&A로 집필한 <b>{total_col_count}편의 심층 에디토리얼(편당 1,400~2,200자)</b>입니다. 웹 매거진(nstock.kr/columns)과 100% 동일하게 정독하실 수 있습니다.
         </p>
     </div>
     """)
 
     if is_compact:
-        # 🌟 컴팩트 모드 (메인 랜딩 페이지 전용): 핵심 필독 BEST 4편만 깔끔하게 노출 + 전편 관제실 이동 버튼 + 접기/펼치기 아코디언
-        highlight_ids = ["ma_golden_cross", "investor_dual_buying", "stoploss_risk_management", "break_even_quant_formula"]
-        highlight_cols = [c for c in STOCK_COLUMNS if c["id"] in highlight_ids]
-        remaining_cols = [c for c in STOCK_COLUMNS if c["id"] not in highlight_ids]
+        highlight_cols = all_columns[:4]
+        remaining_cols = all_columns[4:]
 
         st.caption("🌟 **N-Stock 퀀트 리서치팀 추천 핵심 필독 칼럼 (BEST 4)**")
 
-        # 4개 핵심 하이라이트 카드 (2열 x 2행)
         cols_per_row = 2
         for i in range(0, len(highlight_cols), cols_per_row):
             row_cols = st.columns(cols_per_row)
@@ -702,7 +841,7 @@ def render_stock_knowledge_tab(is_dark: bool = False, key_prefix: str = "", is_c
                                     {col_item['category']}
                                 </span>
                                 <span style="font-size:0.72rem; color:{text_secondary};">
-                                    ⏱️ {col_item['read_time']}
+                                    ⏱️ {col_item['read_time']} · {col_item.get('char_count', 1500):,}자
                                 </span>
                             </div>
                             <h4 style="font-size:0.96rem; font-weight:800; color:{text_primary}; margin:0 0 8px 0; line-height:1.4; min-height:44px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">
@@ -718,17 +857,18 @@ def render_stock_knowledge_tab(is_dark: bool = False, key_prefix: str = "", is_c
         st.markdown("<div style='margin-top:16px;'></div>", unsafe_allow_html=True)
         col_cta1, col_cta2 = st.columns([1.6, 1.4])
         with col_cta1:
-            if st.button("📚 16편 전편 아카이브 전용 관제실로 이동 →", key=f"{key_prefix}btn_goto_hub_dash", type="primary", use_container_width=True):
+            if st.button(f"📚 {total_col_count}편 전편 아카이브 전용 관제실로 이동 →", key=f"{key_prefix}btn_goto_hub_dash", type="primary", use_container_width=True):
                 st.session_state["active_nav_menu"] = "📚 주식 실전 지식 아카이브 (16편)"
                 st.session_state["current_page"] = "dashboard"
                 if hasattr(st, "query_params"):
                     st.query_params["page"] = "dashboard"
+                    st.query_params["view"] = "knowledge"
                 st.rerun()
         with col_cta2:
-            st.link_button("🌐 웹 전용 16편 아카이브 허브 열기", "https://nstock.kr/columns/", use_container_width=True)
+            st.link_button(f"🌐 웹 전용 {total_col_count}편 아카이브 허브 열기", "https://nstock.kr/columns/", use_container_width=True)
 
-        with st.expander("▼ 나머지 12편 칼럼 목록 펼쳐보기 / 접기", expanded=False):
-            st.caption("추가 12개 전문 칼럼 목록입니다.")
+        with st.expander(f"▼ 나머지 {len(remaining_cols)}편 칼럼 목록 펼쳐보기 / 접기", expanded=False):
+            st.caption(f"추가 {len(remaining_cols)}개 전문 칼럼 목록입니다.")
             cols_sub = 3
             for i in range(0, len(remaining_cols), cols_sub):
                 r_cols = st.columns(cols_sub)
@@ -744,7 +884,7 @@ def render_stock_knowledge_tab(is_dark: bool = False, key_prefix: str = "", is_c
                                         {c_item['category']}
                                     </span>
                                     <span style="font-size:0.72rem; color:{text_secondary};">
-                                        ⏱️ {c_item['read_time']}
+                                        ⏱️ {c_item['read_time']} · {c_item.get('char_count', 1500):,}자
                                     </span>
                                 </div>
                                 <h4 style="font-size:0.92rem; font-weight:800; color:{text_primary}; margin:0 0 6px 0; line-height:1.4; min-height:40px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">
@@ -764,17 +904,17 @@ def render_stock_knowledge_tab(is_dark: bool = False, key_prefix: str = "", is_c
         cat_options = ["전체 보기", "차트 보조지표", "수급과 거래량", "실전 리스크 관리", "테마 & 미국주식"]
         selected_cat = st.radio("카테고리 선택", cat_options, index=0, horizontal=True, label_visibility="collapsed", key=f"{key_prefix}hub_cat")
     with col_f2:
-        search_kw = st.text_input("칼럼 검색", placeholder="🔍 키워드 검색 (예: 골든크로스, 볼린저밴드, 손절매, 나스닥...)", label_visibility="collapsed", key=f"{key_prefix}hub_search")
+        search_kw = st.text_input("칼럼 검색", placeholder="🔍 키워드 검색 (예: 골든크로스, 볼린저밴드, 손절매, PER...)", label_visibility="collapsed", key=f"{key_prefix}hub_search")
 
     # 필터링
-    filtered_cols = STOCK_COLUMNS
+    filtered_cols = all_columns
     if selected_cat != "전체 보기":
         filtered_cols = [c for c in filtered_cols if c["category"] == selected_cat]
     if search_kw and search_kw.strip():
         kw = search_kw.strip().lower()
         filtered_cols = [c for c in filtered_cols if kw in c["title"].lower() or kw in c["summary"].lower() or kw in c["category"].lower()]
 
-    st.caption(f"총 **{len(filtered_cols)}개**의 전문 주식 칼럼이 등록되어 있습니다.")
+    st.caption(f"총 **{len(filtered_cols)}편**의 심층 에디토리얼 칼럼이 등록되어 있습니다. (웹 매거진 `nstock.kr/columns` 100% 동기화)")
 
     # 3열 카드 그리드
     cols_per_row = 3
@@ -792,7 +932,7 @@ def render_stock_knowledge_tab(is_dark: bool = False, key_prefix: str = "", is_c
                                 {col_item['category']}
                             </span>
                             <span style="font-size:0.72rem; color:{text_secondary};">
-                                ⏱️ {col_item['read_time']}
+                                ⏱️ {col_item['read_time']} · {col_item.get('char_count', 1500):,}자
                             </span>
                         </div>
                         <h4 style="font-size:0.96rem; font-weight:800; color:{text_primary}; margin:0 0 8px 0; line-height:1.4; min-height:44px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">
@@ -802,5 +942,9 @@ def render_stock_knowledge_tab(is_dark: bool = False, key_prefix: str = "", is_c
                             {col_item['summary']}
                         </p>
                         """)
-                        if st.button("📖 칼럼 전문 정독하기", key=f"{key_prefix}btn_col_{col_item['id']}", use_container_width=True):
-                            show_column_detail_dialog(col_item, is_dark)
+                        b1, b2 = st.columns([1.6, 1])
+                        with b1:
+                            if st.button("📖 전문 정독하기", key=f"{key_prefix}btn_col_{col_item['id']}", use_container_width=True, type="primary"):
+                                show_column_detail_dialog(col_item, is_dark)
+                        with b2:
+                            st.link_button("🌐 웹 원문", col_item.get("web_url", "https://nstock.kr/columns/"), use_container_width=True)

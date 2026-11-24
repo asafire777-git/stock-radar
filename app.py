@@ -4190,7 +4190,18 @@ if _cur_is_admin and "마스터 관리자" in _cur_sel_menu:
 
 if "지식 아카이브" in _cur_sel_menu or "16편" in _cur_sel_menu:
     st.session_state["matrix_intro_transition"] = False
-    render_stock_knowledge_tab(is_dark=is_dark, key_prefix="app_")
+    try:
+        import importlib
+        import src.stock_knowledge_hub as _skh_mod
+        _skh_f = getattr(_skh_mod, "__file__", None)
+        if _skh_f and os.path.exists(_skh_f):
+            _skh_mt = os.path.getmtime(_skh_f)
+            if _ADMIN_MOD_MTIMES.get(_skh_f) != _skh_mt:
+                importlib.reload(_skh_mod)
+                _ADMIN_MOD_MTIMES[_skh_f] = _skh_mt
+        _skh_mod.render_stock_knowledge_tab(is_dark=is_dark, key_prefix="app_")
+    except Exception:
+        render_stock_knowledge_tab(is_dark=is_dark, key_prefix="app_")
     render_footer_legal_bar(is_dark=is_dark, key_prefix="app_")
     st.stop()
 
