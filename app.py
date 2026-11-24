@@ -3263,10 +3263,31 @@ def display_investor_table(investor_df: pd.DataFrame, rows: int = 5):
 
 
 def render_clickable_stock_table(df: pd.DataFrame, key: str):
-    """체크박스뿐 아니라 종목명·종목코드·현재가 등 행의 어느 셀을 클릭해도 즉시 반응하는 통합 종목 표 (텍스트 잘림 방지 자동 컬럼 폭 최적화)"""
+    """체크박스뿐 아니라 종목명·종목코드·현재가 등 행의 어느 셀을 클릭해도 즉시 반응하는 통합 종목 표 (텍스트 잘림 원천 방지)"""
+    view_df = df.copy() if (df is not None and not df.empty) else df
     col_cfg = {}
-    if df is not None and not df.empty:
-        for col in df.columns:
+    if view_df is not None and not view_df.empty:
+        # 표 전용 간결화: 괄호 부가설명 제거 & ' · ' 구분자로 한 화면 가독성 극대화 (상세 설명은 행 클릭 팝업에 그대로 제공)
+        for col in view_df.columns:
+            c_str = str(col)
+            if any(k in c_str for k in ("핵심 포착신호", "포착신호")):
+                def _compact_signal(val):
+                    s = str(val or "").strip()
+                    if not s or s.startswith("🔒"):
+                        return s
+                    s = re.sub(r"\s*\([^)]*\)", "", s)
+                    parts = [p.strip() for p in s.split(",") if p.strip()]
+                    return " · ".join(parts)
+                view_df[col] = view_df[col].apply(_compact_signal)
+            elif "예측방향" in c_str:
+                def _compact_dir(val):
+                    s = str(val or "").strip()
+                    if not s or s.startswith("🔒"):
+                        return s
+                    return re.sub(r"\s*\([^)]*\)", "", s).strip()
+                view_df[col] = view_df[col].apply(_compact_dir)
+
+        for col in view_df.columns:
             c_str = str(col)
             if c_str in ("종목명", "종목"):
                 try:
@@ -3274,17 +3295,19 @@ def render_clickable_stock_table(df: pd.DataFrame, key: str):
                 except Exception:
                     col_cfg[col] = st.column_config.TextColumn(c_str, width="medium")
             elif any(k in c_str for k in ("핵심 포착신호", "포착신호", "추천 근거", "분석 요약", "선정 사유", "사유")):
+                max_len = int(view_df[col].astype(str).map(len).max()) if len(view_df) > 0 else 28
+                dyn_w = max(360, min(680, max_len * 11 + 48))
                 try:
-                    col_cfg[col] = st.column_config.TextColumn(c_str, width=560)
+                    col_cfg[col] = st.column_config.TextColumn(c_str, width=dyn_w)
                 except Exception:
                     col_cfg[col] = st.column_config.TextColumn(c_str, width="large")
             elif any(k in c_str for k in ("예측방향", "추세", "상태")):
-                col_cfg[col] = st.column_config.TextColumn(c_str, width="medium")
-            elif c_str in ("시장", "AI등급", "등급", "순위", "종목코드", "코드"):
+                col_cfg[col] = st.column_config.TextColumn(c_str, width="small")
+            elif c_str in ("시장", "AI등급", "등급", "순위", "종목코드", "코드", "티커"):
                 col_cfg[col] = st.column_config.TextColumn(c_str, width="small")
     try:
         return st.dataframe(
-            df,
+            view_df,
             use_container_width=True,
             hide_index=True,
             column_config=col_cfg if col_cfg else None,
@@ -3294,7 +3317,7 @@ def render_clickable_stock_table(df: pd.DataFrame, key: str):
         )
     except Exception:
         return st.dataframe(
-            df,
+            view_df,
             use_container_width=True,
             hide_index=True,
             on_select="rerun",
