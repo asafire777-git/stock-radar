@@ -152,10 +152,22 @@ def render_admin_dashboard(is_dark: bool = False):
         st.link_button("⚡ GA4 30분 실시간", f"https://analytics.google.com/analytics/web/#/p{saved_prop_id}/reports/realtime", use_container_width=True)
 
     import streamlit.components.v1 as components
-    components.iframe(
-        "https://lookerstudio.google.com/embed/reporting/43cfe019-16f2-4e00-af61-5477c2ed0357",
-        height=760,
-        scrolling=True,
+    components.html(
+        """
+        <div style="width:100%; border-radius:12px; overflow:hidden; border:1px solid #CBD5E1; background:#FFFFFF;">
+            <iframe
+                width="100%"
+                height="860"
+                src="https://lookerstudio.google.com/embed/reporting/43cfe019-16f2-4e00-af61-5477c2ed0357/page/kIV1C"
+                frameborder="0"
+                style="border:0; display:block;"
+                allowfullscreen
+                sandbox="allow-storage-access-by-user-activation allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox">
+            </iframe>
+        </div>
+        """,
+        height=880,
+        scrolling=False,
     )
     st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
 
