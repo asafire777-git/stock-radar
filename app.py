@@ -1094,11 +1094,25 @@ with st.sidebar:
             "🏆 AI 성과 검증실 (적중률)",
             "📚 주식 실전 지식 아카이브 (16편)",
         ]
+        _MENU_TO_SLUG = {
+            "🏠 서비스 소개 & 실전 가이드": "intro",
+            "🎯 오늘의 AI 추천주 (원픽 TOP 20)": "picks",
+            "⚡ 실시간 급등 순위 (TOP 100)": "rising",
+            "🚀 신규 상장주 모니터링": "ipo",
+            "🩺 1초 종목 종합 정밀 진단실": "diagnosis",
+            "🤖 Gemini 4 Argon 1:1 AI 투자 비서": "argon",
+            "🏆 AI 성과 검증실 (적중률)": "performance",
+            "📚 주식 실전 지식 아카이브 (16편)": "knowledge",
+            "👑 마스터 관리자 상세 통계실": "admin",
+        }
+        _SLUG_TO_MENU = {v: k for k, v in _MENU_TO_SLUG.items()}
         valid_menus = nav_options + (["👑 마스터 관리자 상세 통계실"] if is_admin_active else [])
 
         if "active_nav_menu" not in st.session_state or st.session_state["active_nav_menu"] not in valid_menus:
-            if is_admin_active and str(st.query_params.get("view", "")).strip().lower() == "admin":
-                st.session_state["active_nav_menu"] = "👑 마스터 관리자 상세 통계실"
+            _qp_view = str(st.query_params.get("view", "")).strip().lower()
+            _restored_menu = _SLUG_TO_MENU.get(_qp_view)
+            if _restored_menu and _restored_menu in valid_menus:
+                st.session_state["active_nav_menu"] = _restored_menu
             else:
                 st.session_state["active_nav_menu"] = "🎯 오늘의 AI 추천주 (원픽 TOP 20)"
 
@@ -1113,8 +1127,7 @@ with st.sidebar:
             ):
                 st.session_state["active_nav_menu"] = opt
                 clear_nav_query_params()
-                if "view" in st.query_params:
-                    del st.query_params["view"]
+                st.query_params["view"] = _MENU_TO_SLUG.get(opt, "picks")
                 st.rerun()
 
         selected_menu = st.session_state["active_nav_menu"]
@@ -1172,12 +1185,134 @@ with st.sidebar:
                 clear_nav_query_params()
                 st.query_params["view"] = "admin"
                 st.rerun()
-            try:
-                import streamlit.components.v1 as _view_comp
-                _cur_view = "admin" if is_admin_tab_active else "main"
-                _view_comp.html(f"<script>try{{window.parent.postMessage({{type:'NSTOCK_VIEW',view:'{_cur_view}'}},'*');}}catch(e){{}}</script>", height=0)
-            except Exception:
-                pass
+
+        # ----------------------------------------------------
+        # 전역 UX 엔진: ① 모든 메뉴 새로고침 유지(window.top) ② 메뉴 전환 시 최상단 자동 스크롤 ③ 플로팅 TOP 액션 버튼
+        # ----------------------------------------------------
+        _cur_menu_now = st.session_state.get("active_nav_menu", "🎯 오늘의 AI 추천주 (원픽 TOP 20)")
+        _cur_slug_now = _MENU_TO_SLUG.get(_cur_menu_now, "picks")
+        _menu_just_changed = (st.session_state.get("_last_scrolled_menu") != _cur_menu_now)
+        st.session_state["_last_scrolled_menu"] = _cur_menu_now
+        try:
+            import streamlit.components.v1 as _ux_comp
+            _do_scroll_js = "true" if _menu_just_changed else "false"
+            _btn_bg = "linear-gradient(135deg, #2563EB 0%, #4F46E5 100%)" if not is_dark else "linear-gradient(135deg, #3B82F6 0%, #6366F1 100%)"
+            _ux_comp.html(f"""
+            <script>
+            (function() {{
+                try {{
+                    // 1. 부모 포털(nstock.kr/radar)에 현재 메뉴 슬러그 동기화 (모든 메뉴 F5 새로고침 유지)
+                    var msg = {{ type: 'NSTOCK_VIEW', view: '{_cur_slug_now}' }};
+                    try {{ window.top.postMessage(msg, '*'); }} catch(e) {{}}
+                    try {{ window.parent.postMessage(msg, '*'); }} catch(e) {{}}
+
+                    var pdoc = window.parent.document;
+                    if (!pdoc || !pdoc.body) return;
+
+                    function getScrollTargets() {{
+                        var arr = [];
+                        var s1 = pdoc.querySelector('[data-testid="stMain"]');
+                        var s2 = pdoc.querySelector('section.main');
+                        var s3 = pdoc.querySelector('[data-testid="stAppViewContainer"]');
+                        if (s1) arr.push(s1);
+                        if (s2 && s2 !== s1) arr.push(s2);
+                        if (s3 && s3 !== s1 && s3 !== s2) arr.push(s3);
+                        return arr;
+                    }}
+
+                    function scrollAllTop(smooth) {{
+                        var behavior = smooth ? 'smooth' : 'auto';
+                        getScrollTargets().forEach(function(el) {{
+                            try {{ el.scrollTo({{ top: 0, behavior: behavior }}); }} catch(e) {{ el.scrollTop = 0; }}
+                        }});
+                        try {{ window.parent.scrollTo({{ top: 0, behavior: behavior }}); }} catch(e) {{}}
+                    }}
+
+                    // 2. 메뉴 전환 시 화면 하단으로 튀는 버그 방지 (즉시 + 마운트 후 2중 최상단 고정)
+                    if ({_do_scroll_js}) {{
+                        scrollAllTop(false);
+                        setTimeout(function() {{ scrollAllTop(false); }}, 120);
+                        setTimeout(function() {{ scrollAllTop(false); }}, 360);
+                    }}
+
+                    // 3. 모든 메뉴 공통 플로팅 TOP 액션 버튼 주입 (스크롤 260px 이상 시 부드럽게 등장)
+                    var btnId = 'nstock-floating-top-btn';
+                    var btn = pdoc.getElementById(btnId);
+                    if (!btn) {{
+                        btn = pdoc.createElement('button');
+                        btn.id = btnId;
+                        btn.type = 'button';
+                        btn.title = '화면 맨 위로 이동';
+                        btn.innerHTML = '<span style="font-size:0.95rem;line-height:1;">↑</span><span>TOP</span>';
+                        btn.style.cssText = [
+                            'position:fixed',
+                            'right:24px',
+                            'bottom:62px',
+                            'z-index:99999',
+                            'display:inline-flex',
+                            'align-items:center',
+                            'gap:5px',
+                            'padding:9px 15px',
+                            'border-radius:999px',
+                            'border:1px solid rgba(255,255,255,0.28)',
+                            'background:{_btn_bg}',
+                            'color:#FFFFFF',
+                            'font-size:0.8rem',
+                            'font-weight:800',
+                            'letter-spacing:0.03em',
+                            'cursor:pointer',
+                            'box-shadow:0 8px 22px rgba(37,99,235,0.38)',
+                            'backdrop-filter:blur(8px)',
+                            'opacity:0',
+                            'transform:translateY(14px)',
+                            'pointer-events:none',
+                            'transition:opacity 0.22s ease, transform 0.22s ease, box-shadow 0.2s ease'
+                        ].join(';');
+                        btn.onmouseenter = function() {{
+                            btn.style.transform = 'translateY(-2px)';
+                            btn.style.boxShadow = '0 12px 26px rgba(37,99,235,0.52)';
+                        }};
+                        btn.onmouseleave = function() {{
+                            btn.style.transform = 'translateY(0)';
+                            btn.style.boxShadow = '0 8px 22px rgba(37,99,235,0.38)';
+                        }};
+                        btn.onclick = function() {{ scrollAllTop(true); }};
+                        pdoc.body.appendChild(btn);
+                    }}
+
+                    function updateBtnVisibility() {{
+                        var maxScroll = window.parent.scrollY || 0;
+                        getScrollTargets().forEach(function(el) {{
+                            if (el.scrollTop > maxScroll) maxScroll = el.scrollTop;
+                        }});
+                        if (maxScroll > 260) {{
+                            btn.style.opacity = '1';
+                            btn.style.transform = 'translateY(0)';
+                            btn.style.pointerEvents = 'auto';
+                        }} else {{
+                            btn.style.opacity = '0';
+                            btn.style.transform = 'translateY(14px)';
+                            btn.style.pointerEvents = 'none';
+                        }}
+                    }}
+
+                    getScrollTargets().forEach(function(el) {{
+                        if (!el._nstockScrollBound) {{
+                            el.addEventListener('scroll', updateBtnVisibility, {{ passive: true }});
+                            el._nstockScrollBound = true;
+                        }}
+                    }});
+                    if (!window.parent._nstockScrollBound) {{
+                        window.parent.addEventListener('scroll', updateBtnVisibility, {{ passive: true }});
+                        window.parent._nstockScrollBound = true;
+                    }}
+                    updateBtnVisibility();
+                }} catch(err) {{}}
+            }})();
+            </script>
+            """, height=0)
+        except Exception:
+            pass
 
         st.markdown("---")
         now_str = get_now_kst().strftime("%Y-%m-%d %H:%M:%S KST")

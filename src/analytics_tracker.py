@@ -99,7 +99,7 @@ def log_search_event(query: str, stock_name: str = "", stock_code: str = "", mar
                 "market": log_entry["market"][:20],
             },
         }, ensure_ascii=False)
-        _ga_comp.html(f"<script>try{{window.parent.postMessage({_ev_payload},'*');}}catch(e){{}}</script>", height=0)
+        _ga_comp.html(f"<script>try{{(window.top||window.parent).postMessage({_ev_payload},'*');}}catch(e){{}}</script>", height=0)
     except Exception:
         pass
 
