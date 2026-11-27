@@ -273,3 +273,117 @@ class KISVirtualBroker:
             return {"ok": False, "error": f"주문 실패: {data.get('msg1', resp.text[:120])}"}
         except Exception as e:
             return {"ok": False, "error": f"주문 예외: {str(e)[:120]}"}
+
+    @staticmethod
+    def _normalize_us_exchange(market: str) -> str:
+        """미국 거래소 코드를 KIS API 표준(NASD/NYSE/AMEX)으로 변환"""
+        m = str(market or "").upper().strip()
+        if "NYSE" in m or m == "NYS":
+            return "NYSE"
+        if "AMEX" in m or m == "AMS":
+            return "AMEX"
+        return "NASD"
+
+    def get_us_account_balance(self, exchange: str = "NASD") -> dict:
+        """모의투자 해외(미국)주식 잔고 및 보유 종목 조회 (TR: VTTS3012R)"""
+        token, msg = self.get_access_token()
+        if not token:
+            return {"ok": False, "error": msg, "summary": {}, "holdings": []}
+
+        _throttle()
+        url = f"{self.base_url}/uapi/overseas-stock/v1/trading/inquire-balance"
+        params = {
+            "CANO": self.creds["account_no"],
+            "ACNT_PRDT_CD": self.creds["account_code"],
+            "OVRS_EXCG_CD": self._normalize_us_exchange(exchange),
+            "TR_CRCY_CD": "USD",
+            "CTX_AREA_FK200": "",
+            "CTX_AREA_NK200": "",
+        }
+        try:
+            resp = requests.get(url, headers=self._headers("VTTS3012R", token), params=params, timeout=10)
+            data = resp.json()
+            if resp.status_code != 200 or data.get("rt_cd") != "0":
+                return {
+                    "ok": False,
+                    "error": f"미국주식 잔고 조회 오류: {data.get('msg1', resp.text[:120])}",
+                    "summary": {},
+                    "holdings": [],
+                }
+            out2 = data.get("output2") or {}
+            if isinstance(out2, list):
+                out2 = out2[0] if out2 else {}
+            tot_eval = float(out2.get("tot_evlu_pfls_amt", 0) or 0)
+            pchs_tot = float(out2.get("frcr_pchs_amt1", 0) or 0)
+            profit_amt = float(out2.get("ovrs_tot_pfls", 0) or 0)
+            profit_rt = float(out2.get("tot_pftrt", 0) or 0)
+
+            holdings = []
+            for row in data.get("output1") or []:
+                qty = int(float(row.get("ovrs_cblc_qty", 0) or 0))
+                if qty <= 0:
+                    continue
+                holdings.append({
+                    "code": str(row.get("ovrs_pdno", "")).strip().upper(),
+                    "name": str(row.get("ovrs_item_name", "")).strip(),
+                    "exchange": str(row.get("ovrs_excg_cd", "NASD")).strip().upper(),
+                    "qty": qty,
+                    "avg_price": round(float(row.get("pchs_avg_pric", 0) or 0), 2),
+                    "cur_price": round(float(row.get("now_pric2", 0) or 0), 2),
+                    "eval_amt": round(float(row.get("ovrs_stck_evlu_amt", 0) or 0), 2),
+                    "profit_amt": round(float(row.get("frcr_evlu_pfls_amt", 0) or 0), 2),
+                    "profit_rate": round(float(row.get("evlu_pfls_rt", 0) or 0), 2),
+                })
+
+            summary = {
+                "total_eval_usd": round(pchs_tot + profit_amt, 2) if tot_eval == 0 else round(tot_eval, 2),
+                "purchase_total_usd": round(pchs_tot, 2),
+                "eval_profit_usd": round(profit_amt, 2),
+                "eval_profit_rate": round(profit_rt, 2),
+            }
+            return {"ok": True, "error": "", "summary": summary, "holdings": holdings}
+        except Exception as e:
+            return {"ok": False, "error": f"미국주식 잔고 예외: {str(e)[:120]}", "summary": {}, "holdings": []}
+
+    def place_us_order(self, side: str, ticker: str, qty: int, limit_price_usd: float, market: str = "NASD") -> dict:
+        """
+        모의투자 미국주식 지정가 매수/매도 주문
+        - side: 'BUY' (TR: VTTT1002U) or 'SELL' (TR: VTTT1001U)
+        - 미국주식 모의투자는 지정가('00') 필수
+        """
+        if qty <= 0:
+            return {"ok": False, "error": "주문 수량은 1주 이상이어야 합니다."}
+        if limit_price_usd <= 0:
+            return {"ok": False, "error": "지정가($)는 0보다 커야 합니다."}
+        token, msg = self.get_access_token()
+        if not token:
+            return {"ok": False, "error": msg}
+
+        tr_id = "VTTT1002U" if side.upper() == "BUY" else "VTTT1001U"
+        excg = self._normalize_us_exchange(market)
+        body = {
+            "CANO": self.creds["account_no"],
+            "ACNT_PRDT_CD": self.creds["account_code"],
+            "OVRS_EXCG_CD": excg,
+            "PDNO": str(ticker).strip().upper(),
+            "ORD_QTY": str(int(qty)),
+            "OVRS_ORD_UNPR": f"{float(limit_price_usd):.2f}",
+            "ORD_SVR_DVSN_CD": "0",
+            "ORD_DVSN": "00",
+        }
+        hashkey = self._get_hashkey(body)
+        _throttle()
+        url = f"{self.base_url}/uapi/overseas-stock/v1/trading/order"
+        try:
+            resp = requests.post(url, headers=self._headers(tr_id, token, hashkey), json=body, timeout=10)
+            data = resp.json()
+            if resp.status_code == 200 and data.get("rt_cd") == "0":
+                out = data.get("output") or {}
+                return {
+                    "ok": True,
+                    "order_no": out.get("ODNO", ""),
+                    "msg": data.get("msg1", "미국주식 모의주문 전송 완료"),
+                }
+            return {"ok": False, "error": f"미국주식 주문 실패: {data.get('msg1', resp.text[:120])}"}
+        except Exception as e:
+            return {"ok": False, "error": f"미국주식 주문 예외: {str(e)[:120]}"}

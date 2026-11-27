@@ -188,11 +188,15 @@ def render_admin_dashboard(*args, **kwargs):
     import importlib
     try:
         import src.analytics_tracker as _at_mod
+        import src.kis_broker as _kb_mod
+        import src.auto_trader as _tr_mod
         import src.admin_dashboard as _ad_mod
+        _mods = (_at_mod, _kb_mod, _tr_mod, _ad_mod)
     except ImportError:
         import analytics_tracker as _at_mod
         import admin_dashboard as _ad_mod
-    for _m in (_at_mod, _ad_mod):
+        _mods = (_at_mod, _ad_mod)
+    for _m in _mods:
         _f = getattr(_m, "__file__", None)
         if _f and os.path.exists(_f):
             _mt = os.path.getmtime(_f)

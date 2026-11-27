@@ -702,13 +702,14 @@ def _get_live_ai_candidates_for_autotrader() -> list:
 
 
 def _render_kis_autotrading_panel(is_dark: bool = False):
-    """대표님 전용 한국투자증권(KIS Developers) 모의투자(VTS) 자동매매 관제실"""
+    """대표님 전용 한국투자증권(KIS Developers) 모의투자(VTS) 자동매매 관제실 (국내 + 미국주식 통합)"""
     from src.kis_broker import KISVirtualBroker, is_kis_vts_configured
     from src.auto_trader import (
         load_autotrader_config,
         save_autotrader_config,
         load_trade_logs,
         run_trading_cycle,
+        run_us_trading_cycle,
     )
 
     card_bg = "#151A23" if is_dark else "#FFFFFF"
@@ -716,12 +717,31 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
     text_primary = "#F8FAFC" if is_dark else "#0F172A"
     text_secondary = "#94A3B8" if is_dark else "#64748B"
 
+    # 시장 선택 토글 (🇰🇷 국내주식 KRX vs 🇺🇸 미국주식 NASDAQ·NYSE)
+    kis_market_mode = st.radio(
+        "자동매매 대상 시장",
+        ["🇰🇷 국내주식 (KRX)", "🇺🇸 미국주식 (NASDAQ·NYSE)"],
+        horizontal=True,
+        label_visibility="collapsed",
+        key="kis_market_mode_radio",
+    )
+    is_us_mode = ("미국주식" in kis_market_mode)
+
     cfg = load_autotrader_config()
     kis_ready = is_kis_vts_configured()
     broker = KISVirtualBroker()
     bal_data = {"ok": False, "summary": {}, "holdings": [], "error": ""}
+    kr_bal_cash = 0
     if kis_ready:
-        bal_data = broker.get_account_balance()
+        kr_bal = broker.get_account_balance()
+        if kr_bal.get("ok"):
+            kr_bal_cash = kr_bal["summary"].get("cash_available", 0)
+        if is_us_mode:
+            bal_data = broker.get_us_account_balance("NASD")
+            if bal_data.get("ok"):
+                bal_data["summary"]["krw_cash_ref"] = kr_bal_cash
+        else:
+            bal_data = kr_bal
 
     # 1. 상단 VTS 안전 잠금 배너 & 긴급 킬스위치
     b_col1, b_col2 = st.columns([3.2, 1.2])
@@ -745,7 +765,7 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
 
     st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
 
-    # 2. 계좌 현황 KPI 카드 4종
+    # 2. 계좌 현황 KPI 카드 4종 (국내 KRW / 미국 USD 자동 전환)
     s = bal_data.get("summary") or {}
     c1, c2, c3, c4 = st.columns(4)
     with c1:
@@ -753,56 +773,84 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
         <div style="background:{card_bg}; border:1px solid {border_color}; border-top:3px solid {'#10B981' if bal_data.get('ok') else '#F59E0B'}; border-radius:14px; padding:15px 18px;">
             <div style="font-size:0.74rem; color:{text_secondary}; font-weight:700;">📡 KIS VTS 연결 상태</div>
             <div style="font-size:1.3rem; font-weight:900; color:{'#10B981' if bal_data.get('ok') else '#F59E0B'}; margin-top:4px;">{'연결 정상' if bal_data.get('ok') else '키 등록 대기'}</div>
-            <div style="font-size:0.70rem; color:{text_secondary}; margin-top:3px;">openapivts:29443</div>
+            <div style="font-size:0.70rem; color:{text_secondary}; margin-top:3px;">{'🇺🇸 미국주식 (VTTS3012R)' if is_us_mode else '🇰🇷 국내주식 (VTTC8434R)'}</div>
         </div>
         """)
     with c2:
-        tot_eval = s.get("total_eval", 0)
+        if is_us_mode:
+            tot_disp = f"${s.get('total_eval_usd', 0):,.2f}" if bal_data.get("ok") else "-"
+            sub_lbl = "미국주식 보유 평가액 (USD)"
+        else:
+            tot_disp = f"{s.get('total_eval', 0):,}원" if bal_data.get("ok") else "-"
+            sub_lbl = "모의계좌 총 자산"
         st.html(f"""
         <div style="background:{card_bg}; border:1px solid {border_color}; border-top:3px solid #3B82F6; border-radius:14px; padding:15px 18px;">
             <div style="font-size:0.74rem; color:{text_secondary}; font-weight:700;">💰 총 평가자산</div>
-            <div style="font-size:1.3rem; font-weight:900; color:#3B82F6; margin-top:4px;">{f'{tot_eval:,}원' if bal_data.get('ok') else '-'}</div>
-            <div style="font-size:0.70rem; color:{text_secondary}; margin-top:3px;">모의계좌 총 자산</div>
+            <div style="font-size:1.3rem; font-weight:900; color:#3B82F6; margin-top:4px;">{tot_disp}</div>
+            <div style="font-size:0.70rem; color:{text_secondary}; margin-top:3px;">{sub_lbl}</div>
         </div>
         """)
     with c3:
-        cash_avail = s.get("cash_available", 0)
+        if is_us_mode:
+            cash_disp = f"{s.get('krw_cash_ref', kr_bal_cash):,}원" if kis_ready else "-"
+            cash_sub = "통합 원화 예수금 (자동환전)"
+        else:
+            cash_disp = f"{s.get('cash_available', 0):,}원" if bal_data.get("ok") else "-"
+            cash_sub = "예수금 기준"
         st.html(f"""
         <div style="background:{card_bg}; border:1px solid {border_color}; border-top:3px solid #8B5CF6; border-radius:14px; padding:15px 18px;">
             <div style="font-size:0.74rem; color:{text_secondary}; font-weight:700;">💵 주문 가능 현금</div>
-            <div style="font-size:1.3rem; font-weight:900; color:#8B5CF6; margin-top:4px;">{f'{cash_avail:,}원' if bal_data.get('ok') else '-'}</div>
-            <div style="font-size:0.70rem; color:{text_secondary}; margin-top:3px;">예수금 기준</div>
+            <div style="font-size:1.3rem; font-weight:900; color:#8B5CF6; margin-top:4px;">{cash_disp}</div>
+            <div style="font-size:0.70rem; color:{text_secondary}; margin-top:3px;">{cash_sub}</div>
         </div>
         """)
     with c4:
-        p_amt = s.get("eval_profit", 0)
+        p_amt = s.get("eval_profit_usd", 0.0) if is_us_mode else s.get("eval_profit", 0)
         p_rt = s.get("eval_profit_rate", 0.0)
         p_col = "#10B981" if p_amt >= 0 else "#EF4444"
+        if bal_data.get("ok"):
+            p_disp = f"${p_amt:+,.2f} ({p_rt:+.2f}%)" if is_us_mode else f"{p_amt:+,}원 ({p_rt:+.2f}%)"
+        else:
+            p_disp = "-"
         st.html(f"""
         <div style="background:{card_bg}; border:1px solid {border_color}; border-top:3px solid {p_col}; border-radius:14px; padding:15px 18px;">
             <div style="font-size:0.74rem; color:{text_secondary}; font-weight:700;">📈 평가 손익</div>
-            <div style="font-size:1.3rem; font-weight:900; color:{p_col}; margin-top:4px;">{f'{p_amt:+,}원 ({p_rt:+.2f}%)' if bal_data.get('ok') else '-'}</div>
+            <div style="font-size:1.3rem; font-weight:900; color:{p_col}; margin-top:4px;">{p_disp}</div>
             <div style="font-size:0.70rem; color:{text_secondary}; margin-top:3px;">보유종목 {len(bal_data.get('holdings', []))}개</div>
         </div>
         """)
 
     st.markdown("---")
 
-    # 3. 전략 파라미터 실시간 설정 (종목당 투자금액 자유 조정 가능)
+    # 3. 전략 파라미터 실시간 설정 (국내 원화 / 미국 달러 자유 조정)
     st.markdown("#### ⚙️ 매매 전략 & 리스크 가드레일 설정 (실시간 조정)")
     with st.container(border=True):
         r1c1, r1c2, r1c3, r1c4 = st.columns(4)
         with r1c1:
-            budget_per_stock = st.number_input(
-                "💵 종목당 투자금액 (원)",
-                min_value=100000,
-                max_value=50000000,
-                value=int(cfg.get("budget_per_stock", 1000000)),
-                step=100000,
-                format="%d",
-                key="kis_cfg_budget",
-                help="1종목 매수 시 투입할 최대 금액입니다. 10만원 단위로 언제든 자유롭게 변경할 수 있습니다.",
-            )
+            if is_us_mode:
+                budget_per_us_usd = st.number_input(
+                    "💵 미국 종목당 투자금액 ($ USD)",
+                    min_value=100,
+                    max_value=30000,
+                    value=int(cfg.get("budget_per_us_stock_usd", 500)),
+                    step=100,
+                    format="%d",
+                    key="kis_cfg_budget_usd",
+                    help="미국주식 1종목당 투입할 최대 달러 금액입니다. $100 단위로 자유 조정 가능합니다.",
+                )
+                budget_per_stock = int(cfg.get("budget_per_stock", 1000000))
+            else:
+                budget_per_stock = st.number_input(
+                    "💵 종목당 투자금액 (원)",
+                    min_value=100000,
+                    max_value=50000000,
+                    value=int(cfg.get("budget_per_stock", 1000000)),
+                    step=100000,
+                    format="%d",
+                    key="kis_cfg_budget",
+                    help="1종목 매수 시 투입할 최대 금액입니다. 10만원 단위로 언제든 자유롭게 변경할 수 있습니다.",
+                )
+                budget_per_us_usd = int(cfg.get("budget_per_us_stock_usd", 500))
         with r1c2:
             max_holdings = st.number_input(
                 "📦 최대 동시 보유 종목수",
@@ -813,10 +861,12 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
                 key="kis_cfg_max_hold",
             )
         with r1c3:
+            _grade_opts = ["S", "A", "B"]
+            _cur_g = cfg.get("min_grade", "A")
             min_grade = st.selectbox(
                 "🏆 최소 AI 등급",
-                options=["S", "A"],
-                index=0 if cfg.get("min_grade", "A") == "S" else 1,
+                options=_grade_opts,
+                index=_grade_opts.index(_cur_g) if _cur_g in _grade_opts else 1,
                 key="kis_cfg_grade",
             )
         with r1c4:
@@ -863,6 +913,7 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
                 save_autotrader_config({
                     "kill_switch": cfg.get("kill_switch", False),
                     "budget_per_stock": int(budget_per_stock),
+                    "budget_per_us_stock_usd": int(budget_per_us_usd),
                     "max_holdings": int(max_holdings),
                     "min_grade": min_grade,
                     "min_score": int(min_score),
@@ -870,37 +921,51 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
                     "stop_loss_pct": float(stop_loss),
                     "daily_loss_limit_pct": float(daily_loss),
                 })
-                st.toast(f"✅ 설정 저장 완료! (종목당 {int(budget_per_stock):,}원 · 최대 {int(max_holdings)}종목 · 익절 +{take_profit}% / 손절 {stop_loss}%)")
+                b_txt = f"${int(budget_per_us_usd):,}" if is_us_mode else f"{int(budget_per_stock):,}원"
+                st.toast(f"✅ 설정 저장 완료! (종목당 {b_txt} · 최대 {int(max_holdings)}종목 · 익절 +{take_profit}% / 손절 {stop_loss}%)")
                 st.rerun(scope="fragment")
 
     st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
 
     # 4. 즉시 시그널 스캔 (Dry-Run) & 모의계좌 1회 실행
-    st.markdown("#### ⚡ 자동매매 시뮬레이션 & 모의주문 실행")
+    st.markdown(f"#### ⚡ {'🇺🇸 미국주식' if is_us_mode else '🇰🇷 국내주식'} 시뮬레이션 & 모의주문 실행")
     ex_c1, ex_c2 = st.columns([1.2, 1.4])
     with ex_c1:
-        if st.button("🔍 지금 시그널 스캔 (Dry-Run 시뮬레이션)", key="kis_dry_run_btn", type="primary", use_container_width=True):
-            with st.spinner("N-Stock AI 퀀트 추천주 실시간 수집 및 매수·매도 시뮬레이션 연산 중..."):
-                cands = _get_live_ai_candidates_for_autotrader()
-                res = run_trading_cycle(cands, dry_run=True)
+        if st.button(f"🔍 {'미국' if is_us_mode else '국내'} 시그널 스캔 (Dry-Run 시뮬레이션)", key="kis_dry_run_btn", type="primary", use_container_width=True):
+            with st.spinner(f"N-Stock {'미국주식' if is_us_mode else '국내주식'} AI 퀀트 추천주 실시간 스캔 중..."):
+                if is_us_mode:
+                    from src.overseas_collector import fetch_top_rising_overseas_stocks
+                    cands = fetch_top_rising_overseas_stocks() or []
+                    res = run_us_trading_cycle(cands, dry_run=True)
+                else:
+                    cands = _get_live_ai_candidates_for_autotrader()
+                    res = run_trading_cycle(cands, dry_run=True)
                 res["scanned_total"] = len(cands)
                 res["scanned_preview"] = cands[:8]
+                res["is_us"] = is_us_mode
                 st.session_state["kis_last_cycle_result"] = res
     with ex_c2:
         live_confirm = st.checkbox(
-            "모의투자 계좌(VTS)에 실제 시장가 주문을 전송합니다.",
+            f"모의투자 계좌(VTS)에 {'미국주식 지정가(+0.5%)' if is_us_mode else '국내주식 시장가'} 주문을 전송합니다.",
             key="kis_live_confirm_chk",
             disabled=not kis_ready,
         )
         if st.button(
-            "⚡ 모의계좌 1회 실행 (VTS 주문)",
+            f"⚡ {'미국' if is_us_mode else '국내'} 모의계좌 1회 실행 (VTS 주문)",
             key="kis_vts_exec_btn",
             disabled=not (kis_ready and live_confirm and not cfg.get("kill_switch", False)),
             use_container_width=True,
         ):
-            with st.spinner("한국투자증권 모의투자(VTS) 주문 전송 중..."):
-                cands = _get_live_ai_candidates_for_autotrader()
-                res = run_trading_cycle(cands, dry_run=False)
+            with st.spinner(f"한국투자증권 모의투자(VTS) {'미국주식' if is_us_mode else '국내주식'} 주문 전송 중..."):
+                if is_us_mode:
+                    from src.overseas_collector import fetch_top_rising_overseas_stocks
+                    cands = fetch_top_rising_overseas_stocks() or []
+                    res = run_us_trading_cycle(cands, dry_run=False)
+                else:
+                    cands = _get_live_ai_candidates_for_autotrader()
+                    res = run_trading_cycle(cands, dry_run=False)
+                res["scanned_total"] = len(cands)
+                res["is_us"] = is_us_mode
                 st.session_state["kis_last_cycle_result"] = res
                 st.rerun(scope="fragment")
 
@@ -909,7 +974,8 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
         if not last_res.get("ok"):
             st.error(last_res.get("error", "실행 오류"))
         else:
-            mode_tag = "🧪 Dry-Run 시뮬레이션" if last_res.get("dry_run") else "⚡ KIS VTS 모의주문 실행"
+            res_is_us = bool(last_res.get("is_us") or last_res.get("market") == "US")
+            mode_tag = ("🧪 미국 Dry-Run" if res_is_us else "🧪 국내 Dry-Run") if last_res.get("dry_run") else ("⚡ 미국 VTS 주문" if res_is_us else "⚡ 국내 VTS 주문")
             buys = last_res.get("buys", [])
             sells = last_res.get("sells", [])
             scanned_n = last_res.get("scanned_total", len(buys))
@@ -917,16 +983,30 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
             if last_res.get("blocked_reason"):
                 st.warning(f"🚨 {last_res['blocked_reason']}")
             if buys:
-                df_b = pd.DataFrame([{
-                    "종목코드": b["code"],
-                    "종목명": b["name"],
-                    "AI등급": b["grade"],
-                    "종합점수": b["score"],
-                    "현재가(원)": f"{b['price']:,}",
-                    "주문수량(주)": f"{b['qty']:,}",
-                    "예상매수금(원)": f"{b['est_amt']:,}",
-                    "진입 근거": b["reason"],
-                } for b in buys])
+                if res_is_us:
+                    df_b = pd.DataFrame([{
+                        "티커": b["code"],
+                        "종목명": b["name"],
+                        "시장": b.get("market", "NASDAQ"),
+                        "AI등급": b["grade"],
+                        "종합점수": b["score"],
+                        "현재가($)": f"${b['price_usd']:,.2f}",
+                        "지정가($)": f"${b['limit_price_usd']:,.2f}",
+                        "주문수량(주)": f"{b['qty']:,}",
+                        "예상매수금($)": f"${b['est_amt_usd']:,.2f}",
+                        "진입 근거": b["reason"],
+                    } for b in buys])
+                else:
+                    df_b = pd.DataFrame([{
+                        "종목코드": b["code"],
+                        "종목명": b["name"],
+                        "AI등급": b["grade"],
+                        "종합점수": b["score"],
+                        "현재가(원)": f"{b['price']:,}",
+                        "주문수량(주)": f"{b['qty']:,}",
+                        "예상매수금(원)": f"{b['est_amt']:,}",
+                        "진입 근거": b["reason"],
+                    } for b in buys])
                 st.dataframe(df_b, use_container_width=True, hide_index=True)
             else:
                 st.info("현재 설정된 필터 조건(등급·점수·등락률 +15% 상한·종목당 투자금액)에 부합하는 신규 매수 후보가 없습니다.")
@@ -934,33 +1014,45 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
                 if prev:
                     with st.expander(f"🔎 스캔된 상위 {len(prev)}개 AI 후보 참고 보기 (필터 기준 비교용)", expanded=True):
                         df_p = pd.DataFrame([{
-                            "종목코드": c["code"],
+                            "코드/티커": c["code"],
                             "종목명": c["name"],
                             "AI등급": c["grade"],
-                            "종합점수": c["total_score"],
-                            "5일상승확률(%)": c["upside_prob"],
-                            "당일등락률(%)": c["change_rate"],
-                            "현재가(원)": f"{c['price']:,}",
+                            "종합점수": c.get("total_score", 0),
+                            "5일상승확률(%)": c.get("upside_prob", 0),
+                            "당일등락률(%)": c.get("change_rate", 0),
+                            "현재가": f"${c['price_usd']:,.2f}" if res_is_us else f"{c.get('price', 0):,}원",
                         } for c in prev])
                         st.dataframe(df_p, use_container_width=True, hide_index=True)
 
     # 5. 현재 모의계좌 보유 종목 & 원클릭 수동 매도
     if bal_data.get("ok") and bal_data.get("holdings"):
         st.markdown("---")
-        st.markdown("#### 📦 현재 모의계좌 보유 종목")
+        st.markdown(f"#### 📦 현재 모의계좌 보유 종목 ({'🇺🇸 미국주식' if is_us_mode else '🇰🇷 국내주식'})")
         for h in bal_data["holdings"]:
-            hc1, hc2, hc3, hc4, hc5 = st.columns([1.8, 1, 1.2, 1.2, 1])
+            hc1, hc2, hc3, hc4, hc5 = st.columns([1.8, 1, 1.3, 1.2, 1])
             hc1.markdown(f"**{h['name']}** (`{h['code']}`)")
             hc2.caption(f"{h['qty']:,}주")
-            hc3.caption(f"평단 {h['avg_price']:,}원 → 현재 {h['cur_price']:,}원")
-            hc4.markdown(f"<span style='color:{'#10B981' if h['profit_rate']>=0 else '#EF4444'}; font-weight:800;'>{h['profit_rate']:+.2f}% ({h['profit_amt']:+,}원)</span>", unsafe_allow_html=True)
-            if hc5.button("시장가 매도", key=f"kis_sell_{h['code']}", use_container_width=True):
-                s_res = broker.place_order("SELL", h["code"], h["qty"], order_type="01")
-                if s_res.get("ok"):
-                    st.toast(f"✅ {h['name']} {h['qty']}주 모의 매도 주문 완료!")
-                    st.rerun(scope="fragment")
-                else:
-                    st.error(s_res.get("error", "매도 실패"))
+            if is_us_mode:
+                hc3.caption(f"평단 ${h['avg_price']:,.2f} → 현재 ${h['cur_price']:,.2f}")
+                hc4.markdown(f"<span style='color:{'#10B981' if h['profit_rate']>=0 else '#EF4444'}; font-weight:800;'>{h['profit_rate']:+.2f}% (${h['profit_amt']:+,.2f})</span>", unsafe_allow_html=True)
+                if hc5.button("지정가 매도", key=f"kis_us_sell_{h['code']}", use_container_width=True):
+                    s_px = round(float(h["cur_price"]) * 0.995, 2)
+                    s_res = broker.place_us_order("SELL", h["code"], h["qty"], s_px, market=h.get("exchange", "NASD"))
+                    if s_res.get("ok"):
+                        st.toast(f"✅ {h['name']} {h['qty']}주 미국 모의 매도 주문 완료!")
+                        st.rerun(scope="fragment")
+                    else:
+                        st.error(s_res.get("error", "매도 실패"))
+            else:
+                hc3.caption(f"평단 {h['avg_price']:,}원 → 현재 {h['cur_price']:,}원")
+                hc4.markdown(f"<span style='color:{'#10B981' if h['profit_rate']>=0 else '#EF4444'}; font-weight:800;'>{h['profit_rate']:+.2f}% ({h['profit_amt']:+,}원)</span>", unsafe_allow_html=True)
+                if hc5.button("시장가 매도", key=f"kis_sell_{h['code']}", use_container_width=True):
+                    s_res = broker.place_order("SELL", h["code"], h["qty"], order_type="01")
+                    if s_res.get("ok"):
+                        st.toast(f"✅ {h['name']} {h['qty']}주 모의 매도 주문 완료!")
+                        st.rerun(scope="fragment")
+                    else:
+                        st.error(s_res.get("error", "매도 실패"))
 
     # 6. 자동매매 감사 로그
     st.markdown("---")

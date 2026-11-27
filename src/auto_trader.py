@@ -18,7 +18,8 @@ LOG_FILE = os.path.join(DATA_DIR, "autotrader_logs.json")
 
 DEFAULT_AUTOTRADER_CONFIG = {
     "kill_switch": False,              # True면 모든 신규 매수 즉시 차단
-    "budget_per_stock": 1000000,       # 종목당 투자금액 (원) — UI에서 자유 조정 가능 (10만~5,000만)
+    "budget_per_stock": 1000000,       # 국내 종목당 투자금액 (원) — UI에서 자유 조정 가능 (10만~5,000만)
+    "budget_per_us_stock_usd": 500,    # 미국 종목당 투자금액 (USD 달러) — UI에서 자유 조정 가능 ($100~$30,000)
     "max_holdings": 5,                 # 최대 동시 보유 종목 수
     "min_grade": "A",                  # 최소 AI 등급 ('S' 또는 'A')
     "min_score": 80,                   # 최소 AI 종합점수
@@ -244,6 +245,155 @@ def run_trading_cycle(candidates: list, dry_run: bool = True) -> dict:
 
     return {
         "ok": True,
+        "dry_run": dry_run,
+        "kis_connected": broker.is_ready,
+        "kill_switch": cfg.get("kill_switch", False),
+        "blocked_reason": blocked_reason,
+        "summary": summary,
+        "holdings": holdings,
+        "sells": sells,
+        "buys": buys,
+        "executed": executed,
+    }
+
+
+def evaluate_us_buy_signals(candidates: list, holdings: list, cfg: dict) -> list:
+    """미국주식 AI 추천 후보군 중 안전 필터를 통과한 매수 예정 종목 산출 (USD 기준)"""
+    if cfg.get("kill_switch", False):
+        return []
+
+    held_codes = {str(h.get("code", "")).strip().upper() for h in holdings}
+    max_hold = int(cfg.get("max_holdings", 5))
+    slots_left = max(0, max_hold - len(held_codes))
+    if slots_left <= 0:
+        return []
+
+    budget_usd = float(cfg.get("budget_per_us_stock_usd", 500))
+    min_grade = str(cfg.get("min_grade", "A"))
+    min_score = float(cfg.get("min_score", 80))
+    min_prob = float(cfg.get("min_upside_prob", 70.0))
+    max_chg = float(cfg.get("max_day_change_rate", 15.0))
+
+    buys = []
+    for c in candidates or []:
+        if len(buys) >= slots_left:
+            break
+        ticker = str(c.get("code", "")).strip().upper()
+        if not ticker or ticker in held_codes:
+            continue
+        price_usd = float(c.get("price_usd", 0) or 0)
+        if price_usd <= 0 or price_usd > budget_usd:
+            continue
+        grade = str(c.get("grade", "B"))
+        score = float(c.get("total_score", 0) or 0)
+        prob = float(c.get("upside_prob", 0) or 0)
+        chg = float(c.get("change_rate", 0) or 0)
+
+        if not _grade_ok(grade, min_grade):
+            continue
+        if score < min_score or prob < min_prob:
+            continue
+        if chg > max_chg:
+            continue
+
+        qty = int(budget_usd // price_usd)
+        if qty <= 0:
+            continue
+        # 미국주식 지정가 체결용 +0.5% 버퍼 가격
+        limit_price = round(price_usd * 1.005, 2)
+        buys.append({
+            "code": ticker,
+            "name": str(c.get("name", ticker)),
+            "market": str(c.get("market", "NASDAQ")),
+            "grade": grade,
+            "score": score,
+            "upside_prob": prob,
+            "change_rate": chg,
+            "price_usd": round(price_usd, 2),
+            "limit_price_usd": limit_price,
+            "qty": qty,
+            "est_amt_usd": round(qty * price_usd, 2),
+            "action": "BUY",
+            "reason": f"미국 AI {grade}등급({score:.0f}점) · 상승확률 {prob:.1f}%",
+        })
+    return buys
+
+
+def run_us_trading_cycle(candidates: list, dry_run: bool = True) -> dict:
+    """미국주식(NASDAQ·NYSE·AMEX) 모의투자 1회 실행 사이클"""
+    cfg = load_autotrader_config()
+    broker = KISVirtualBroker()
+    holdings = []
+    summary = {}
+    blocked_reason = ""
+
+    if broker.is_ready:
+        bal = broker.get_us_account_balance("NASD")
+        if bal.get("ok"):
+            holdings = bal["holdings"]
+            summary = bal["summary"]
+            if summary.get("eval_profit_rate", 0.0) <= float(cfg.get("daily_loss_limit_pct", -3.0)):
+                blocked_reason = f"일일 손실 한도({cfg['daily_loss_limit_pct']}%) 도달 — 미국주식 신규 매수 차단"
+        elif not dry_run:
+            return {"ok": False, "error": bal.get("error", "미국 모의계좌 조회 실패"), "buys": [], "sells": [], "executed": []}
+    elif not dry_run:
+        return {"ok": False, "error": "KIS 모의투자 API 키([kis_vts])가 등록되어 있지 않습니다.", "buys": [], "sells": [], "executed": []}
+
+    sells = evaluate_exit_signals(holdings, cfg)
+    buys = [] if (cfg.get("kill_switch") or blocked_reason) else evaluate_us_buy_signals(candidates, holdings, cfg)
+
+    executed = []
+    if not dry_run:
+        for s in sells:
+            sell_px = round(float(s.get("cur_price", 0)) * 0.995, 2)
+            res = broker.place_us_order("SELL", s["code"], s["qty"], sell_px, market=s.get("exchange", "NASD"))
+            rec = {
+                "mode": "VTS_US_LIVE",
+                "action": "SELL",
+                "code": s["code"],
+                "name": s["name"],
+                "qty": s["qty"],
+                "price": f"${sell_px:.2f}",
+                "reason": s["reason"],
+                "status": "성공" if res.get("ok") else f"실패({res.get('error', '')[:40]})",
+                "order_no": res.get("order_no", ""),
+            }
+            append_trade_log(rec)
+            executed.append(rec)
+
+        for b in buys:
+            res = broker.place_us_order("BUY", b["code"], b["qty"], b["limit_price_usd"], market=b.get("market", "NASD"))
+            rec = {
+                "mode": "VTS_US_LIVE",
+                "action": "BUY",
+                "code": b["code"],
+                "name": b["name"],
+                "qty": b["qty"],
+                "price": f"${b['limit_price_usd']:.2f}",
+                "reason": b["reason"],
+                "status": "성공" if res.get("ok") else f"실패({res.get('error', '')[:40]})",
+                "order_no": res.get("order_no", ""),
+            }
+            append_trade_log(rec)
+            executed.append(rec)
+    else:
+        for item in sells + buys:
+            px = item.get("price_usd") or item.get("cur_price", 0)
+            append_trade_log({
+                "mode": "DRY_RUN_US",
+                "action": item["action"],
+                "code": item["code"],
+                "name": item["name"],
+                "qty": item["qty"],
+                "price": f"${float(px):.2f}",
+                "reason": item["reason"],
+                "status": "미국 시뮬레이션 완료",
+                "order_no": "-",
+            })
+
+    return {
+        "ok": True,
+        "market": "US",
         "dry_run": dry_run,
         "kis_connected": broker.is_ready,
         "kill_switch": cfg.get("kill_switch", False),
