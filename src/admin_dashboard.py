@@ -791,22 +791,27 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
         """)
     with c2:
         if is_us_mode:
-            tot_disp = f"${s.get('total_eval_usd', 0):,.2f}" if bal_data.get("ok") else "-"
-            sub_lbl = "미국주식 보유 평가액 (USD)"
+            ev_usd = s.get("total_eval_usd", 0.0)
+            tot_disp = f"${ev_usd:,.2f}" if bal_data.get("ok") else "-"
+            card2_title = "💰 미국주식 보유 평가액"
+            sub_lbl = "보유 미국주식 시가 평가 (USD)" if ev_usd > 0 else "보유 미국주식 없음 (매수 전)"
         else:
             tot_disp = f"{s.get('total_eval', 0):,}원" if bal_data.get("ok") else "-"
-            sub_lbl = "모의계좌 총 자산"
+            card2_title = "💰 총 평가자산"
+            sub_lbl = "모의계좌 총 자산 (예수금+주식)"
         st.html(f"""
         <div style="background:{card_bg}; border:1px solid {border_color}; border-top:3px solid #3B82F6; border-radius:14px; padding:15px 18px;">
-            <div style="font-size:0.74rem; color:{text_secondary}; font-weight:700;">💰 총 평가자산</div>
+            <div style="font-size:0.74rem; color:{text_secondary}; font-weight:700;">{card2_title}</div>
             <div style="font-size:1.3rem; font-weight:900; color:#3B82F6; margin-top:4px;">{tot_disp}</div>
             <div style="font-size:0.70rem; color:{text_secondary}; margin-top:3px;">{sub_lbl}</div>
         </div>
         """)
     with c3:
         if is_us_mode:
-            cash_disp = f"{s.get('krw_cash_ref', kr_bal_cash):,}원" if kis_ready else "-"
-            cash_sub = "통합 원화 예수금 (자동환전)"
+            krw_ref = s.get("krw_cash_ref", kr_bal_cash)
+            est_usd = krw_ref / 1400.0 if krw_ref > 0 else 0.0
+            cash_disp = f"{krw_ref:,}원" if kis_ready else "-"
+            cash_sub = f"통합 원화 예수금 (약 ${est_usd:,.0f} 매수 가능)"
         else:
             cash_disp = f"{s.get('cash_available', 0):,}원" if bal_data.get("ok") else "-"
             cash_sub = "예수금 기준"
