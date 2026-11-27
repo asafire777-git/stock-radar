@@ -756,6 +756,11 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
         """)
     with b_col2:
         ks_now = bool(cfg.get("kill_switch", False))
+        st.html(
+            f"<div style='text-align:center; font-size:0.76rem; font-weight:800; margin-bottom:4px; color:{'#EF4444' if ks_now else '#10B981'};'>"
+            f"{'🛑 현재 상태: 긴급 정지 중' if ks_now else '🟢 현재 상태: 정상 가동 가능'}"
+            f"</div>"
+        )
         btn_lbl = "🟢 긴급정지 해제 (재개)" if ks_now else "🛑 자동매매 긴급 정지"
         if st.button(btn_lbl, key="kis_kill_switch_btn", type="primary" if ks_now else "secondary", use_container_width=True):
             cfg["kill_switch"] = not ks_now
