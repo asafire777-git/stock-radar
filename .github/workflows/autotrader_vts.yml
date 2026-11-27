@@ -27,7 +27,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install --quiet requests pandas numpy scikit-learn lightgbm beautifulsoup4 lxml
+          pip install --quiet requests pandas numpy scikit-learn lightgbm beautifulsoup4 lxml streamlit finance-datareader
 
       - name: Run N-Stock VTS Auto-Trading Worker
         env:
