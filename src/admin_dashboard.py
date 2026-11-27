@@ -762,17 +762,33 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
         </div>
         """)
     with b_col2:
-        ks_now = bool(cfg.get("kill_switch", False))
+        from src.github_worker_ctrl import (
+            get_cloud_worker_status,
+            set_cloud_worker_enabled,
+            sync_config_to_github,
+            is_github_remote_ready,
+        )
+        gh_status = get_cloud_worker_status()
+        gh_linked = bool(gh_status.get("connected"))
+        # 클라우드 워커가 연결돼 있으면 실제 클라우드 상태 기준으로 동기화
+        ks_now = (not gh_status.get("enabled", True)) if gh_linked else bool(cfg.get("kill_switch", False))
+        _cloud_tag = "☁️ 24h 클라우드 연동됨" if gh_linked else "💻 웹 수동 제어 모드"
         st.html(
-            f"<div style='text-align:center; font-size:0.76rem; font-weight:800; margin-bottom:4px; color:{'#EF4444' if ks_now else '#10B981'};'>"
-            f"{'🛑 현재 상태: 긴급 정지 중' if ks_now else '🟢 현재 상태: 정상 가동 가능'}"
+            f"<div style='text-align:center; font-size:0.75rem; font-weight:800; margin-bottom:4px; color:{'#EF4444' if ks_now else '#10B981'};'>"
+            f"{'🛑 무인·수동 모두 정지 중' if ks_now else '🟢 정상 가동 중'} <span style='color:{text_secondary}; font-weight:600;'>({_cloud_tag})</span>"
             f"</div>"
         )
-        btn_lbl = "🟢 긴급정지 해제 (재개)" if ks_now else "🛑 자동매매 긴급 정지"
+        btn_lbl = "🟢 자동매매 가동 (재개)" if ks_now else "🛑 자동매매 긴급 정지"
         if st.button(btn_lbl, key="kis_kill_switch_btn", type="primary" if ks_now else "secondary", use_container_width=True):
-            cfg["kill_switch"] = not ks_now
+            new_ks = not ks_now
+            cfg["kill_switch"] = new_ks
             save_autotrader_config(cfg)
-            st.toast("🛑 긴급 정지가 활성화되었습니다." if cfg["kill_switch"] else "🟢 긴급 정지가 해제되었습니다.")
+            if gh_linked:
+                ok_gh, msg_gh = set_cloud_worker_enabled(enabled=not new_ks)
+                sync_config_to_github(cfg)
+                st.toast(f"{'🛑' if new_ks else '🟢'} {msg_gh}" if ok_gh else f"⚠️ {msg_gh}")
+            else:
+                st.toast("🛑 웹 자동매매 정지됨 (24h 클라우드 원격 제어는 아래 GitHub 토큰 등록 시 통합)" if new_ks else "🟢 자동매매 가동 재개!")
             st.rerun(scope="fragment")
 
     st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
@@ -974,7 +990,7 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
         with r3c4:
             st.markdown("<div style='height:26px;'></div>", unsafe_allow_html=True)
             if st.button("💾 전략 설정 저장", key="kis_save_cfg_btn", type="primary", use_container_width=True):
-                save_autotrader_config({
+                new_cfg = {
                     "kill_switch": cfg.get("kill_switch", False),
                     "budget_per_stock": int(budget_per_stock),
                     "budget_per_us_stock_usd": int(budget_per_us_usd),
@@ -990,9 +1006,11 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
                     "enable_partial_tp": bool(enable_partial_tp),
                     "trailing_activate_pct": float(trailing_activate),
                     "trailing_drop_pct": float(trailing_drop),
-                })
+                }
+                save_autotrader_config(new_cfg)
+                synced = sync_config_to_github(new_cfg) if gh_linked else False
                 b_txt = f"${int(budget_per_us_usd):,}" if is_us_mode else f"{int(budget_per_stock):,}원"
-                st.toast(f"✅ 설정 저장 완료! (종목당 {b_txt} · 트레일링 {'ON' if enable_trailing_stop else 'OFF'} · 단타필터 {'ON' if enable_intraday_timing else 'OFF'})")
+                st.toast(f"✅ 설정 저장 완료! (종목당 {b_txt}" + (" · ☁️ 클라우드 워커 동기화됨)" if synced else ")"))
                 st.rerun(scope="fragment")
 
     st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
