@@ -315,9 +315,57 @@ class KISVirtualBroker:
                     continue
                 break
             if resp.status_code != 200 or data.get("rt_cd") != "0":
+                # 1차 VTTS3012R 지연/오류 시 2차 해외주식 체결기준 현재잔고(VTRP6504R) 자동 폴백
+                fb_url = f"{self.base_url}/uapi/overseas-stock/v1/trading/inquire-present-balance"
+                fb_params = {
+                    "CANO": self.creds["account_no"],
+                    "ACNT_PRDT_CD": self.creds["account_code"],
+                    "WCRC_FRCR_DVSN_CD": "02",
+                    "NATN_CD": "840",
+                    "TR_MKET_CD": "00",
+                    "INQR_DVSN_CD": "00",
+                }
+                _throttle(0.8)
+                fb_resp = requests.get(fb_url, headers=self._headers("VTRP6504R", token), params=fb_params, timeout=10)
+                fb_data = fb_resp.json()
+                if fb_resp.status_code == 200 and fb_data.get("rt_cd") == "0":
+                    holdings = []
+                    for row in fb_data.get("output1") or []:
+                        qty = int(float(row.get("ccld_qty_smtl1", 0) or 0))
+                        if qty <= 0:
+                            continue
+                        holdings.append({
+                            "code": str(row.get("pdno", "")).strip().upper(),
+                            "name": str(row.get("prdt_name", "")).strip(),
+                            "exchange": str(row.get("ovrs_excg_cd", "NASD")).strip().upper(),
+                            "qty": qty,
+                            "avg_price": round(float(row.get("avg_unpr3", 0) or 0), 2),
+                            "cur_price": round(float(row.get("ovrs_now_pric1", 0) or 0), 2),
+                            "eval_amt": round(float(row.get("frcr_evlu_amt2", 0) or 0), 2),
+                            "profit_amt": round(float(row.get("evlu_pfls_amt2", 0) or 0), 2),
+                            "profit_rate": round(float(row.get("evlu_pfls_rt1", 0) or 0), 2),
+                        })
+                    out3 = fb_data.get("output3") or {}
+                    pchs = float(out3.get("pchs_amt_smtl", 0) or 0)
+                    evlu = float(out3.get("evlu_amt_smtl", 0) or 0)
+                    pfls = float(out3.get("evlu_pfls_amt_smtl", 0) or 0)
+                    rt = round((pfls / pchs * 100.0), 2) if pchs > 0 else 0.0
+                    return {
+                        "ok": True,
+                        "error": "",
+                        "summary": {
+                            "total_eval_usd": round(evlu, 2),
+                            "purchase_total_usd": round(pchs, 2),
+                            "eval_profit_usd": round(pfls, 2),
+                            "eval_profit_rate": rt,
+                        },
+                        "holdings": holdings,
+                    }
+                mc = data.get("msg_cd") or fb_data.get("msg_cd") or resp.status_code
+                m1 = data.get("msg1") or fb_data.get("msg1") or resp.text[:100]
                 return {
                     "ok": False,
-                    "error": f"미국주식 잔고 조회 오류: {data.get('msg1', resp.text[:120])}",
+                    "error": f"미국주식 잔고 조회 오류 [{mc}]: {m1}",
                     "summary": {},
                     "holdings": [],
                 }
