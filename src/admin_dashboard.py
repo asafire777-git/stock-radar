@@ -983,6 +983,12 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
                 key="kis_cfg_partial_tp",
                 help="목표 익절률(+6%) 도달 시 50%만 먼저 익절하고 나머지 50%는 트레일링 스탑으로 끝까지 수익을 키웁니다.",
             )
+            enable_two_strike_sl = st.checkbox(
+                "🛡️ 2회 연속 확인 손절 (흔들림 방어)",
+                value=bool(cfg.get("enable_two_strike_sl", True)),
+                key="kis_cfg_two_strike_sl",
+                help="10분 체크에서 손절선(-3%)을 2회 연속 이탈할 때만 손절해 잠깐의 투매 흔들림에 털리지 않습니다. (단, 1.8배 급락 시 즉시 손절)",
+            )
         with r3c2:
             trailing_activate = st.number_input(
                 "🚀 트레일링 발동 수익률 (%)",
@@ -1018,6 +1024,7 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
                     "enable_intraday_timing": bool(enable_intraday_timing),
                     "enable_trailing_stop": bool(enable_trailing_stop),
                     "enable_partial_tp": bool(enable_partial_tp),
+                    "enable_two_strike_sl": bool(enable_two_strike_sl),
                     "trailing_activate_pct": float(trailing_activate),
                     "trailing_drop_pct": float(trailing_drop),
                 }

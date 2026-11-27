@@ -33,6 +33,7 @@ DEFAULT_AUTOTRADER_CONFIG = {
     "enable_intraday_timing": True,    # 단타 장중 5분봉/윗꼬리 진입 타이밍 정밀 필터
     "enable_trailing_stop": True,      # 트레일링 스탑 (고점 추적 익절) 활성화
     "enable_partial_tp": True,         # 1차 목표가 도달 시 50% 분할 익절 + 50% 수익 극대화
+    "enable_two_strike_sl": True,      # 2회 연속 이탈 확인 손절 (잠깐 흔들림 방어, 1.8배 급락 시 즉시 손절)
     "trailing_activate_pct": 4.0,      # 트레일링 스탑 발동 수익률 (%)
     "trailing_drop_pct": 2.5,          # 최고 수익률 대비 하락 이탈 시 전량 익절 (%)
 }
@@ -160,8 +161,10 @@ def evaluate_exit_signals(holdings: list, cfg: dict) -> list:
     sl = float(cfg.get("stop_loss_pct", -3.0))
     use_ts = bool(cfg.get("enable_trailing_stop", True))
     use_partial = bool(cfg.get("enable_partial_tp", True))
+    use_two_strike = bool(cfg.get("enable_two_strike_sl", True))
     ts_act = float(cfg.get("trailing_activate_pct", 4.0))
     ts_drop = float(cfg.get("trailing_drop_pct", 2.5))
+    hard_crash_sl = round(sl * 1.8, 2)  # 예: -3% 설정 시 -5.4% 이상 급락은 1회만에 즉시 손절
 
     hwm = load_hwm_state()
     held_keys = set()
@@ -174,15 +177,31 @@ def evaluate_exit_signals(holdings: list, cfg: dict) -> list:
         if qty <= 0:
             continue
 
-        rec = hwm.get(code, {"peak_rt": rt, "partial_done": False})
+        rec = hwm.get(code, {"peak_rt": rt, "partial_done": False, "sl_strikes": 0})
         peak_rt = max(float(rec.get("peak_rt", rt)), rt)
         partial_done = bool(rec.get("partial_done", False))
-        hwm[code] = {"peak_rt": round(peak_rt, 2), "partial_done": partial_done}
+        sl_strikes = int(rec.get("sl_strikes", 0))
 
-        # 1순위: 기계적 손절 (무조건 전량 매도)
+        # 1순위: 기계적 손절 (2회 연속 이탈 확인 + 1.8배 급락 시 즉시 손절)
         if rt <= sl:
-            exits.append({**h, "qty": qty, "action": "SELL", "exit_type": "STOP_LOSS", "reason": f"기계적 손절 ({rt:+.2f}% ≤ {sl:.1f}%)"})
+            sl_strikes += 1
+            hwm[code] = {"peak_rt": round(peak_rt, 2), "partial_done": partial_done, "sl_strikes": sl_strikes}
+            if (not use_two_strike) or (rt <= hard_crash_sl) or (sl_strikes >= 2):
+                reason_sl = (
+                    f"급락 즉시 손절 ({rt:+.2f}% ≤ {hard_crash_sl:.1f}%)"
+                    if (use_two_strike and rt <= hard_crash_sl and sl_strikes == 1)
+                    else (
+                        f"2회 연속 이탈 확인 손절 ({rt:+.2f}% ≤ {sl:.1f}%)"
+                        if use_two_strike
+                        else f"기계적 손절 ({rt:+.2f}% ≤ {sl:.1f}%)"
+                    )
+                )
+                exits.append({**h, "qty": qty, "action": "SELL", "exit_type": "STOP_LOSS", "reason": reason_sl})
             continue
+        else:
+            # 손절선 위로 회복되면 연속 이탈 카운트 즉시 초기화
+            sl_strikes = 0
+            hwm[code] = {"peak_rt": round(peak_rt, 2), "partial_done": partial_done, "sl_strikes": 0}
 
         # 2순위: 트레일링 스탑 (고점 +ts_act% 돌파 후 고점 대비 -ts_drop% 밀리면 전량 익절)
         if use_ts and peak_rt >= ts_act and rt <= (peak_rt - ts_drop):
