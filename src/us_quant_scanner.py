@@ -99,6 +99,86 @@ def fetch_us_60d_ohlcv(ticker: str) -> tuple[pd.DataFrame, float, float]:
         return pd.DataFrame(), 0.0, 0.0
 
 
+def _score_us_quant_100(ohlcv_ind: pd.DataFrame, chg_pct: float) -> tuple[float, str, list]:
+    """
+    미국주식(NASDAQ/NYSE) 변동성 특성에 맞춘 100점 만점 실측 퀀트 채점 엔진
+    (국내 급등주 기준인 +10~30% 대신 미국주식의 건전 상승 +1~8%·정배열·RSI·MACD·거래량 비율 기반)
+    """
+    last = ohlcv_ind.iloc[-1]
+    close = float(last.get("close", 0) or 0)
+    ma5 = float(last.get("ma5", close) or close)
+    ma20 = float(last.get("ma20", close) or close)
+    ma60 = float(last.get("ma60", close) or close)
+    rsi = float(last.get("rsi", 50) or 50)
+    macd = float(last.get("macd", 0) or 0)
+    macd_sig = float(last.get("macd_signal", 0) or 0)
+    bb_mid = float(last.get("bb_mid", ma20) or ma20)
+    bb_up = float(last.get("bb_upper", close * 1.05) or (close * 1.05))
+    vol = float(last.get("volume", 0) or 0)
+    vol_ma20 = float(ohlcv_ind["volume"].tail(20).mean() or 1.0)
+    vol_ratio = vol / vol_ma20 if vol_ma20 > 0 else 1.0
+
+    # 5일 수익률
+    ret5 = ((close - float(ohlcv_ind["close"].iloc[-6])) / float(ohlcv_ind["close"].iloc[-6]) * 100.0) if len(ohlcv_ind) >= 6 else chg_pct
+
+    score = 0.0
+    sigs = []
+
+    # 1. 이평선 추세 정배열 (30점)
+    if close >= ma5:
+        score += 8
+    if close >= ma20:
+        score += 10
+        sigs.append("20일선 안착")
+    if ma5 >= ma20:
+        score += 6
+        sigs.append("단기 정배열")
+    if ma20 >= ma60:
+        score += 6
+        sigs.append("중기 우상향")
+
+    # 2. 모멘텀 & RSI·MACD (30점)
+    if 0.5 <= chg_pct <= 10.0:
+        score += min(14.0, 6.0 + chg_pct * 1.6)
+        sigs.append(f"당일 {chg_pct:+.1f}% 강세")
+    elif chg_pct > 10.0:
+        score += 10.0
+    elif -1.0 <= chg_pct < 0.5:
+        score += 5.0
+    if ret5 > 0:
+        score += min(6.0, 2.0 + ret5 * 0.5)
+    if 45.0 <= rsi <= 72.0:
+        score += 6.0
+    elif 35.0 <= rsi < 45.0:
+        score += 4.0
+    if macd >= macd_sig:
+        score += 4.0
+        sigs.append("MACD 상승전환")
+
+    # 3. 거래량 에너지 (20점)
+    if vol_ratio >= 1.5:
+        score += 20.0
+        sigs.append(f"거래량 {int(vol_ratio*100)}% 급증")
+    elif vol_ratio >= 1.1:
+        score += 15.0
+    elif vol_ratio >= 0.75:
+        score += 11.0
+    else:
+        score += 7.0
+
+    # 4. 볼린저 밴드 탄력 (20점)
+    if close >= bb_mid:
+        score += 12.0
+    else:
+        score += 5.0
+    if bb_mid <= close <= bb_up * 1.02:
+        score += 8.0
+
+    final_score = round(min(98.0, max(20.0, score)), 1)
+    grade = "S" if final_score >= 85 else ("A" if final_score >= 75 else ("B" if final_score >= 65 else "C"))
+    return final_score, grade, sigs[:3]
+
+
 def _evaluate_us_ticker(item: tuple) -> Dict[str, Any] | None:
     ticker, name, market = item
     ohlcv, price_usd, chg_pct = fetch_us_60d_ohlcv(ticker)
@@ -106,22 +186,14 @@ def _evaluate_us_ticker(item: tuple) -> Dict[str, Any] | None:
         return None
     try:
         ohlcv_ind = compute_technical_indicators(ohlcv)
-        signals = analyze_stock_signals(ohlcv_ind)
-
-        # 미국 주식 거래대금(억원 환산 근사: price_usd * volume * 1400 / 1e8)
         last_vol = float(ohlcv["volume"].iloc[-1])
         trade_val_krw_eok = round((price_usd * last_vol * 1400.0) / 1e8, 1)
 
-        item_dict = {
-            "change_rate": chg_pct,
-            "trade_value_억": trade_val_krw_eok,
-            "days_since_listing": 365,
-        }
-        q_res = calculate_quant_score(item_dict, signals, pd.DataFrame(), strategy="스윙")
-        # 미국주식은 KRX 외인/기관 수급 항목(20점 만점)이 없으므로 나머지 80점 만점을 100점 기준으로 공정 환산
-        adj_score = round(min(99.0, float(q_res["total_score"]) * 1.25), 1)
-        adj_grade = "S" if adj_score >= 82 else ("A" if adj_score >= 72 else ("B" if adj_score >= 60 else "C"))
+        adj_score, adj_grade, sigs = _score_us_quant_100(ohlcv_ind, chg_pct)
         p_res = predictor.predict_probability(ohlcv_ind, quant_score=adj_score)
+        raw_ml_prob = float(p_res.get("upside_probability", 55.0) or 55.0)
+        # 미국주식 실측 퀀트 점수 + ML 확률 앙상블 보정
+        us_prob = round(min(93.0, max(35.0, adj_score * 0.65 + raw_ml_prob * 0.35 + 8.0)), 1)
 
         return {
             "code": ticker,
@@ -132,9 +204,9 @@ def _evaluate_us_ticker(item: tuple) -> Dict[str, Any] | None:
             "trade_value_억": trade_val_krw_eok,
             "grade": adj_grade,
             "total_score": adj_score,
-            "upside_prob": p_res["upside_probability"],
+            "upside_prob": us_prob,
             "direction": p_res["direction"],
-            "signals": ", ".join(signals.get("signals", [])[:3]) or "추세 모니터링",
+            "signals": ", ".join(sigs) if sigs else "추세 모니터링",
             "is_overseas": True,
             "data_source": "Yahoo 60일 실측 OHLCV",
         }
