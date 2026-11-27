@@ -625,25 +625,80 @@ def render_admin_dashboard(is_dark: bool = False):
 
 
 def _get_live_ai_candidates_for_autotrader() -> list:
-    """세션에 캐시된 N-Stock AI 추천주 후보군을 우선 가져오고, 없으면 즉석 스캔 수행"""
+    """세션에 캐시된 N-Stock AI 추천주 후보군을 우선 가져오고, 없으면 네이버/KRX 실시간 즉석 병렬 스캔 수행"""
     for k, v in st.session_state.items():
         if str(k).startswith("cached_cand_") and isinstance(v, list) and len(v) > 0:
             return v
     try:
-        from src.krx_collector import fetch_top_rising_stocks, fetch_top_volume_stocks
-        from src.prediction_model import evaluate_candidates
+        import concurrent.futures
+        from src.naver_collector import fetch_top_rising_stocks, fetch_top_volume_stocks
+        from src.krx_collector import get_stock_ohlcv, get_investor_net_purchases
+        from src.technical_analysis import compute_technical_indicators, analyze_stock_signals
+        from src.quant_scorer import calculate_quant_score
+        from src.prediction_model import predictor
+
         df_r = fetch_top_rising_stocks(limit=40)
         df_v = fetch_top_volume_stocks(limit=25)
+        frames = []
         if df_r is not None and not df_r.empty:
-            swing = df_r[(df_r["change_rate"] >= 2.0) & (df_r["change_rate"] <= 15.0)].head(20)
-            pool = pd.concat([swing, df_v.head(15)]).drop_duplicates(subset=["code"]).head(20)
-            if not pool.empty:
-                cands = evaluate_candidates(pool.to_dict("records"), "스윙")
-                st.session_state["cached_cand_autotrader_scan"] = cands
-                return cands
-    except Exception:
-        pass
-    return []
+            swing = df_r[(df_r["change_rate"] >= 1.5) & (df_r["change_rate"] <= 20.0)].head(18)
+            frames.append(swing if not swing.empty else df_r.head(15))
+        if df_v is not None and not df_v.empty:
+            frames.append(df_v.head(15))
+        if not frames:
+            return []
+        pool = pd.concat(frames).drop_duplicates(subset=["code"]).head(20)
+        records = pool.to_dict("records")
+
+        def _eval_one(row):
+            code = str(row.get("code", "")).strip()
+            if not code:
+                return None
+            try:
+                ohlcv = get_stock_ohlcv(code, days=60)
+                if ohlcv is None or ohlcv.empty or len(ohlcv) < 20:
+                    return None
+                ohlcv_ind = compute_technical_indicators(ohlcv)
+                signals = analyze_stock_signals(ohlcv_ind)
+                inv_df = get_investor_net_purchases(code, days=15)
+                item_dict = {
+                    "change_rate": float(row.get("change_rate", 0.0)),
+                    "trade_value_억": float(row.get("trade_value_억", 0.0)),
+                    "days_since_listing": int(row.get("days_since_listing", 90)),
+                }
+                q_res = calculate_quant_score(item_dict, signals, inv_df, strategy="스윙")
+                p_res = predictor.predict_probability(ohlcv_ind, quant_score=q_res["total_score"])
+                return {
+                    "code": code,
+                    "name": str(row.get("name", "")),
+                    "market": row.get("market", ""),
+                    "price": int(float(row.get("price", 0))),
+                    "change_rate": float(row.get("change_rate", 0.0)),
+                    "grade": q_res["grade"],
+                    "total_score": q_res["total_score"],
+                    "upside_prob": p_res["upside_probability"],
+                    "direction": p_res["direction"],
+                }
+            except Exception:
+                return None
+
+        cands = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as ex:
+            futs = [ex.submit(_eval_one, r) for r in records]
+            for f in futs:
+                try:
+                    res = f.result(timeout=6.0)
+                    if res:
+                        cands.append(res)
+                except Exception:
+                    pass
+        cands.sort(key=lambda x: (x.get("total_score", 0), x.get("upside_prob", 0)), reverse=True)
+        if cands:
+            st.session_state["cached_cand_autotrader_scan"] = cands
+        return cands
+    except Exception as e:
+        st.session_state["kis_last_scan_error"] = str(e)
+        return []
 
 
 def _render_kis_autotrading_panel(is_dark: bool = False):
@@ -825,9 +880,11 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
     ex_c1, ex_c2 = st.columns([1.2, 1.4])
     with ex_c1:
         if st.button("🔍 지금 시그널 스캔 (Dry-Run 시뮬레이션)", key="kis_dry_run_btn", type="primary", use_container_width=True):
-            with st.spinner("N-Stock AI 퀀트 추천주 기반 매수·매도 시뮬레이션 연산 중..."):
+            with st.spinner("N-Stock AI 퀀트 추천주 실시간 수집 및 매수·매도 시뮬레이션 연산 중..."):
                 cands = _get_live_ai_candidates_for_autotrader()
                 res = run_trading_cycle(cands, dry_run=True)
+                res["scanned_total"] = len(cands)
+                res["scanned_preview"] = cands[:8]
                 st.session_state["kis_last_cycle_result"] = res
     with ex_c2:
         live_confirm = st.checkbox(
@@ -855,7 +912,8 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
             mode_tag = "🧪 Dry-Run 시뮬레이션" if last_res.get("dry_run") else "⚡ KIS VTS 모의주문 실행"
             buys = last_res.get("buys", [])
             sells = last_res.get("sells", [])
-            st.success(f"**{mode_tag} 완료** — 매수 후보 **{len(buys)}건** · 매도(익절/손절) 후보 **{len(sells)}건**")
+            scanned_n = last_res.get("scanned_total", len(buys))
+            st.success(f"**{mode_tag} 완료** — AI 후보 **{scanned_n}종목** 스캔 → 매수 통과 **{len(buys)}건** · 매도(익절/손절) **{len(sells)}건**")
             if last_res.get("blocked_reason"):
                 st.warning(f"🚨 {last_res['blocked_reason']}")
             if buys:
@@ -871,7 +929,20 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
                 } for b in buys])
                 st.dataframe(df_b, use_container_width=True, hide_index=True)
             else:
-                st.info("현재 설정된 필터 조건(등급·점수·등락률 상한·종목당 투자금액)에 부합하는 신규 매수 후보가 없습니다.")
+                st.info("현재 설정된 필터 조건(등급·점수·등락률 +15% 상한·종목당 투자금액)에 부합하는 신규 매수 후보가 없습니다.")
+                prev = last_res.get("scanned_preview") or []
+                if prev:
+                    with st.expander(f"🔎 스캔된 상위 {len(prev)}개 AI 후보 참고 보기 (필터 기준 비교용)", expanded=True):
+                        df_p = pd.DataFrame([{
+                            "종목코드": c["code"],
+                            "종목명": c["name"],
+                            "AI등급": c["grade"],
+                            "종합점수": c["total_score"],
+                            "5일상승확률(%)": c["upside_prob"],
+                            "당일등락률(%)": c["change_rate"],
+                            "현재가(원)": f"{c['price']:,}",
+                        } for c in prev])
+                        st.dataframe(df_p, use_container_width=True, hide_index=True)
 
     # 5. 현재 모의계좌 보유 종목 & 원클릭 수동 매도
     if bal_data.get("ok") and bal_data.get("holdings"):
