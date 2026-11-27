@@ -1,0 +1,50 @@
+name: N-Stock Phase 2 Unattended VTS Auto-Trader
+
+on:
+  schedule:
+    # 🇰🇷 한국 정규장 (평일 09:05~15:20 KST = 00:05~06:20 UTC) 10분마다 실행
+    - cron: '*/10 0-6 * * 1-5'
+    # 🇺🇸 미국 정규장 (23:35~05:50 KST = 14:35~20:50 UTC) 15분마다 실행
+    - cron: '*/15 14-20 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      market:
+        description: '테스트 대상 시장 (auto / kr / us)'
+        required: false
+        default: 'auto'
+
+jobs:
+  run-vts-autotrader:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install --quiet requests pandas numpy scikit-learn lightgbm beautifulsoup4 lxml
+
+      - name: Run N-Stock VTS Auto-Trading Worker
+        env:
+          KIS_VTS_APP_KEY: ${{ secrets.KIS_VTS_APP_KEY }}
+          KIS_VTS_APP_SECRET: ${{ secrets.KIS_VTS_APP_SECRET }}
+          KIS_VTS_ACCOUNT_NO: ${{ secrets.KIS_VTS_ACCOUNT_NO }}
+          KIS_VTS_ACCOUNT_CODE: '01'
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          # 기본값은 안전을 위해 Dry-Run. GitHub Secrets에 AUTOTRADER_LIVE_VTS=true 설정 시 실제 모의주문 실행
+          AUTOTRADER_LIVE_VTS: ${{ secrets.AUTOTRADER_LIVE_VTS }}
+        run: |
+          if [ "${{ github.event.inputs.market }}" = "kr" ]; then
+            python autotrader_worker.py --force-kr
+          elif [ "${{ github.event.inputs.market }}" = "us" ]; then
+            python autotrader_worker.py --force-us
+          else
+            python autotrader_worker.py
+          fi

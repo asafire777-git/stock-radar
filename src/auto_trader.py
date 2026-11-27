@@ -15,6 +15,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 CONFIG_FILE = os.path.join(DATA_DIR, "autotrader_config.json")
 LOG_FILE = os.path.join(DATA_DIR, "autotrader_logs.json")
+HWM_FILE = os.path.join(DATA_DIR, "autotrader_hwm.json")
 
 DEFAULT_AUTOTRADER_CONFIG = {
     "kill_switch": False,              # True면 모든 신규 매수 즉시 차단
@@ -25,11 +26,64 @@ DEFAULT_AUTOTRADER_CONFIG = {
     "min_score": 80,                   # 최소 AI 종합점수
     "min_upside_prob": 70.0,           # 최소 5일 상승확률 (%)
     "max_day_change_rate": 15.0,       # 추격매수 방지 상한 등락률 (%)
-    "take_profit_pct": 6.0,            # 목표 익절률 (%)
+    "take_profit_pct": 6.0,            # 1차 목표 익절률 (%) — 분할 익절 ON 시 50% 매도 후 잔여 50% 트레일링
     "stop_loss_pct": -3.0,             # 기계적 손절률 (%)
     "daily_loss_limit_pct": -3.0,      # 일일 계좌 평가손실 셧다운 한도 (%)
     "enable_news_filter": True,        # 매수 직전 AI 뉴스·악재 자동 판독 차단 필터
+    "enable_intraday_timing": True,    # 단타 장중 5분봉/윗꼬리 진입 타이밍 정밀 필터
+    "enable_trailing_stop": True,      # 트레일링 스탑 (고점 추적 익절) 활성화
+    "enable_partial_tp": True,         # 1차 목표가 도달 시 50% 분할 익절 + 50% 수익 극대화
+    "trailing_activate_pct": 4.0,      # 트레일링 스탑 발동 수익률 (%)
+    "trailing_drop_pct": 2.5,          # 최고 수익률 대비 하락 이탈 시 전량 익절 (%)
 }
+
+
+def load_hwm_state() -> dict:
+    """보유 종목별 최고 수익률(High-Water Mark) 및 1차 분할익절 여부 로드"""
+    try:
+        if os.path.exists(HWM_FILE):
+            with open(HWM_FILE, "r", encoding="utf-8") as f:
+                d = json.load(f)
+            if isinstance(d, dict):
+                return d
+    except Exception:
+        pass
+    return {}
+
+
+def save_hwm_state(state: dict):
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        with open(HWM_FILE, "w", encoding="utf-8") as f:
+            json.dump(state, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+
+def send_telegram_alert(message: str) -> bool:
+    """텔레그램 봇 실시간 체결·손절 알림 발송 (미설정 시 조용히 스킵)"""
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+    chat_id = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
+    if not token or not chat_id:
+        try:
+            import streamlit as st
+            if hasattr(st, "secrets") and "telegram" in st.secrets:
+                token = str(st.secrets["telegram"].get("bot_token", "")).strip()
+                chat_id = str(st.secrets["telegram"].get("chat_id", "")).strip()
+        except Exception:
+            pass
+    if not token or not chat_id:
+        return False
+    try:
+        import requests
+        resp = requests.post(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            json={"chat_id": chat_id, "text": message, "parse_mode": "HTML"},
+            timeout=6,
+        )
+        return resp.status_code == 200
+    except Exception:
+        return False
 
 
 def load_autotrader_config() -> dict:
@@ -98,16 +152,69 @@ def _grade_ok(grade: str, min_grade: str) -> bool:
 
 
 def evaluate_exit_signals(holdings: list, cfg: dict) -> list:
-    """보유 종목 중 익절(+%) 또는 손절(-%) 조건 도달 종목 추출"""
+    """
+    보유 종목 청산 시그널 평가 (기계적 손절 + 50% 분할 익절 + 고점 추적 트레일링 스탑)
+    """
     exits = []
     tp = float(cfg.get("take_profit_pct", 6.0))
     sl = float(cfg.get("stop_loss_pct", -3.0))
+    use_ts = bool(cfg.get("enable_trailing_stop", True))
+    use_partial = bool(cfg.get("enable_partial_tp", True))
+    ts_act = float(cfg.get("trailing_activate_pct", 4.0))
+    ts_drop = float(cfg.get("trailing_drop_pct", 2.5))
+
+    hwm = load_hwm_state()
+    held_keys = set()
+
     for h in holdings:
+        code = str(h.get("code", "")).strip().upper()
+        held_keys.add(code)
+        qty = int(h.get("qty", 0))
         rt = float(h.get("profit_rate", 0.0))
+        if qty <= 0:
+            continue
+
+        rec = hwm.get(code, {"peak_rt": rt, "partial_done": False})
+        peak_rt = max(float(rec.get("peak_rt", rt)), rt)
+        partial_done = bool(rec.get("partial_done", False))
+        hwm[code] = {"peak_rt": round(peak_rt, 2), "partial_done": partial_done}
+
+        # 1순위: 기계적 손절 (무조건 전량 매도)
+        if rt <= sl:
+            exits.append({**h, "qty": qty, "action": "SELL", "exit_type": "STOP_LOSS", "reason": f"기계적 손절 ({rt:+.2f}% ≤ {sl:.1f}%)"})
+            continue
+
+        # 2순위: 트레일링 스탑 (고점 +ts_act% 돌파 후 고점 대비 -ts_drop% 밀리면 전량 익절)
+        if use_ts and peak_rt >= ts_act and rt <= (peak_rt - ts_drop):
+            exits.append({
+                **h,
+                "qty": qty,
+                "action": "SELL",
+                "exit_type": "TRAILING_STOP",
+                "reason": f"트레일링 스탑 익절 (최고 {peak_rt:+.2f}% → 현재 {rt:+.2f}%, -{ts_drop:.1f}% 이탈)",
+            })
+            continue
+
+        # 3순위: 목표 익절 도달 (+tp%)
         if rt >= tp:
-            exits.append({**h, "action": "SELL", "reason": f"목표 익절 도달 ({rt:+.2f}% ≥ +{tp:.1f}%)"})
-        elif rt <= sl:
-            exits.append({**h, "action": "SELL", "reason": f"기계적 손절 도달 ({rt:+.2f}% ≤ {sl:.1f}%)"})
+            if use_partial and use_ts and not partial_done and qty >= 2:
+                sell_qty = max(1, qty // 2)
+                hwm[code]["partial_done"] = True
+                exits.append({
+                    **h,
+                    "qty": sell_qty,
+                    "action": "SELL",
+                    "exit_type": "PARTIAL_TP",
+                    "reason": f"1차 50% 분할 익절 ({rt:+.2f}% ≥ +{tp:.1f}%) · 잔여 {qty - sell_qty}주 트레일링",
+                })
+            elif not use_ts:
+                exits.append({**h, "qty": qty, "action": "SELL", "exit_type": "TAKE_PROFIT", "reason": f"목표 익절 도달 ({rt:+.2f}% ≥ +{tp:.1f}%)"})
+
+    # 더 이상 보유하지 않는 종목은 HWM에서 정리
+    for old_k in list(hwm.keys()):
+        if old_k not in held_keys:
+            del hwm[old_k]
+    save_hwm_state(hwm)
     return exits
 
 
@@ -170,6 +277,32 @@ def evaluate_buy_signals(candidates: list, holdings: list, cfg: dict) -> list:
     return buys
 
 
+def _apply_intraday_timing_filter(buys: list, is_us: bool = False, enabled: bool = True) -> tuple[list, list]:
+    """단타 장중 5분봉/윗꼬리 진입 타이밍 정밀 필터"""
+    if not buys:
+        return [], []
+    if not enabled:
+        for b in buys:
+            b["timing_label"] = "미사용"
+            b["timing_reason"] = "단타 타이밍 필터 꺼짐"
+        return buys, []
+
+    from src.intraday_timing import check_krx_intraday_timing, check_us_intraday_5m_timing
+    approved, blocked = [], []
+    for b in buys:
+        if is_us:
+            t_res = check_us_intraday_5m_timing(b["code"])
+        else:
+            t_res = check_krx_intraday_timing(b["code"], fallback_price=b.get("price", 0))
+        b["timing_label"] = t_res.get("label", "⚪ 기본 통과")
+        b["timing_reason"] = t_res.get("reason", "")
+        if not t_res.get("ok", True):
+            blocked.append(b)
+        else:
+            approved.append(b)
+    return approved, blocked
+
+
 def _apply_news_risk_filter(buys: list, is_us: bool = False, enabled: bool = True) -> tuple[list, list]:
     """매수 직전 최종 통과 종목에 대해 실시간 뉴스·공시 AI 악재 필터 적용"""
     if not buys:
@@ -223,7 +356,8 @@ def run_trading_cycle(candidates: list, dry_run: bool = True) -> dict:
 
     sells = evaluate_exit_signals(holdings, cfg)
     raw_buys = [] if (cfg.get("kill_switch") or blocked_reason) else evaluate_buy_signals(candidates, holdings, cfg)
-    buys, news_blocked = _apply_news_risk_filter(raw_buys, is_us=False, enabled=bool(cfg.get("enable_news_filter", True)))
+    timed_buys, timing_blocked = _apply_intraday_timing_filter(raw_buys, is_us=False, enabled=bool(cfg.get("enable_intraday_timing", True)))
+    buys, news_blocked = _apply_news_risk_filter(timed_buys, is_us=False, enabled=bool(cfg.get("enable_news_filter", True)))
 
     executed = []
     if not dry_run:
@@ -282,6 +416,7 @@ def run_trading_cycle(candidates: list, dry_run: bool = True) -> dict:
         "holdings": holdings,
         "sells": sells,
         "buys": buys,
+        "timing_blocked": timing_blocked,
         "news_blocked": news_blocked,
         "executed": executed,
     }
@@ -371,7 +506,8 @@ def run_us_trading_cycle(candidates: list, dry_run: bool = True) -> dict:
 
     sells = evaluate_exit_signals(holdings, cfg)
     raw_buys = [] if (cfg.get("kill_switch") or blocked_reason) else evaluate_us_buy_signals(candidates, holdings, cfg)
-    buys, news_blocked = _apply_news_risk_filter(raw_buys, is_us=True, enabled=bool(cfg.get("enable_news_filter", True)))
+    timed_buys, timing_blocked = _apply_intraday_timing_filter(raw_buys, is_us=True, enabled=bool(cfg.get("enable_intraday_timing", True)))
+    buys, news_blocked = _apply_news_risk_filter(timed_buys, is_us=True, enabled=bool(cfg.get("enable_news_filter", True)))
 
     executed = []
     if not dry_run:
@@ -433,6 +569,7 @@ def run_us_trading_cycle(candidates: list, dry_run: bool = True) -> dict:
         "holdings": holdings,
         "sells": sells,
         "buys": buys,
+        "timing_blocked": timing_blocked,
         "news_blocked": news_blocked,
         "executed": executed,
     }

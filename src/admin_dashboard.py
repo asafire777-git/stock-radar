@@ -927,11 +927,52 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
             )
         with r2c4:
             enable_news_filter = st.checkbox(
-                "📰 AI 뉴스·악재 차단 필터",
+                "📰 AI 뉴스·악재 차단",
                 value=bool(cfg.get("enable_news_filter", True)),
                 key="kis_cfg_news_filter",
                 help="매수 직전 최신 뉴스·공시를 Gemini AI가 판독해 유상증자·횡령·소송 등 치명적 악재 종목을 자동 차단합니다.",
             )
+            enable_intraday_timing = st.checkbox(
+                "⚡ 단타 장중 타이밍 필터",
+                value=bool(cfg.get("enable_intraday_timing", True)),
+                key="kis_cfg_intraday_timing",
+                help="장중 5분봉 과열(RSI 78+)·윗꼬리 밀림(-3.5%)·음봉 전환 종목의 고점 추격 매수를 자동 차단합니다.",
+            )
+
+        r3c1, r3c2, r3c3, r3c4 = st.columns(4)
+        with r3c1:
+            enable_trailing_stop = st.checkbox(
+                "🎯 트레일링 스탑 (추적 익절)",
+                value=bool(cfg.get("enable_trailing_stop", True)),
+                key="kis_cfg_ts_on",
+                help="수익이 발동선(+4% 등)을 넘으면 최고 수익률을 추적하다가 고점 대비 일정 폭 밀릴 때 익절합니다.",
+            )
+            enable_partial_tp = st.checkbox(
+                "✂️ 1차 목표가 50% 분할 익절",
+                value=bool(cfg.get("enable_partial_tp", True)),
+                key="kis_cfg_partial_tp",
+                help="목표 익절률(+6%) 도달 시 50%만 먼저 익절하고 나머지 50%는 트레일링 스탑으로 끝까지 수익을 키웁니다.",
+            )
+        with r3c2:
+            trailing_activate = st.number_input(
+                "🚀 트레일링 발동 수익률 (%)",
+                min_value=2.0,
+                max_value=20.0,
+                value=float(cfg.get("trailing_activate_pct", 4.0)),
+                step=0.5,
+                key="kis_cfg_ts_act",
+            )
+        with r3c3:
+            trailing_drop = st.number_input(
+                "📉 고점 대비 이탈 폭 (%)",
+                min_value=1.0,
+                max_value=10.0,
+                value=float(cfg.get("trailing_drop_pct", 2.5)),
+                step=0.5,
+                key="kis_cfg_ts_drop",
+            )
+        with r3c4:
+            st.markdown("<div style='height:26px;'></div>", unsafe_allow_html=True)
             if st.button("💾 전략 설정 저장", key="kis_save_cfg_btn", type="primary", use_container_width=True):
                 save_autotrader_config({
                     "kill_switch": cfg.get("kill_switch", False),
@@ -944,9 +985,14 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
                     "stop_loss_pct": float(stop_loss),
                     "daily_loss_limit_pct": float(daily_loss),
                     "enable_news_filter": bool(enable_news_filter),
+                    "enable_intraday_timing": bool(enable_intraday_timing),
+                    "enable_trailing_stop": bool(enable_trailing_stop),
+                    "enable_partial_tp": bool(enable_partial_tp),
+                    "trailing_activate_pct": float(trailing_activate),
+                    "trailing_drop_pct": float(trailing_drop),
                 })
                 b_txt = f"${int(budget_per_us_usd):,}" if is_us_mode else f"{int(budget_per_stock):,}원"
-                st.toast(f"✅ 설정 저장 완료! (종목당 {b_txt} · 뉴스필터 {'ON' if enable_news_filter else 'OFF'})")
+                st.toast(f"✅ 설정 저장 완료! (종목당 {b_txt} · 트레일링 {'ON' if enable_trailing_stop else 'OFF'} · 단타필터 {'ON' if enable_intraday_timing else 'OFF'})")
                 st.rerun(scope="fragment")
 
     st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
@@ -1002,13 +1048,18 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
             mode_tag = ("🧪 미국 Dry-Run" if res_is_us else "🧪 국내 Dry-Run") if last_res.get("dry_run") else ("⚡ 미국 VTS 주문" if res_is_us else "⚡ 국내 VTS 주문")
             buys = last_res.get("buys", [])
             sells = last_res.get("sells", [])
+            timing_blocked = last_res.get("timing_blocked", [])
             news_blocked = last_res.get("news_blocked", [])
             scanned_n = last_res.get("scanned_total", len(buys))
             st.success(
                 f"**{mode_tag} 완료** — AI 후보 **{scanned_n}종목** 스캔 → 매수 통과 **{len(buys)}건**"
+                + (f" · ⏱️ 단타 타이밍 보류 **{len(timing_blocked)}건**" if timing_blocked else "")
                 + (f" · 🚨 뉴스 악재 차단 **{len(news_blocked)}건**" if news_blocked else "")
-                + f" · 매도(익절/손절) **{len(sells)}건**"
+                + f" · 매도(익절/트레일링/손절) **{len(sells)}건**"
             )
+            if timing_blocked:
+                for tb in timing_blocked:
+                    st.warning(f"⏱️ **단타 타이밍 보류 (고점 추격 방지)**: **{tb['name']} ({tb['code']})** — {tb.get('timing_label', '')} ({tb.get('timing_reason', '')})")
             if news_blocked:
                 for nb in news_blocked:
                     st.error(f"🚨 **AI 뉴스 악재 매수 차단**: **{nb['name']} ({nb['code']})** — {nb.get('news_reason', '치명적 악재 감지')}")
@@ -1024,8 +1075,9 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
                         "현재가($)": f"${b['price_usd']:,.2f}",
                         "주문수량": f"{b['qty']:,}주",
                         "예상매수($)": f"${b['est_amt_usd']:,.2f}",
+                        "단타 타이밍": b.get("timing_label", "⚪ 통과"),
                         "AI 뉴스 판독": b.get("news_label", "⚪ 중립"),
-                        "뉴스 핵심 요약": b.get("news_reason", "-"),
+                        "뉴스 요약": b.get("news_reason", "-"),
                     } for b in buys])
                 else:
                     df_b = pd.DataFrame([{
@@ -1036,8 +1088,9 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
                         "현재가(원)": f"{b['price']:,}",
                         "주문수량": f"{b['qty']:,}주",
                         "예상매수(원)": f"{b['est_amt']:,}",
+                        "단타 타이밍": b.get("timing_label", "⚪ 통과"),
                         "AI 뉴스 판독": b.get("news_label", "⚪ 중립"),
-                        "뉴스 핵심 요약": b.get("news_reason", "-"),
+                        "뉴스 요약": b.get("news_reason", "-"),
                     } for b in buys])
                 st.dataframe(df_b, use_container_width=True, hide_index=True)
             else:

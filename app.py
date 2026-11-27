@@ -189,11 +189,12 @@ def render_admin_dashboard(*args, **kwargs):
     try:
         import src.analytics_tracker as _at_mod
         import src.kis_broker as _kb_mod
+        import src.intraday_timing as _it_mod
         import src.news_sentiment as _ns_mod
         import src.us_quant_scanner as _uq_mod
         import src.auto_trader as _tr_mod
         import src.admin_dashboard as _ad_mod
-        _mods = (_at_mod, _kb_mod, _ns_mod, _uq_mod, _tr_mod, _ad_mod)
+        _mods = (_at_mod, _kb_mod, _it_mod, _ns_mod, _uq_mod, _tr_mod, _ad_mod)
     except ImportError:
         import analytics_tracker as _at_mod
         import admin_dashboard as _ad_mod
