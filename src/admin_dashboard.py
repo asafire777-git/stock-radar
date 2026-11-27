@@ -807,10 +807,16 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
         """)
     with c2:
         if is_us_mode:
-            ev_usd = s.get("total_eval_usd", 0.0)
-            tot_disp = f"${ev_usd:,.2f}" if bal_data.get("ok") else "-"
+            if s.get("currency") == "KRW":
+                ev_krw = int(s.get("total_eval_krw", 0))
+                ev_usd = float(s.get("total_eval_usd", 0.0))
+                tot_disp = f"{ev_krw:,}원" if bal_data.get("ok") else "-"
+                sub_lbl = f"미국주식 평가액 (약 ${ev_usd:,.2f})" if ev_usd > 0 else ("미국주식 평가액 (원화 환산)" if ev_krw > 0 else "보유 미국주식 없음")
+            else:
+                ev_usd = s.get("total_eval_usd", 0.0)
+                tot_disp = f"${ev_usd:,.2f}" if bal_data.get("ok") else "-"
+                sub_lbl = "보유 미국주식 시가 평가 (USD)" if ev_usd > 0 else "보유 미국주식 없음 (매수 전)"
             card2_title = "💰 미국주식 보유 평가액"
-            sub_lbl = "보유 미국주식 시가 평가 (USD)" if ev_usd > 0 else "보유 미국주식 없음 (매수 전)"
         else:
             tot_disp = f"{s.get('total_eval', 0):,}원" if bal_data.get("ok") else "-"
             card2_title = "💰 총 평가자산"
@@ -824,10 +830,12 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
         """)
     with c3:
         if is_us_mode:
-            krw_ref = s.get("krw_cash_ref", kr_bal_cash)
-            est_usd = krw_ref / 1400.0 if krw_ref > 0 else 0.0
-            cash_disp = f"{krw_ref:,}원" if kis_ready else "-"
-            cash_sub = f"통합 원화 예수금 (약 ${est_usd:,.0f} 매수 가능)"
+            krw_ref = int(s.get("krw_cash_ref", kr_bal_cash))
+            us_pchs_krw = int(s.get("purchase_total_krw", 0))
+            rem_krw = max(0, krw_ref - us_pchs_krw)
+            est_usd = rem_krw / 1400.0 if rem_krw > 0 else 0.0
+            cash_disp = f"{rem_krw:,}원" if kis_ready else "-"
+            cash_sub = f"잔여 매수가능 (약 ${est_usd:,.0f} · 미국매입 {us_pchs_krw:,}원 차감)" if us_pchs_krw > 0 else f"통합 원화 예수금 (약 ${est_usd:,.0f} 매수 가능)"
         else:
             cash_disp = f"{s.get('cash_available', 0):,}원" if bal_data.get("ok") else "-"
             cash_sub = "예수금 기준"
@@ -839,13 +847,19 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
         </div>
         """)
     with c4:
-        p_amt = s.get("eval_profit_usd", 0.0) if is_us_mode else s.get("eval_profit", 0)
-        p_rt = s.get("eval_profit_rate", 0.0)
-        p_col = "#10B981" if p_amt >= 0 else "#EF4444"
-        if bal_data.get("ok"):
-            p_disp = f"${p_amt:+,.2f} ({p_rt:+.2f}%)" if is_us_mode else f"{p_amt:+,}원 ({p_rt:+.2f}%)"
+        if is_us_mode and s.get("currency") == "KRW":
+            p_amt = int(s.get("eval_profit_krw", 0))
+            p_rt = s.get("eval_profit_rate", 0.0)
+            p_col = "#10B981" if p_amt >= 0 else "#EF4444"
+            p_disp = f"{p_amt:+,}원 ({p_rt:+.2f}%)" if bal_data.get("ok") else "-"
         else:
-            p_disp = "-"
+            p_amt = s.get("eval_profit_usd", 0.0) if is_us_mode else s.get("eval_profit", 0)
+            p_rt = s.get("eval_profit_rate", 0.0)
+            p_col = "#10B981" if p_amt >= 0 else "#EF4444"
+            if bal_data.get("ok"):
+                p_disp = f"${p_amt:+,.2f} ({p_rt:+.2f}%)" if is_us_mode else f"{p_amt:+,}원 ({p_rt:+.2f}%)"
+            else:
+                p_disp = "-"
         st.html(f"""
         <div style="background:{card_bg}; border:1px solid {border_color}; border-top:3px solid {p_col}; border-radius:14px; padding:15px 18px;">
             <div style="font-size:0.74rem; color:{text_secondary}; font-weight:700;">📈 평가 손익</div>

@@ -331,32 +331,43 @@ class KISVirtualBroker:
                 if fb_resp.status_code == 200 and fb_data.get("rt_cd") == "0":
                     holdings = []
                     for row in fb_data.get("output1") or []:
-                        qty = int(float(row.get("ccld_qty_smtl1", 0) or 0))
+                        qty = int(float(row.get("cblc_qty13") or row.get("ccld_qty_smtl1") or 0))
                         if qty <= 0:
                             continue
+                        avg_p = round(float(row.get("avg_unpr3") or row.get("pchs_avg_pric") or 0), 2)
+                        cur_p = round(float(row.get("ovrs_now_pric1") or row.get("now_pric2") or 0), 2)
+                        eval_a = round(float(row.get("frcr_evlu_amt2") or (cur_p * qty) or 0), 2)
+                        pfls_a = round(float(row.get("evlu_pfls_amt2") or ((cur_p - avg_p) * qty) or 0), 2)
+                        pfls_r = round(float(row.get("evlu_pfls_rt1") or ((cur_p - avg_p) / avg_p * 100.0 if avg_p > 0 else 0)), 2)
                         holdings.append({
                             "code": str(row.get("pdno", "")).strip().upper(),
                             "name": str(row.get("prdt_name", "")).strip(),
                             "exchange": str(row.get("ovrs_excg_cd", "NASD")).strip().upper(),
                             "qty": qty,
-                            "avg_price": round(float(row.get("avg_unpr3", 0) or 0), 2),
-                            "cur_price": round(float(row.get("ovrs_now_pric1", 0) or 0), 2),
-                            "eval_amt": round(float(row.get("frcr_evlu_amt2", 0) or 0), 2),
-                            "profit_amt": round(float(row.get("evlu_pfls_amt2", 0) or 0), 2),
-                            "profit_rate": round(float(row.get("evlu_pfls_rt1", 0) or 0), 2),
+                            "avg_price": avg_p,
+                            "cur_price": cur_p,
+                            "eval_amt": eval_a,
+                            "profit_amt": pfls_a,
+                            "profit_rate": pfls_r,
                         })
                     out3 = fb_data.get("output3") or {}
-                    pchs = float(out3.get("pchs_amt_smtl", 0) or 0)
-                    evlu = float(out3.get("evlu_amt_smtl", 0) or 0)
-                    pfls = float(out3.get("evlu_pfls_amt_smtl", 0) or 0)
-                    rt = round((pfls / pchs * 100.0), 2) if pchs > 0 else 0.0
+                    # VTRP6504R output3의 pchs_amt_smtl/evlu_amt_smtl/evlu_pfls_amt_smtl은 원화(KRW) 환산 합계
+                    pchs_krw = int(float(out3.get("pchs_amt_smtl", 0) or 0))
+                    evlu_krw = int(float(out3.get("evlu_amt_smtl", 0) or 0))
+                    pfls_krw = int(float(out3.get("evlu_pfls_amt_smtl", 0) or 0))
+                    rt = round((pfls_krw / pchs_krw * 100.0), 2) if pchs_krw > 0 else 0.0
+                    eval_usd_sum = round(sum(h["eval_amt"] for h in holdings), 2)
+                    pfls_usd_sum = round(sum(h["profit_amt"] for h in holdings), 2)
                     return {
                         "ok": True,
                         "error": "",
                         "summary": {
-                            "total_eval_usd": round(evlu, 2),
-                            "purchase_total_usd": round(pchs, 2),
-                            "eval_profit_usd": round(pfls, 2),
+                            "currency": "KRW",
+                            "total_eval_krw": evlu_krw,
+                            "purchase_total_krw": pchs_krw,
+                            "eval_profit_krw": pfls_krw,
+                            "total_eval_usd": eval_usd_sum,
+                            "eval_profit_usd": pfls_usd_sum,
                             "eval_profit_rate": rt,
                         },
                         "holdings": holdings,
