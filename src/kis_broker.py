@@ -301,8 +301,19 @@ class KISVirtualBroker:
             "CTX_AREA_NK200": "",
         }
         try:
-            resp = requests.get(url, headers=self._headers("VTTS3012R", token), params=params, timeout=10)
-            data = resp.json()
+            resp = None
+            data = {}
+            for _attempt in range(2):
+                _throttle(0.8)
+                resp = requests.get(url, headers=self._headers("VTTS3012R", token), params=params, timeout=10)
+                data = resp.json()
+                if resp.status_code == 200 and data.get("rt_cd") == "0":
+                    break
+                msg1 = str(data.get("msg1", ""))
+                if "지연" in msg1 or "초당" in msg1:
+                    time.sleep(1.2)
+                    continue
+                break
             if resp.status_code != 200 or data.get("rt_cd") != "0":
                 return {
                     "ok": False,

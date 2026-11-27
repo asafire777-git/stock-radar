@@ -769,10 +769,11 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
     s = bal_data.get("summary") or {}
     c1, c2, c3, c4 = st.columns(4)
     with c1:
+        _st_txt = "연결 정상" if bal_data.get("ok") else ("일시 지연 (재시도)" if kis_ready else "키 등록 대기")
         st.html(f"""
         <div style="background:{card_bg}; border:1px solid {border_color}; border-top:3px solid {'#10B981' if bal_data.get('ok') else '#F59E0B'}; border-radius:14px; padding:15px 18px;">
             <div style="font-size:0.74rem; color:{text_secondary}; font-weight:700;">📡 KIS VTS 연결 상태</div>
-            <div style="font-size:1.3rem; font-weight:900; color:{'#10B981' if bal_data.get('ok') else '#F59E0B'}; margin-top:4px;">{'연결 정상' if bal_data.get('ok') else '키 등록 대기'}</div>
+            <div style="font-size:1.3rem; font-weight:900; color:{'#10B981' if bal_data.get('ok') else '#F59E0B'}; margin-top:4px;">{_st_txt}</div>
             <div style="font-size:0.70rem; color:{text_secondary}; margin-top:3px;">{'🇺🇸 미국주식 (VTTS3012R)' if is_us_mode else '🇰🇷 국내주식 (VTTC8434R)'}</div>
         </div>
         """)
