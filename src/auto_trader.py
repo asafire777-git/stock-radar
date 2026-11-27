@@ -28,6 +28,7 @@ DEFAULT_AUTOTRADER_CONFIG = {
     "take_profit_pct": 6.0,            # 목표 익절률 (%)
     "stop_loss_pct": -3.0,             # 기계적 손절률 (%)
     "daily_loss_limit_pct": -3.0,      # 일일 계좌 평가손실 셧다운 한도 (%)
+    "enable_news_filter": True,        # 매수 직전 AI 뉴스·악재 자동 판독 차단 필터
 }
 
 
@@ -169,6 +170,33 @@ def evaluate_buy_signals(candidates: list, holdings: list, cfg: dict) -> list:
     return buys
 
 
+def _apply_news_risk_filter(buys: list, is_us: bool = False, enabled: bool = True) -> tuple[list, list]:
+    """매수 직전 최종 통과 종목에 대해 실시간 뉴스·공시 AI 악재 필터 적용"""
+    if not buys:
+        return [], []
+    if not enabled:
+        for b in buys:
+            b["news_label"] = "미사용"
+            b["news_reason"] = "뉴스 필터 꺼짐"
+            b["news_verdict"] = "NEUTRAL"
+        return buys, []
+
+    from src.news_sentiment import analyze_stock_news_risk
+    approved, blocked = [], []
+    for b in buys:
+        n_res = analyze_stock_news_risk(b["code"], b["name"], is_us=is_us)
+        b["news_verdict"] = n_res.get("verdict", "NEUTRAL")
+        b["news_label"] = n_res.get("label", "⚪ 중립")
+        b["news_reason"] = n_res.get("reason", "")
+        b["news_engine"] = n_res.get("engine", "")
+        b["news_headlines"] = n_res.get("headlines", [])
+        if b["news_verdict"] == "CRITICAL_RISK":
+            blocked.append(b)
+        else:
+            approved.append(b)
+    return approved, blocked
+
+
 def run_trading_cycle(candidates: list, dry_run: bool = True) -> dict:
     """
     1회 자동매매 사이클 실행
@@ -194,7 +222,8 @@ def run_trading_cycle(candidates: list, dry_run: bool = True) -> dict:
         return {"ok": False, "error": "KIS 모의투자 API 키([kis_vts])가 등록되어 있지 않습니다.", "buys": [], "sells": [], "executed": []}
 
     sells = evaluate_exit_signals(holdings, cfg)
-    buys = [] if (cfg.get("kill_switch") or blocked_reason) else evaluate_buy_signals(candidates, holdings, cfg)
+    raw_buys = [] if (cfg.get("kill_switch") or blocked_reason) else evaluate_buy_signals(candidates, holdings, cfg)
+    buys, news_blocked = _apply_news_risk_filter(raw_buys, is_us=False, enabled=bool(cfg.get("enable_news_filter", True)))
 
     executed = []
     if not dry_run:
@@ -253,6 +282,7 @@ def run_trading_cycle(candidates: list, dry_run: bool = True) -> dict:
         "holdings": holdings,
         "sells": sells,
         "buys": buys,
+        "news_blocked": news_blocked,
         "executed": executed,
     }
 
@@ -340,7 +370,8 @@ def run_us_trading_cycle(candidates: list, dry_run: bool = True) -> dict:
         return {"ok": False, "error": "KIS 모의투자 API 키([kis_vts])가 등록되어 있지 않습니다.", "buys": [], "sells": [], "executed": []}
 
     sells = evaluate_exit_signals(holdings, cfg)
-    buys = [] if (cfg.get("kill_switch") or blocked_reason) else evaluate_us_buy_signals(candidates, holdings, cfg)
+    raw_buys = [] if (cfg.get("kill_switch") or blocked_reason) else evaluate_us_buy_signals(candidates, holdings, cfg)
+    buys, news_blocked = _apply_news_risk_filter(raw_buys, is_us=True, enabled=bool(cfg.get("enable_news_filter", True)))
 
     executed = []
     if not dry_run:
@@ -402,5 +433,6 @@ def run_us_trading_cycle(candidates: list, dry_run: bool = True) -> dict:
         "holdings": holdings,
         "sells": sells,
         "buys": buys,
+        "news_blocked": news_blocked,
         "executed": executed,
     }

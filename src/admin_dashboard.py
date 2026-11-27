@@ -921,7 +921,12 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
                 key="kis_cfg_dloss",
             )
         with r2c4:
-            st.markdown("<div style='height:28px;'></div>", unsafe_allow_html=True)
+            enable_news_filter = st.checkbox(
+                "📰 AI 뉴스·악재 차단 필터",
+                value=bool(cfg.get("enable_news_filter", True)),
+                key="kis_cfg_news_filter",
+                help="매수 직전 최신 뉴스·공시를 Gemini AI가 판독해 유상증자·횡령·소송 등 치명적 악재 종목을 자동 차단합니다.",
+            )
             if st.button("💾 전략 설정 저장", key="kis_save_cfg_btn", type="primary", use_container_width=True):
                 save_autotrader_config({
                     "kill_switch": cfg.get("kill_switch", False),
@@ -933,9 +938,10 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
                     "take_profit_pct": float(take_profit),
                     "stop_loss_pct": float(stop_loss),
                     "daily_loss_limit_pct": float(daily_loss),
+                    "enable_news_filter": bool(enable_news_filter),
                 })
                 b_txt = f"${int(budget_per_us_usd):,}" if is_us_mode else f"{int(budget_per_stock):,}원"
-                st.toast(f"✅ 설정 저장 완료! (종목당 {b_txt} · 최대 {int(max_holdings)}종목 · 익절 +{take_profit}% / 손절 {stop_loss}%)")
+                st.toast(f"✅ 설정 저장 완료! (종목당 {b_txt} · 뉴스필터 {'ON' if enable_news_filter else 'OFF'})")
                 st.rerun(scope="fragment")
 
     st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
@@ -944,11 +950,11 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
     st.markdown(f"#### ⚡ {'🇺🇸 미국주식' if is_us_mode else '🇰🇷 국내주식'} 시뮬레이션 & 모의주문 실행")
     ex_c1, ex_c2 = st.columns([1.2, 1.4])
     with ex_c1:
-        if st.button(f"🔍 {'미국' if is_us_mode else '국내'} 시그널 스캔 (Dry-Run 시뮬레이션)", key="kis_dry_run_btn", type="primary", use_container_width=True):
-            with st.spinner(f"N-Stock {'미국주식' if is_us_mode else '국내주식'} AI 퀀트 추천주 실시간 스캔 중..."):
+        if st.button(f"🔍 {'미국 60일 퀀트' if is_us_mode else '국내'} 시그널 스캔 (Dry-Run + AI뉴스)", key="kis_dry_run_btn", type="primary", use_container_width=True):
+            with st.spinner(f"N-Stock {'미국주식 60일 OHLCV' if is_us_mode else '국내주식'} 퀀트 스캔 + AI 뉴스·악재 판독 중..."):
                 if is_us_mode:
-                    from src.overseas_collector import fetch_top_rising_overseas_stocks
-                    cands = fetch_top_rising_overseas_stocks() or []
+                    from src.us_quant_scanner import scan_us_quant_candidates
+                    cands = scan_us_quant_candidates(limit=25) or []
                     res = run_us_trading_cycle(cands, dry_run=True)
                 else:
                     cands = _get_live_ai_candidates_for_autotrader()
@@ -969,10 +975,10 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
             disabled=not (kis_ready and live_confirm and not cfg.get("kill_switch", False)),
             use_container_width=True,
         ):
-            with st.spinner(f"한국투자증권 모의투자(VTS) {'미국주식' if is_us_mode else '국내주식'} 주문 전송 중..."):
+            with st.spinner(f"한국투자증권 모의투자(VTS) {'미국주식 60일 퀀트' if is_us_mode else '국내주식'} + AI 뉴스 검증 후 주문 전송 중..."):
                 if is_us_mode:
-                    from src.overseas_collector import fetch_top_rising_overseas_stocks
-                    cands = fetch_top_rising_overseas_stocks() or []
+                    from src.us_quant_scanner import scan_us_quant_candidates
+                    cands = scan_us_quant_candidates(limit=25) or []
                     res = run_us_trading_cycle(cands, dry_run=False)
                 else:
                     cands = _get_live_ai_candidates_for_autotrader()
@@ -991,8 +997,16 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
             mode_tag = ("🧪 미국 Dry-Run" if res_is_us else "🧪 국내 Dry-Run") if last_res.get("dry_run") else ("⚡ 미국 VTS 주문" if res_is_us else "⚡ 국내 VTS 주문")
             buys = last_res.get("buys", [])
             sells = last_res.get("sells", [])
+            news_blocked = last_res.get("news_blocked", [])
             scanned_n = last_res.get("scanned_total", len(buys))
-            st.success(f"**{mode_tag} 완료** — AI 후보 **{scanned_n}종목** 스캔 → 매수 통과 **{len(buys)}건** · 매도(익절/손절) **{len(sells)}건**")
+            st.success(
+                f"**{mode_tag} 완료** — AI 후보 **{scanned_n}종목** 스캔 → 매수 통과 **{len(buys)}건**"
+                + (f" · 🚨 뉴스 악재 차단 **{len(news_blocked)}건**" if news_blocked else "")
+                + f" · 매도(익절/손절) **{len(sells)}건**"
+            )
+            if news_blocked:
+                for nb in news_blocked:
+                    st.error(f"🚨 **AI 뉴스 악재 매수 차단**: **{nb['name']} ({nb['code']})** — {nb.get('news_reason', '치명적 악재 감지')}")
             if last_res.get("blocked_reason"):
                 st.warning(f"🚨 {last_res['blocked_reason']}")
             if buys:
@@ -1000,25 +1014,25 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
                     df_b = pd.DataFrame([{
                         "티커": b["code"],
                         "종목명": b["name"],
-                        "시장": b.get("market", "NASDAQ"),
                         "AI등급": b["grade"],
-                        "종합점수": b["score"],
+                        "점수": b["score"],
                         "현재가($)": f"${b['price_usd']:,.2f}",
-                        "지정가($)": f"${b['limit_price_usd']:,.2f}",
-                        "주문수량(주)": f"{b['qty']:,}",
-                        "예상매수금($)": f"${b['est_amt_usd']:,.2f}",
-                        "진입 근거": b["reason"],
+                        "주문수량": f"{b['qty']:,}주",
+                        "예상매수($)": f"${b['est_amt_usd']:,.2f}",
+                        "AI 뉴스 판독": b.get("news_label", "⚪ 중립"),
+                        "뉴스 핵심 요약": b.get("news_reason", "-"),
                     } for b in buys])
                 else:
                     df_b = pd.DataFrame([{
                         "종목코드": b["code"],
                         "종목명": b["name"],
                         "AI등급": b["grade"],
-                        "종합점수": b["score"],
+                        "점수": b["score"],
                         "현재가(원)": f"{b['price']:,}",
-                        "주문수량(주)": f"{b['qty']:,}",
-                        "예상매수금(원)": f"{b['est_amt']:,}",
-                        "진입 근거": b["reason"],
+                        "주문수량": f"{b['qty']:,}주",
+                        "예상매수(원)": f"{b['est_amt']:,}",
+                        "AI 뉴스 판독": b.get("news_label", "⚪ 중립"),
+                        "뉴스 핵심 요약": b.get("news_reason", "-"),
                     } for b in buys])
                 st.dataframe(df_b, use_container_width=True, hide_index=True)
             else:
