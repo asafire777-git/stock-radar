@@ -329,16 +329,31 @@ class KISVirtualBroker:
                 fb_resp = requests.get(fb_url, headers=self._headers("VTRP6504R", token), params=fb_params, timeout=10)
                 fb_data = fb_resp.json()
                 if fb_resp.status_code == 200 and fb_data.get("rt_cd") == "0":
+                    def _fnum(*vals):
+                        for v in vals:
+                            try:
+                                f = float(v)
+                                if f != 0.0:
+                                    return f
+                            except Exception:
+                                pass
+                        return 0.0
+
                     holdings = []
                     for row in fb_data.get("output1") or []:
-                        qty = int(float(row.get("cblc_qty13") or row.get("ccld_qty_smtl1") or 0))
+                        qty = int(max(
+                            _fnum(row.get("cblc_qty13")),
+                            _fnum(row.get("ccld_qty_smtl1")),
+                            _fnum(row.get("ord_psbl_qty1")),
+                            _fnum(row.get("thdt_buy_ccld_qty1")),
+                        ))
                         if qty <= 0:
                             continue
-                        avg_p = round(float(row.get("avg_unpr3") or row.get("pchs_avg_pric") or 0), 2)
-                        cur_p = round(float(row.get("ovrs_now_pric1") or row.get("now_pric2") or 0), 2)
-                        eval_a = round(float(row.get("frcr_evlu_amt2") or (cur_p * qty) or 0), 2)
-                        pfls_a = round(float(row.get("evlu_pfls_amt2") or ((cur_p - avg_p) * qty) or 0), 2)
-                        pfls_r = round(float(row.get("evlu_pfls_rt1") or ((cur_p - avg_p) / avg_p * 100.0 if avg_p > 0 else 0)), 2)
+                        avg_p = round(_fnum(row.get("avg_unpr3"), row.get("pchs_avg_pric")), 2)
+                        cur_p = round(_fnum(row.get("ovrs_now_pric1"), row.get("now_pric2"), avg_p), 2)
+                        eval_a = round(_fnum(row.get("frcr_evlu_amt2"), cur_p * qty), 2)
+                        pfls_a = round(_fnum(row.get("evlu_pfls_amt2"), (cur_p - avg_p) * qty), 2)
+                        pfls_r = round(_fnum(row.get("evlu_pfls_rt1"), ((cur_p - avg_p) / avg_p * 100.0 if avg_p > 0 else 0.0)), 2)
                         holdings.append({
                             "code": str(row.get("pdno", "")).strip().upper(),
                             "name": str(row.get("prdt_name", "")).strip(),
