@@ -77,6 +77,20 @@ def render_admin_dashboard(is_dark: bool = False):
     </div>
     """)
 
+    # 관제 서브 탭 전환 (종합 트래픽/성과 관제 vs KIS 모의투자 자동매매 관제실)
+    admin_sub_mode = st.radio(
+        "마스터 관리자 관제 섹션",
+        ["📊 종합 트래픽 & AI 성과 관제", "🤖 KIS 자동매매 관제실 (모의투자)"],
+        horizontal=True,
+        label_visibility="collapsed",
+        key="admin_sub_mode_selector",
+    )
+    st.markdown("<div style='height:6px;'></div>", unsafe_allow_html=True)
+
+    if "KIS 자동매매" in admin_sub_mode:
+        _render_kis_autotrading_panel(is_dark=is_dark)
+        return
+
     # 조회 기간 선택 바 (GA4 영구 데이터 + 세션 실측 자동 연동)
     period_map = {
         "🔥 전체 누적": "all",
@@ -608,3 +622,298 @@ def render_admin_dashboard(is_dark: bool = False):
         st.dataframe(df_u, use_container_width=True, height=220)
     else:
         st.info("아직 가입된 회원이 없습니다. 구글 로그인이 발생하면 자동으로 실측 집계됩니다.")
+
+
+def _get_live_ai_candidates_for_autotrader() -> list:
+    """세션에 캐시된 N-Stock AI 추천주 후보군을 우선 가져오고, 없으면 즉석 스캔 수행"""
+    for k, v in st.session_state.items():
+        if str(k).startswith("cached_cand_") and isinstance(v, list) and len(v) > 0:
+            return v
+    try:
+        from src.krx_collector import fetch_top_rising_stocks, fetch_top_volume_stocks
+        from src.prediction_model import evaluate_candidates
+        df_r = fetch_top_rising_stocks(limit=40)
+        df_v = fetch_top_volume_stocks(limit=25)
+        if df_r is not None and not df_r.empty:
+            swing = df_r[(df_r["change_rate"] >= 2.0) & (df_r["change_rate"] <= 15.0)].head(20)
+            pool = pd.concat([swing, df_v.head(15)]).drop_duplicates(subset=["code"]).head(20)
+            if not pool.empty:
+                cands = evaluate_candidates(pool.to_dict("records"), "스윙")
+                st.session_state["cached_cand_autotrader_scan"] = cands
+                return cands
+    except Exception:
+        pass
+    return []
+
+
+def _render_kis_autotrading_panel(is_dark: bool = False):
+    """대표님 전용 한국투자증권(KIS Developers) 모의투자(VTS) 자동매매 관제실"""
+    from src.kis_broker import KISVirtualBroker, is_kis_vts_configured
+    from src.auto_trader import (
+        load_autotrader_config,
+        save_autotrader_config,
+        load_trade_logs,
+        run_trading_cycle,
+    )
+
+    card_bg = "#151A23" if is_dark else "#FFFFFF"
+    border_color = "rgba(255, 255, 255, 0.12)" if is_dark else "#E2E8F0"
+    text_primary = "#F8FAFC" if is_dark else "#0F172A"
+    text_secondary = "#94A3B8" if is_dark else "#64748B"
+
+    cfg = load_autotrader_config()
+    kis_ready = is_kis_vts_configured()
+    broker = KISVirtualBroker()
+    bal_data = {"ok": False, "summary": {}, "holdings": [], "error": ""}
+    if kis_ready:
+        bal_data = broker.get_account_balance()
+
+    # 1. 상단 VTS 안전 잠금 배너 & 긴급 킬스위치
+    b_col1, b_col2 = st.columns([3.2, 1.2])
+    with b_col1:
+        st.html(f"""
+        <div style="background:{'rgba(16,185,129,0.12)' if kis_ready else 'rgba(245,158,11,0.12)'}; border:1.5px solid {'#10B981' if kis_ready else '#F59E0B'}; border-radius:12px; padding:12px 16px; font-size:0.84rem; color:{text_primary};">
+            🛡️ <b>모의투자 전용 안전 잠금 (KIS VTS ONLY)</b> · 실전 계좌 호출이 코드 레벨에서 차단되어 있습니다.<br/>
+            <span style="font-size:0.78rem; color:{text_secondary};">
+                {'🟢 한국투자증권 모의투자 계좌와 실시간 API 연결 완료' if (kis_ready and bal_data.get('ok')) else ('⚠️ KIS 연결 오류: ' + bal_data.get('error', '') if kis_ready else '🟡 KIS 모의투자 API 키([kis_vts]) 미등록 상태 — 지금 바로 Dry-Run 시뮬레이션 테스트 가능!')}
+            </span>
+        </div>
+        """)
+    with b_col2:
+        ks_now = bool(cfg.get("kill_switch", False))
+        btn_lbl = "🟢 긴급정지 해제 (재개)" if ks_now else "🛑 자동매매 긴급 정지"
+        if st.button(btn_lbl, key="kis_kill_switch_btn", type="primary" if ks_now else "secondary", use_container_width=True):
+            cfg["kill_switch"] = not ks_now
+            save_autotrader_config(cfg)
+            st.toast("🛑 긴급 정지가 활성화되었습니다." if cfg["kill_switch"] else "🟢 긴급 정지가 해제되었습니다.")
+            st.rerun(scope="fragment")
+
+    st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
+
+    # 2. 계좌 현황 KPI 카드 4종
+    s = bal_data.get("summary") or {}
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        st.html(f"""
+        <div style="background:{card_bg}; border:1px solid {border_color}; border-top:3px solid {'#10B981' if bal_data.get('ok') else '#F59E0B'}; border-radius:14px; padding:15px 18px;">
+            <div style="font-size:0.74rem; color:{text_secondary}; font-weight:700;">📡 KIS VTS 연결 상태</div>
+            <div style="font-size:1.3rem; font-weight:900; color:{'#10B981' if bal_data.get('ok') else '#F59E0B'}; margin-top:4px;">{'연결 정상' if bal_data.get('ok') else '키 등록 대기'}</div>
+            <div style="font-size:0.70rem; color:{text_secondary}; margin-top:3px;">openapivts:29443</div>
+        </div>
+        """)
+    with c2:
+        tot_eval = s.get("total_eval", 0)
+        st.html(f"""
+        <div style="background:{card_bg}; border:1px solid {border_color}; border-top:3px solid #3B82F6; border-radius:14px; padding:15px 18px;">
+            <div style="font-size:0.74rem; color:{text_secondary}; font-weight:700;">💰 총 평가자산</div>
+            <div style="font-size:1.3rem; font-weight:900; color:#3B82F6; margin-top:4px;">{f'{tot_eval:,}원' if bal_data.get('ok') else '-'}</div>
+            <div style="font-size:0.70rem; color:{text_secondary}; margin-top:3px;">모의계좌 총 자산</div>
+        </div>
+        """)
+    with c3:
+        cash_avail = s.get("cash_available", 0)
+        st.html(f"""
+        <div style="background:{card_bg}; border:1px solid {border_color}; border-top:3px solid #8B5CF6; border-radius:14px; padding:15px 18px;">
+            <div style="font-size:0.74rem; color:{text_secondary}; font-weight:700;">💵 주문 가능 현금</div>
+            <div style="font-size:1.3rem; font-weight:900; color:#8B5CF6; margin-top:4px;">{f'{cash_avail:,}원' if bal_data.get('ok') else '-'}</div>
+            <div style="font-size:0.70rem; color:{text_secondary}; margin-top:3px;">예수금 기준</div>
+        </div>
+        """)
+    with c4:
+        p_amt = s.get("eval_profit", 0)
+        p_rt = s.get("eval_profit_rate", 0.0)
+        p_col = "#10B981" if p_amt >= 0 else "#EF4444"
+        st.html(f"""
+        <div style="background:{card_bg}; border:1px solid {border_color}; border-top:3px solid {p_col}; border-radius:14px; padding:15px 18px;">
+            <div style="font-size:0.74rem; color:{text_secondary}; font-weight:700;">📈 평가 손익</div>
+            <div style="font-size:1.3rem; font-weight:900; color:{p_col}; margin-top:4px;">{f'{p_amt:+,}원 ({p_rt:+.2f}%)' if bal_data.get('ok') else '-'}</div>
+            <div style="font-size:0.70rem; color:{text_secondary}; margin-top:3px;">보유종목 {len(bal_data.get('holdings', []))}개</div>
+        </div>
+        """)
+
+    st.markdown("---")
+
+    # 3. 전략 파라미터 실시간 설정 (종목당 투자금액 자유 조정 가능)
+    st.markdown("#### ⚙️ 매매 전략 & 리스크 가드레일 설정 (실시간 조정)")
+    with st.container(border=True):
+        r1c1, r1c2, r1c3, r1c4 = st.columns(4)
+        with r1c1:
+            budget_per_stock = st.number_input(
+                "💵 종목당 투자금액 (원)",
+                min_value=100000,
+                max_value=50000000,
+                value=int(cfg.get("budget_per_stock", 1000000)),
+                step=100000,
+                format="%d",
+                key="kis_cfg_budget",
+                help="1종목 매수 시 투입할 최대 금액입니다. 10만원 단위로 언제든 자유롭게 변경할 수 있습니다.",
+            )
+        with r1c2:
+            max_holdings = st.number_input(
+                "📦 최대 동시 보유 종목수",
+                min_value=1,
+                max_value=15,
+                value=int(cfg.get("max_holdings", 5)),
+                step=1,
+                key="kis_cfg_max_hold",
+            )
+        with r1c3:
+            min_grade = st.selectbox(
+                "🏆 최소 AI 등급",
+                options=["S", "A"],
+                index=0 if cfg.get("min_grade", "A") == "S" else 1,
+                key="kis_cfg_grade",
+            )
+        with r1c4:
+            min_score = st.number_input(
+                "🎯 최소 AI 종합점수",
+                min_value=60,
+                max_value=95,
+                value=int(cfg.get("min_score", 80)),
+                step=1,
+                key="kis_cfg_score",
+            )
+
+        r2c1, r2c2, r2c3, r2c4 = st.columns(4)
+        with r2c1:
+            take_profit = st.number_input(
+                "📈 목표 익절률 (%)",
+                min_value=2.0,
+                max_value=30.0,
+                value=float(cfg.get("take_profit_pct", 6.0)),
+                step=0.5,
+                key="kis_cfg_tp",
+            )
+        with r2c2:
+            stop_loss = st.number_input(
+                "🛡️ 기계적 손절률 (%)",
+                min_value=-15.0,
+                max_value=-1.0,
+                value=float(cfg.get("stop_loss_pct", -3.0)),
+                step=0.5,
+                key="kis_cfg_sl",
+            )
+        with r2c3:
+            daily_loss = st.number_input(
+                "🚨 일일 손실 셧다운 (%)",
+                min_value=-10.0,
+                max_value=-1.0,
+                value=float(cfg.get("daily_loss_limit_pct", -3.0)),
+                step=0.5,
+                key="kis_cfg_dloss",
+            )
+        with r2c4:
+            st.markdown("<div style='height:28px;'></div>", unsafe_allow_html=True)
+            if st.button("💾 전략 설정 저장", key="kis_save_cfg_btn", type="primary", use_container_width=True):
+                save_autotrader_config({
+                    "kill_switch": cfg.get("kill_switch", False),
+                    "budget_per_stock": int(budget_per_stock),
+                    "max_holdings": int(max_holdings),
+                    "min_grade": min_grade,
+                    "min_score": int(min_score),
+                    "take_profit_pct": float(take_profit),
+                    "stop_loss_pct": float(stop_loss),
+                    "daily_loss_limit_pct": float(daily_loss),
+                })
+                st.toast(f"✅ 설정 저장 완료! (종목당 {int(budget_per_stock):,}원 · 최대 {int(max_holdings)}종목 · 익절 +{take_profit}% / 손절 {stop_loss}%)")
+                st.rerun(scope="fragment")
+
+    st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
+
+    # 4. 즉시 시그널 스캔 (Dry-Run) & 모의계좌 1회 실행
+    st.markdown("#### ⚡ 자동매매 시뮬레이션 & 모의주문 실행")
+    ex_c1, ex_c2 = st.columns([1.2, 1.4])
+    with ex_c1:
+        if st.button("🔍 지금 시그널 스캔 (Dry-Run 시뮬레이션)", key="kis_dry_run_btn", type="primary", use_container_width=True):
+            with st.spinner("N-Stock AI 퀀트 추천주 기반 매수·매도 시뮬레이션 연산 중..."):
+                cands = _get_live_ai_candidates_for_autotrader()
+                res = run_trading_cycle(cands, dry_run=True)
+                st.session_state["kis_last_cycle_result"] = res
+    with ex_c2:
+        live_confirm = st.checkbox(
+            "모의투자 계좌(VTS)에 실제 시장가 주문을 전송합니다.",
+            key="kis_live_confirm_chk",
+            disabled=not kis_ready,
+        )
+        if st.button(
+            "⚡ 모의계좌 1회 실행 (VTS 주문)",
+            key="kis_vts_exec_btn",
+            disabled=not (kis_ready and live_confirm and not cfg.get("kill_switch", False)),
+            use_container_width=True,
+        ):
+            with st.spinner("한국투자증권 모의투자(VTS) 주문 전송 중..."):
+                cands = _get_live_ai_candidates_for_autotrader()
+                res = run_trading_cycle(cands, dry_run=False)
+                st.session_state["kis_last_cycle_result"] = res
+                st.rerun(scope="fragment")
+
+    last_res = st.session_state.get("kis_last_cycle_result")
+    if last_res:
+        if not last_res.get("ok"):
+            st.error(last_res.get("error", "실행 오류"))
+        else:
+            mode_tag = "🧪 Dry-Run 시뮬레이션" if last_res.get("dry_run") else "⚡ KIS VTS 모의주문 실행"
+            buys = last_res.get("buys", [])
+            sells = last_res.get("sells", [])
+            st.success(f"**{mode_tag} 완료** — 매수 후보 **{len(buys)}건** · 매도(익절/손절) 후보 **{len(sells)}건**")
+            if last_res.get("blocked_reason"):
+                st.warning(f"🚨 {last_res['blocked_reason']}")
+            if buys:
+                df_b = pd.DataFrame([{
+                    "종목코드": b["code"],
+                    "종목명": b["name"],
+                    "AI등급": b["grade"],
+                    "종합점수": b["score"],
+                    "현재가(원)": f"{b['price']:,}",
+                    "주문수량(주)": f"{b['qty']:,}",
+                    "예상매수금(원)": f"{b['est_amt']:,}",
+                    "진입 근거": b["reason"],
+                } for b in buys])
+                st.dataframe(df_b, use_container_width=True, hide_index=True)
+            else:
+                st.info("현재 설정된 필터 조건(등급·점수·등락률 상한·종목당 투자금액)에 부합하는 신규 매수 후보가 없습니다.")
+
+    # 5. 현재 모의계좌 보유 종목 & 원클릭 수동 매도
+    if bal_data.get("ok") and bal_data.get("holdings"):
+        st.markdown("---")
+        st.markdown("#### 📦 현재 모의계좌 보유 종목")
+        for h in bal_data["holdings"]:
+            hc1, hc2, hc3, hc4, hc5 = st.columns([1.8, 1, 1.2, 1.2, 1])
+            hc1.markdown(f"**{h['name']}** (`{h['code']}`)")
+            hc2.caption(f"{h['qty']:,}주")
+            hc3.caption(f"평단 {h['avg_price']:,}원 → 현재 {h['cur_price']:,}원")
+            hc4.markdown(f"<span style='color:{'#10B981' if h['profit_rate']>=0 else '#EF4444'}; font-weight:800;'>{h['profit_rate']:+.2f}% ({h['profit_amt']:+,}원)</span>", unsafe_allow_html=True)
+            if hc5.button("시장가 매도", key=f"kis_sell_{h['code']}", use_container_width=True):
+                s_res = broker.place_order("SELL", h["code"], h["qty"], order_type="01")
+                if s_res.get("ok"):
+                    st.toast(f"✅ {h['name']} {h['qty']}주 모의 매도 주문 완료!")
+                    st.rerun(scope="fragment")
+                else:
+                    st.error(s_res.get("error", "매도 실패"))
+
+    # 6. 자동매매 감사 로그
+    st.markdown("---")
+    st.markdown("#### 🧾 자동매매 실행 감사 로그 (최신 30건)")
+    t_logs = load_trade_logs(limit=30)
+    if t_logs:
+        df_tl = pd.DataFrame(t_logs)
+        st.dataframe(df_tl, use_container_width=True, hide_index=True, height=220)
+    else:
+        st.info("아직 실행된 자동매매 / 시뮬레이션 로그가 없습니다. 위 [🔍 지금 시그널 스캔] 버튼으로 바로 테스트해 보세요!")
+
+    # 7. KIS 모의투자 API 키 등록 가이드
+    with st.expander("🔑 한국투자증권 모의투자 API 키([kis_vts]) 등록 방법 (나중에 키 넣으실 때 참고)", expanded=not kis_ready):
+        st.markdown(
+            """
+            1. **[KIS Developers 포털](https://apiportal.koreainvestment.com/)** 로그인 → **모의투자 API 신청** → **모의투자용 `APP KEY` · `APP SECRET` · 모의계좌번호(앞 8자리)** 확인
+            2. **Streamlit Cloud → Settings → Secrets** 맨 아래에 아래 형식으로 붙여넣고 **Save**:
+            ```toml
+            [kis_vts]
+            app_key = "발급받은_모의투자_APP_KEY"
+            app_secret = "발급받은_모의투자_APP_SECRET"
+            account_no = "50123456"
+            account_code = "01"
+            ```
+            3. 저장 후 새로고침하시면 **연결 상태가 `🟢 연결 정상`**으로 자동 전환되며, 모의계좌 잔고 조회 및 1클릭 모의주문 실행이 활성화됩니다.
+            """
+        )
