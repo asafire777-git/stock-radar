@@ -1143,33 +1143,76 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
 
     # 5. 현재 모의계좌 보유 종목 & 원클릭 수동 매도
     if bal_data.get("ok") and bal_data.get("holdings"):
+        from src.auto_trader import append_trade_log
         st.markdown("---")
         st.markdown(f"#### 📦 현재 모의계좌 보유 종목 ({'🇺🇸 미국주식' if is_us_mode else '🇰🇷 국내주식'})")
+        _sell_fb = st.session_state.pop("kis_manual_sell_feedback", None)
+        if _sell_fb:
+            if _sell_fb.get("ok"):
+                st.success(_sell_fb["msg"])
+            else:
+                st.error(_sell_fb["msg"])
+        if is_us_mode:
+            st.caption("💡 미국주식 모의투자는 시장가 미지원으로 **현재가 대비 -0.5% 지정가(즉시 체결용)**로 매도 주문을 전송합니다.")
         for h in bal_data["holdings"]:
-            hc1, hc2, hc3, hc4, hc5 = st.columns([1.8, 1, 1.3, 1.2, 1])
+            hc1, hc2, hc3, hc4, hc5 = st.columns([1.6, 0.7, 1.4, 1.2, 1.3])
             hc1.markdown(f"**{h['name']}** (`{h['code']}`)")
             hc2.caption(f"{h['qty']:,}주")
             if is_us_mode:
+                s_px = round(float(h["cur_price"]) * 0.995, 2)
                 hc3.caption(f"평단 ${h['avg_price']:,.2f} → 현재 ${h['cur_price']:,.2f}")
                 hc4.markdown(f"<span style='color:{'#10B981' if h['profit_rate']>=0 else '#EF4444'}; font-weight:800;'>{h['profit_rate']:+.2f}% (${h['profit_amt']:+,.2f})</span>", unsafe_allow_html=True)
-                if hc5.button("지정가 매도", key=f"kis_us_sell_{h['code']}", use_container_width=True):
-                    s_px = round(float(h["cur_price"]) * 0.995, 2)
+                if hc5.button(f"매도 (${s_px:,.2f})", key=f"kis_us_sell_{h['code']}", use_container_width=True, help=f"현재가(${h['cur_price']:,.2f}) 대비 -0.5% 즉시 체결용 지정가 ${s_px:,.2f}로 전량 매도"):
                     s_res = broker.place_us_order("SELL", h["code"], h["qty"], s_px, market=h.get("exchange", "NASD"))
+                    append_trade_log({
+                        "mode": "VTS_US_LIVE",
+                        "action": "SELL",
+                        "code": h["code"],
+                        "name": h["name"],
+                        "qty": h["qty"],
+                        "price": f"${s_px:,.2f}",
+                        "reason": "관리자 수동 지정가 매도",
+                        "status": "성공" if s_res.get("ok") else f"실패({s_res.get('error', '')[:45]})",
+                        "order_no": s_res.get("order_no", ""),
+                    })
                     if s_res.get("ok"):
-                        st.toast(f"✅ {h['name']} {h['qty']}주 미국 모의 매도 주문 완료!")
-                        st.rerun(scope="fragment")
+                        st.session_state["kis_manual_sell_feedback"] = {
+                            "ok": True,
+                            "msg": f"✅ **{h['name']} ({h['code']}) {h['qty']}주** 지정가 **${s_px:,.2f}** 매도 주문 완료! (주문번호: `{s_res.get('order_no', '-')}`)",
+                        }
                     else:
-                        st.error(s_res.get("error", "매도 실패"))
+                        st.session_state["kis_manual_sell_feedback"] = {
+                            "ok": False,
+                            "msg": f"❌ **{h['name']} 매도 실패**: {s_res.get('error', '알 수 없는 오류')}",
+                        }
+                    st.rerun(scope="fragment")
             else:
                 hc3.caption(f"평단 {h['avg_price']:,}원 → 현재 {h['cur_price']:,}원")
                 hc4.markdown(f"<span style='color:{'#10B981' if h['profit_rate']>=0 else '#EF4444'}; font-weight:800;'>{h['profit_rate']:+.2f}% ({h['profit_amt']:+,}원)</span>", unsafe_allow_html=True)
                 if hc5.button("시장가 매도", key=f"kis_sell_{h['code']}", use_container_width=True):
                     s_res = broker.place_order("SELL", h["code"], h["qty"], order_type="01")
+                    append_trade_log({
+                        "mode": "VTS_LIVE",
+                        "action": "SELL",
+                        "code": h["code"],
+                        "name": h["name"],
+                        "qty": h["qty"],
+                        "price": h["cur_price"],
+                        "reason": "관리자 수동 시장가 매도",
+                        "status": "성공" if s_res.get("ok") else f"실패({s_res.get('error', '')[:45]})",
+                        "order_no": s_res.get("order_no", ""),
+                    })
                     if s_res.get("ok"):
-                        st.toast(f"✅ {h['name']} {h['qty']}주 모의 매도 주문 완료!")
-                        st.rerun(scope="fragment")
+                        st.session_state["kis_manual_sell_feedback"] = {
+                            "ok": True,
+                            "msg": f"✅ **{h['name']} ({h['code']}) {h['qty']}주** 시장가 매도 주문 완료! (주문번호: `{s_res.get('order_no', '-')}`)",
+                        }
                     else:
-                        st.error(s_res.get("error", "매도 실패"))
+                        st.session_state["kis_manual_sell_feedback"] = {
+                            "ok": False,
+                            "msg": f"❌ **{h['name']} 매도 실패**: {s_res.get('error', '알 수 없는 오류')}",
+                        }
+                    st.rerun(scope="fragment")
 
     # 6. 자동매매 감사 로그
     st.markdown("---")
