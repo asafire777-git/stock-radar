@@ -340,18 +340,34 @@ class KISVirtualBroker:
                         return 0.0
 
                     holdings = []
-                    for row in fb_data.get("output1") or []:
+                    out1_rows = fb_data.get("output1") or []
+                    # VTRP6504R INQR_DVSN_CD='00'에서 output1이 비어있으면 '01'(종목별)로 1회 추가 조회
+                    if not out1_rows:
+                        fb_params2 = dict(fb_params, INQR_DVSN_CD="01")
+                        _throttle(0.6)
+                        fb_resp2 = requests.get(fb_url, headers=self._headers("VTRP6504R", token), params=fb_params2, timeout=10)
+                        if fb_resp2.status_code == 200 and fb_resp2.json().get("rt_cd") == "0":
+                            out1_rows = fb_resp2.json().get("output1") or []
+
+                    for row in out1_rows:
                         qty = int(max(
                             _fnum(row.get("cblc_qty13")),
                             _fnum(row.get("ccld_qty_smtl1")),
                             _fnum(row.get("ord_psbl_qty1")),
                             _fnum(row.get("thdt_buy_ccld_qty1")),
+                            _fnum(row.get("ovrs_cblc_qty")),
+                            _fnum(row.get("hldg_qty")),
+                            _fnum(row.get("ccld_qty")),
+                            _fnum(row.get("tot_ccld_qty")),
                         ))
+                        avg_p = round(_fnum(row.get("avg_unpr3"), row.get("pchs_avg_pric"), row.get("frcr_pchs_amt")), 2)
+                        cur_p = round(_fnum(row.get("ovrs_now_pric1"), row.get("now_pric2"), avg_p), 2)
+                        eval_raw = _fnum(row.get("frcr_evlu_amt2"), row.get("ovrs_stck_evlu_amt"))
+                        if qty <= 0 and eval_raw > 0 and cur_p > 0:
+                            qty = max(1, int(round(eval_raw / cur_p)))
                         if qty <= 0:
                             continue
-                        avg_p = round(_fnum(row.get("avg_unpr3"), row.get("pchs_avg_pric")), 2)
-                        cur_p = round(_fnum(row.get("ovrs_now_pric1"), row.get("now_pric2"), avg_p), 2)
-                        eval_a = round(_fnum(row.get("frcr_evlu_amt2"), cur_p * qty), 2)
+                        eval_a = round(_fnum(eval_raw, cur_p * qty), 2)
                         pfls_a = round(_fnum(row.get("evlu_pfls_amt2"), (cur_p - avg_p) * qty), 2)
                         pfls_r = round(_fnum(row.get("evlu_pfls_rt1"), ((cur_p - avg_p) / avg_p * 100.0 if avg_p > 0 else 0.0)), 2)
                         holdings.append({
@@ -365,11 +381,69 @@ class KISVirtualBroker:
                             "profit_amt": pfls_a,
                             "profit_rate": pfls_r,
                         })
+
                     out3 = fb_data.get("output3") or {}
                     # VTRP6504R output3의 pchs_amt_smtl/evlu_amt_smtl/evlu_pfls_amt_smtl은 원화(KRW) 환산 합계
                     pchs_krw = int(float(out3.get("pchs_amt_smtl", 0) or 0))
                     evlu_krw = int(float(out3.get("evlu_amt_smtl", 0) or 0))
                     pfls_krw = int(float(out3.get("evlu_pfls_amt_smtl", 0) or 0))
+
+                    # KIS 모의투자(VTS) 당일 체결 직후 output1이 지연되어 빈 배열로 올 경우, 체결 로그+실시간 시세로 보유목록 보강
+                    if not holdings and (evlu_krw > 0 or pchs_krw > 0):
+                        try:
+                            log_fp = os.path.join(DATA_DIR, "autotrader_logs.json")
+                            if os.path.exists(log_fp):
+                                with open(log_fp, "r", encoding="utf-8") as lf:
+                                    tlogs = json.load(lf) or []
+                                pos_map = {}
+                                for lg in tlogs:
+                                    if lg.get("mode") != "VTS_US_LIVE" or lg.get("status") != "성공":
+                                        continue
+                                    tk = str(lg.get("code", "")).strip().upper()
+                                    if not tk:
+                                        continue
+                                    q = int(lg.get("qty", 0) or 0)
+                                    px = float(str(lg.get("price", "0")).replace("$", "").replace(",", "") or 0)
+                                    if lg.get("action") == "BUY":
+                                        cur = pos_map.get(tk, {"code": tk, "name": lg.get("name", tk), "qty": 0, "cost": 0.0})
+                                        cur["qty"] += q
+                                        cur["cost"] += q * px
+                                        pos_map[tk] = cur
+                                    elif lg.get("action") == "SELL" and tk in pos_map:
+                                        pos_map[tk]["qty"] = max(0, pos_map[tk]["qty"] - q)
+                                for tk, pinfo in pos_map.items():
+                                    if pinfo["qty"] <= 0:
+                                        continue
+                                    avg_p = round(pinfo["cost"] / pinfo["qty"], 2) if pinfo["qty"] > 0 else 0.0
+                                    cur_p = avg_p
+                                    try:
+                                        yr = requests.get(
+                                            f"https://query1.finance.yahoo.com/v8/finance/chart/{tk}?range=1d&interval=5m",
+                                            headers={"User-Agent": "Mozilla/5.0"},
+                                            timeout=4,
+                                        )
+                                        if yr.status_code == 200:
+                                            rm = ((yr.json().get("chart") or {}).get("result") or [{}])[0].get("meta") or {}
+                                            if rm.get("regularMarketPrice"):
+                                                cur_p = round(float(rm["regularMarketPrice"]), 2)
+                                    except Exception:
+                                        pass
+                                    excg = "NYSE" if tk in ("IONQ", "RDDT", "ORCL", "LLY", "JPM") else "NASD"
+                                    pfls_a = round((cur_p - avg_p) * pinfo["qty"], 2)
+                                    pfls_r = round(((cur_p - avg_p) / avg_p * 100.0), 2) if avg_p > 0 else 0.0
+                                    holdings.append({
+                                        "code": tk,
+                                        "name": pinfo["name"],
+                                        "exchange": excg,
+                                        "qty": pinfo["qty"],
+                                        "avg_price": avg_p,
+                                        "cur_price": cur_p,
+                                        "eval_amt": round(cur_p * pinfo["qty"], 2),
+                                        "profit_amt": pfls_a,
+                                        "profit_rate": pfls_r,
+                                    })
+                        except Exception:
+                            pass
                     rt = round((pfls_krw / pchs_krw * 100.0), 2) if pchs_krw > 0 else 0.0
                     eval_usd_sum = round(sum(h["eval_amt"] for h in holdings), 2)
                     pfls_usd_sum = round(sum(h["profit_amt"] for h in holdings), 2)
