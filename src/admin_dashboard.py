@@ -746,12 +746,19 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
     # 1. 상단 VTS 안전 잠금 배너 & 긴급 킬스위치
     b_col1, b_col2 = st.columns([3.2, 1.2])
     with b_col1:
+        _err_raw = bal_data.get("error", "")
+        _delay_hint = (
+            "<br/><span style='font-size:0.74rem; color:#F59E0B;'>"
+            "💡 <b>안내</b>: 평일 <b>17:30~18:00</b> 전후는 한국투자증권 모의투자 서버 일일 정산 시간대로 일시 지연이 잦습니다. "
+            "<b>18:00 이후</b> 새로고침해 보시고, 지속 시 한투 앱에서 <b>해외주식 모의투자</b> 신청 여부를 확인해 주세요."
+            "</span>"
+        ) if (kis_ready and not bal_data.get("ok") and ("지연" in _err_raw or is_us_mode)) else ""
         st.html(f"""
-        <div style="background:{'rgba(16,185,129,0.12)' if kis_ready else 'rgba(245,158,11,0.12)'}; border:1.5px solid {'#10B981' if kis_ready else '#F59E0B'}; border-radius:12px; padding:12px 16px; font-size:0.84rem; color:{text_primary};">
+        <div style="background:{'rgba(16,185,129,0.12)' if (kis_ready and bal_data.get('ok')) else 'rgba(245,158,11,0.12)'}; border:1.5px solid {'#10B981' if (kis_ready and bal_data.get('ok')) else '#F59E0B'}; border-radius:12px; padding:12px 16px; font-size:0.84rem; color:{text_primary};">
             🛡️ <b>모의투자 전용 안전 잠금 (KIS VTS ONLY)</b> · 실전 계좌 호출이 코드 레벨에서 차단되어 있습니다.<br/>
             <span style="font-size:0.78rem; color:{text_secondary};">
-                {'🟢 한국투자증권 모의투자 계좌와 실시간 API 연결 완료' if (kis_ready and bal_data.get('ok')) else ('⚠️ KIS 연결 오류: ' + bal_data.get('error', '') if kis_ready else '🟡 KIS 모의투자 API 키([kis_vts]) 미등록 상태 — 지금 바로 Dry-Run 시뮬레이션 테스트 가능!')}
-            </span>
+                {'🟢 한국투자증권 모의투자 계좌와 실시간 API 연결 완료' if (kis_ready and bal_data.get('ok')) else ('⚠️ KIS 연결 오류: ' + _err_raw if kis_ready else '🟡 KIS 모의투자 API 키([kis_vts]) 미등록 상태 — 지금 바로 Dry-Run 시뮬레이션 테스트 가능!')}
+            </span>{_delay_hint}
         </div>
         """)
     with b_col2:
