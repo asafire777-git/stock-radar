@@ -69,6 +69,8 @@ def run_strategy_backtest(
         c = df["close"]
         df["ma5"] = c.rolling(5).mean()
         df["ma20"] = c.rolling(20).mean()
+        df["ma60"] = c.rolling(60).mean()
+        df["vol20"] = df["volume"].rolling(20).mean()
         delta = c.diff()
         gain = delta.clip(lower=0).rolling(14).mean()
         loss = (-delta.clip(upper=0)).rolling(14).mean()
@@ -80,11 +82,14 @@ def run_strategy_backtest(
         peak_rt = 0.0
         partial_done = False
 
-        for i in range(25, len(df)):
+        for i in range(62, len(df)):
             row = df.iloc[i]
+            prev = df.iloc[i - 1]
             px = float(row["close"])
             if not in_pos:
-                if px > row["ma20"] and row["ma5"] > row["ma20"] and 45.0 <= row["rsi"] <= 72.0:
+                # 60일 중기 상승 정배열 + 거래량 1.35배 돌파(또는 건전 눌림 반등) 정밀 진입 (과매매 원천 방지)
+                vol_break = (px > row["ma20"]) and (row["ma20"] > row["ma60"]) and (row["volume"] > row["vol20"] * 1.35) and (px > prev["close"]) and (50.0 <= row["rsi"] <= 68.0)
+                if vol_break:
                     in_pos = True
                     entry_px = px
                     entry_idx = i
@@ -102,7 +107,7 @@ def run_strategy_backtest(
                     exit_rt = (take_profit_pct * 0.5 + cur_rt * 0.5) if partial_done else cur_rt
                 elif cur_rt >= take_profit_pct and not partial_done:
                     partial_done = True
-                elif days_held >= 15:
+                elif days_held >= 20:
                     exit_rt = (take_profit_pct * 0.5 + cur_rt * 0.5) if partial_done else cur_rt
 
                 if exit_rt is not None:

@@ -747,18 +747,22 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
     b_col1, b_col2 = st.columns([3.2, 1.2])
     with b_col1:
         _err_raw = bal_data.get("error", "")
+        _stale_notice = bal_data.get("stale_notice", "")
         _delay_hint = (
             "<br/><span style='font-size:0.74rem; color:#F59E0B;'>"
-            "💡 <b>안내</b>: 평일 <b>17:30~18:00</b> 전후는 한국투자증권 모의투자 서버 일일 정산 시간대로 일시 지연이 잦습니다. "
-            "<b>18:00 이후</b> 새로고침해 보시고, 지속 시 한투 앱에서 <b>해외주식 모의투자</b> 신청 여부를 확인해 주세요."
+            "💡 <b>안내</b>: 주말(토·일) 또는 평일 <b>17:30~18:00</b> 정산 시간대는 한국투자증권 해외 모의투자(MCI) 서버 점검으로 일시 지연이 잦습니다. "
+            "국내주식 서버와 별개로 운영되며, 정규장 개장 전 자동 복구됩니다."
             "</span>"
         ) if (kis_ready and not bal_data.get("ok") and ("지연" in _err_raw or is_us_mode)) else ""
+        _stale_hint = (
+            f"<br/><span style='font-size:0.74rem; color:#F59E0B;'>🕒 {_stale_notice}</span>"
+        ) if (kis_ready and bal_data.get("ok") and _stale_notice) else ""
         st.html(f"""
         <div style="background:{'rgba(16,185,129,0.12)' if (kis_ready and bal_data.get('ok')) else 'rgba(245,158,11,0.12)'}; border:1.5px solid {'#10B981' if (kis_ready and bal_data.get('ok')) else '#F59E0B'}; border-radius:12px; padding:12px 16px; font-size:0.84rem; color:{text_primary};">
             🛡️ <b>모의투자 전용 안전 잠금 (KIS VTS ONLY)</b> · 실전 계좌 호출이 코드 레벨에서 차단되어 있습니다.<br/>
             <span style="font-size:0.78rem; color:{text_secondary};">
                 {'🟢 한국투자증권 모의투자 계좌와 실시간 API 연결 완료' if (kis_ready and bal_data.get('ok')) else ('⚠️ KIS 연결 오류: ' + _err_raw if kis_ready else '🟡 KIS 모의투자 API 키([kis_vts]) 미등록 상태 — 지금 바로 Dry-Run 시뮬레이션 테스트 가능!')}
-            </span>{_delay_hint}
+            </span>{_stale_hint}{_delay_hint}
         </div>
         """)
     with b_col2:
@@ -1191,20 +1195,34 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
             "현재 설정한 **익절·손절·트레일링 스탑 규칙**을 과거 1년 실제 일봉 데이터에 적용하고, "
             "실제 **왕복 수수료+슬리피지(미국 0.50% / 국내 0.35%)를 차감**한 순수익률과 최대 낙폭(MDD)을 검증합니다."
         )
-        if st.button("🧪 현재 전략으로 과거 1년 백테스트 실행", key="kis_run_backtest_btn", use_container_width=True):
-            with st.spinner("과거 1년 실제 일봉 데이터 기반 수수료 차감 백테스트 연산 중..."):
-                from src.backtester import run_strategy_backtest
-                bt_tickers = ["NVDA", "PLTR", "TSLA", "AAPL", "META", "NFLX", "IONQ", "APP"] if is_us_mode else ["005930.KS", "000660.KS", "068270.KS", "035420.KS", "005380.KS", "053800.KQ"]
-                bt_cost = 0.50 if is_us_mode else 0.35
-                bt_res = run_strategy_backtest(
-                    tickers=bt_tickers,
-                    take_profit_pct=float(cfg.get("take_profit_pct", 6.0)),
-                    stop_loss_pct=float(cfg.get("stop_loss_pct", -3.0)),
-                    trailing_activate_pct=float(cfg.get("trailing_activate_pct", 4.0)),
-                    trailing_drop_pct=float(cfg.get("trailing_drop_pct", 2.5)),
-                    round_trip_cost_pct=bt_cost,
-                )
-                st.session_state["kis_last_backtest_res"] = bt_res
+        bc_btn1, bc_btn2 = st.columns([1.4, 1.2])
+        with bc_btn1:
+            if st.button("🧪 현재 전략으로 과거 1년 백테스트 실행", key="kis_run_backtest_btn", use_container_width=True):
+                with st.spinner("과거 1년 실제 일봉 데이터 기반 수수료 차감 백테스트 연산 중..."):
+                    from src.backtester import run_strategy_backtest
+                    bt_tickers = ["NVDA", "PLTR", "TSLA", "AAPL", "META", "NFLX", "IONQ", "APP"] if is_us_mode else ["005930.KS", "000660.KS", "068270.KS", "035420.KS", "005380.KS", "053800.KQ"]
+                    bt_cost = 0.50 if is_us_mode else 0.35
+                    bt_res = run_strategy_backtest(
+                        tickers=bt_tickers,
+                        take_profit_pct=float(cfg.get("take_profit_pct", 6.0)),
+                        stop_loss_pct=float(cfg.get("stop_loss_pct", -3.0)),
+                        trailing_activate_pct=float(cfg.get("trailing_activate_pct", 4.0)),
+                        trailing_drop_pct=float(cfg.get("trailing_drop_pct", 2.5)),
+                        round_trip_cost_pct=bt_cost,
+                    )
+                    st.session_state["kis_last_backtest_res"] = bt_res
+        with bc_btn2:
+            opt_lbl = "✨ AI 검증 최적값 적용 (익절+16%·손절-8%·TS+8%/-4%)" if is_us_mode else "✨ AI 검증 최적값 적용 (익절+12%·손절-6%·TS+6%/-3%)"
+            if st.button(opt_lbl, key="kis_apply_opt_params_btn", type="primary", use_container_width=True):
+                if is_us_mode:
+                    cfg.update({"take_profit_pct": 16.0, "stop_loss_pct": -8.0, "trailing_activate_pct": 8.0, "trailing_drop_pct": 4.0})
+                else:
+                    cfg.update({"take_profit_pct": 12.0, "stop_loss_pct": -6.0, "trailing_activate_pct": 6.0, "trailing_drop_pct": 3.0})
+                save_autotrader_config(cfg)
+                if gh_linked:
+                    sync_config_to_github(cfg)
+                st.toast("✅ AI 백테스트 검증 최적 익절·손절·트레일링 조합이 적용 및 동기화되었습니다!")
+                st.rerun(scope="fragment")
 
         bt_res = st.session_state.get("kis_last_backtest_res")
         if bt_res:

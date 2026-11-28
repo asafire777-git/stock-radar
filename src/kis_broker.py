@@ -447,7 +447,7 @@ class KISVirtualBroker:
                     rt = round((pfls_krw / pchs_krw * 100.0), 2) if pchs_krw > 0 else 0.0
                     eval_usd_sum = round(sum(h["eval_amt"] for h in holdings), 2)
                     pfls_usd_sum = round(sum(h["profit_amt"] for h in holdings), 2)
-                    return {
+                    res_payload = {
                         "ok": True,
                         "error": "",
                         "summary": {
@@ -461,8 +461,26 @@ class KISVirtualBroker:
                         },
                         "holdings": holdings,
                     }
+                    # 주말/MCI 점검 시에도 직전 정상 잔고를 보존하기 위해 스냅샷 캐싱
+                    try:
+                        os.makedirs(DATA_DIR, exist_ok=True)
+                        with open(os.path.join(DATA_DIR, "kis_us_last_balance.json"), "w", encoding="utf-8") as cf:
+                            json.dump({**res_payload, "cached_at": datetime.now(KST).strftime("%Y-%m-%d %H:%M")}, cf, ensure_ascii=False, indent=2)
+                    except Exception:
+                        pass
+                    return res_payload
                 mc = data.get("msg_cd") or fb_data.get("msg_cd") or resp.status_code
                 m1 = data.get("msg1") or fb_data.get("msg1") or resp.text[:100]
+                # 주말·점검 중 KIS MCI 오류([OPSQ0008] 등) 시 마지막 정상 잔고 스냅샷 자동 표시
+                cache_fp = os.path.join(DATA_DIR, "kis_us_last_balance.json")
+                if os.path.exists(cache_fp):
+                    try:
+                        with open(cache_fp, "r", encoding="utf-8") as cf:
+                            cached_bal = json.load(cf)
+                        cached_bal["stale_notice"] = f"KIS 해외 MCI 주말/정산 점검 중 [{mc}] — 마지막 정상 조회({cached_bal.get('cached_at', '')}) 표시"
+                        return cached_bal
+                    except Exception:
+                        pass
                 return {
                     "ok": False,
                     "error": f"미국주식 잔고 조회 오류 [{mc}]: {m1}",
