@@ -63,11 +63,15 @@ NYSE_TICKERS.discard("PLTR")
 def _log(msg: str):
     ts = datetime.now(KST).strftime("%Y-%m-%d %H:%M:%S")
     line = f"[{ts}][WS-Scalper] {msg}"
-    print(line, flush=True)
     try:
         os.makedirs(os.path.dirname(LOG_OUT_PATH), exist_ok=True)
         with open(LOG_OUT_PATH, "a", encoding="utf-8") as f:
             f.write(line + "\n")
+    except Exception:
+        pass
+    try:
+        if sys.stdout is not None:
+            print(line, flush=True)
     except Exception:
         pass
 
@@ -526,10 +530,18 @@ class KISWebSocketScalper:
         import websockets
 
         app_key, app_secret, account_no = load_local_secrets_to_env()
-        if not (app_key and app_secret and account_no):
-            _log("❌ [kis_vts] API 키가 설정되지 않았습니다!")
-            _log(f"   경로: {SECRETS_TOML_PATH} 에 [kis_vts] app_key, app_secret, account_no 를 입력 후 다시 실행해 주세요.")
-            return
+        _warned_no_keys = False
+        while not (app_key and app_secret and account_no):
+            if not _warned_no_keys:
+                _log("⏳ [kis_vts] API 키 대기 중 (백그라운드 상시 대기 모드 활성화)")
+                _log(f"   경로: {SECRETS_TOML_PATH} 에 [kis_vts] app_key, app_secret, account_no 를 저장하면 30초 내 자동 연결됩니다.")
+                _warned_no_keys = True
+            await asyncio.sleep(30)
+            app_key, app_secret, account_no = load_local_secrets_to_env()
+
+        if _warned_no_keys:
+            _log("✅ [kis_vts] API 키 감지 완료! 브로커를 초기화하고 실시간 엔진을 가동합니다.")
+            self.broker = KISVirtualBroker()
 
         _log("🚀 N-Stock 0.1초 실시간 WebSocket 초단타 엔진 가동 (KIS VTS 모의투자 전용)")
         if self.dry_run:
