@@ -193,12 +193,13 @@ def render_admin_dashboard(*args, **kwargs):
         import src.state_sync as _ss_mod
         import src.market_regime as _mr_mod
         import src.ai_committee as _ac_mod
+        import src.backtester as _bt_mod
         import src.intraday_timing as _it_mod
         import src.news_sentiment as _ns_mod
         import src.us_quant_scanner as _uq_mod
         import src.auto_trader as _tr_mod
         import src.admin_dashboard as _ad_mod
-        _mods = (_at_mod, _kb_mod, _gh_mod, _ss_mod, _mr_mod, _ac_mod, _it_mod, _ns_mod, _uq_mod, _tr_mod, _ad_mod)
+        _mods = (_at_mod, _kb_mod, _gh_mod, _ss_mod, _mr_mod, _ac_mod, _bt_mod, _it_mod, _ns_mod, _uq_mod, _tr_mod, _ad_mod)
     except ImportError:
         import analytics_tracker as _at_mod
         import admin_dashboard as _ad_mod

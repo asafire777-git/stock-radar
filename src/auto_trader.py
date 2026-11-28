@@ -447,7 +447,26 @@ def run_trading_cycle(candidates: list, dry_run: bool = True) -> dict:
     buys, committee_blocked, regime_info = _apply_regime_and_committee(news_ok_buys, cfg, is_us=False)
 
     executed = []
+    chased = []
     if not dry_run:
+        # Step 1: 이전 사이클의 미체결 주문이 남아있으면 Smart Order Chaser로 자동 취소·재주문
+        try:
+            chased = broker.chase_unfilled_us_orders()
+            for ch in chased:
+                append_trade_log({
+                    "mode": "SMART_CHASER",
+                    "action": ch.get("side", "SELL"),
+                    "code": ch.get("code", ""),
+                    "name": ch.get("name", ""),
+                    "qty": ch.get("qty", 0),
+                    "price": f"${ch.get('new_price', 0):.2f}",
+                    "reason": f"미체결 자동 추격 정정 (${ch.get('old_price', 0):.2f}→${ch.get('new_price', 0):.2f})",
+                    "status": ch.get("status", ""),
+                    "order_no": ch.get("order_no", ""),
+                })
+        except Exception:
+            chased = []
+
         for s in sells:
             res = broker.place_order("SELL", s["code"], s["qty"], order_type="01")
             rec = {
@@ -507,6 +526,7 @@ def run_trading_cycle(candidates: list, dry_run: bool = True) -> dict:
         "news_blocked": news_blocked,
         "committee_blocked": committee_blocked,
         "regime": regime_info,
+        "chased": chased,
         "executed": executed,
     }
 
@@ -600,7 +620,26 @@ def run_us_trading_cycle(candidates: list, dry_run: bool = True) -> dict:
     buys, committee_blocked, regime_info = _apply_regime_and_committee(news_ok_buys, cfg, is_us=True)
 
     executed = []
+    chased = []
     if not dry_run:
+        # Step 1: 이전 사이클의 미체결 주문이 남아있으면 Smart Order Chaser로 자동 취소·재주문
+        try:
+            chased = broker.chase_unfilled_us_orders()
+            for ch in chased:
+                append_trade_log({
+                    "mode": "SMART_CHASER",
+                    "action": ch.get("side", "SELL"),
+                    "code": ch.get("code", ""),
+                    "name": ch.get("name", ""),
+                    "qty": ch.get("qty", 0),
+                    "price": f"${ch.get('new_price', 0):.2f}",
+                    "reason": f"미체결 자동 추격 정정 (${ch.get('old_price', 0):.2f}→${ch.get('new_price', 0):.2f})",
+                    "status": ch.get("status", ""),
+                    "order_no": ch.get("order_no", ""),
+                })
+        except Exception:
+            chased = []
+
         for s in sells:
             sell_px = round(float(s.get("cur_price", 0)) * 0.995, 2)
             res = broker.place_us_order("SELL", s["code"], s["qty"], sell_px, market=s.get("exchange", "NASD"))
@@ -663,5 +702,6 @@ def run_us_trading_cycle(candidates: list, dry_run: bool = True) -> dict:
         "news_blocked": news_blocked,
         "committee_blocked": committee_blocked,
         "regime": regime_info,
+        "chased": chased,
         "executed": executed,
     }

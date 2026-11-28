@@ -115,16 +115,21 @@ def scan_krx_candidates_headless() -> list:
 def format_alert_message(market: str, res: dict) -> str:
     mode_lbl = "🧪 Dry-Run" if res.get("dry_run") else "⚡ KIS VTS 실주문"
     mkt_lbl = "🇺🇸 미국주식" if market == "US" else "🇰🇷 국내주식"
-    lines = [f"<b>[N-Stock 무인 자동매매] {mkt_lbl} ({mode_lbl})</b>"]
+    reg = res.get("regime") or {}
+    lines = [f"<b>[N-Stock 3자 AI 무인 자동매매] {mkt_lbl} ({mode_lbl})</b>"]
+    if reg:
+        lines.append(f"🌦️ <b>시장 국면</b>: {reg.get('label', '')} (VIX {reg.get('vix', '-')})")
+    for ch in res.get("chased", []):
+        lines.append(f"⚡ <b>미체결 자동 추격</b>: {ch.get('name')}({ch.get('code')}) {ch.get('qty')}주 → ${ch.get('new_price', 0):.2f} ({ch.get('status')})")
     for s in res.get("sells", []):
         lines.append(f"🔴 <b>매도</b>: {s['name']}({s['code']}) {s['qty']}주 — {s['reason']}")
     for b in res.get("buys", []):
         lines.append(
             f"🟢 <b>매수</b>: {b['name']}({b['code']}) {b['qty']}주 | "
-            f"{b.get('timing_label', '')} | {b.get('news_label', '')}"
+            f"{b.get('committee_badge', '')} | {b.get('sizing_note', '')}"
         )
     for nb in res.get("news_blocked", []):
-        lines.append(f"🚨 <b>뉴스 악재 차단</b>: {nb['name']}({nb['code']}) — {nb.get('news_reason', '')}")
+        lines.append(f"🚨 <b>뉴스 VETO 차단</b>: {nb['name']}({nb['code']}) — {nb.get('news_reason', '')}")
     if res.get("blocked_reason"):
         lines.append(f"⛔ {res['blocked_reason']}")
     return "\n".join(lines)

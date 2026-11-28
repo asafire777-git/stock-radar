@@ -546,3 +546,110 @@ class KISVirtualBroker:
             return {"ok": False, "error": f"미국주식 주문 실패: {data.get('msg1', resp.text[:120])}"}
         except Exception as e:
             return {"ok": False, "error": f"미국주식 주문 예외: {str(e)[:120]}"}
+
+    def get_us_unfilled_orders(self, exchange: str = "NASD") -> list:
+        """모의투자 미국주식 미체결 내역 조회 (TR: VTTS3018R)"""
+        token, _ = self.get_access_token()
+        if not token:
+            return []
+        url = f"{self.base_url}/uapi/overseas-stock/v1/trading/inquire-nccs"
+        unfilled = []
+        for excg in ("NASD", "NYSE"):
+            _throttle(0.6)
+            params = {
+                "CANO": self.creds["account_no"],
+                "ACNT_PRDT_CD": self.creds["account_code"],
+                "OVRS_EXCG_CD": excg,
+                "SORT_SQN": "DS",
+                "CTX_AREA_FK200": "",
+                "CTX_AREA_NK200": "",
+            }
+            try:
+                r = requests.get(url, headers=self._headers("VTTS3018R", token), params=params, timeout=8)
+                d = r.json()
+                if r.status_code != 200 or d.get("rt_cd") != "0":
+                    continue
+                for row in d.get("output") or []:
+                    rem_qty = int(float(row.get("nccs_qty", 0) or 0))
+                    if rem_qty <= 0:
+                        continue
+                    unfilled.append({
+                        "order_no": str(row.get("odno", "")).strip(),
+                        "code": str(row.get("pdno", "")).strip().upper(),
+                        "name": str(row.get("prdt_name", "")).strip(),
+                        "exchange": str(row.get("ovrs_excg_cd", excg)).strip().upper(),
+                        "side": "SELL" if str(row.get("sll_buy_dvsn_cd", "")) == "01" else "BUY",
+                        "rem_qty": rem_qty,
+                        "ord_price": float(row.get("ft_ord_unpr3", 0) or 0),
+                    })
+            except Exception:
+                pass
+        return unfilled
+
+    def cancel_us_order(self, order_no: str, ticker: str, qty: int, exchange: str = "NASD") -> dict:
+        """모의투자 미국주식 미체결 주문 취소 (TR: VTTT1004U)"""
+        token, msg = self.get_access_token()
+        if not token:
+            return {"ok": False, "error": msg}
+        body = {
+            "CANO": self.creds["account_no"],
+            "ACNT_PRDT_CD": self.creds["account_code"],
+            "OVRS_EXCG_CD": self._normalize_us_exchange(exchange),
+            "PDNO": str(ticker).strip().upper(),
+            "ORGN_ODNO": str(order_no).strip(),
+            "RVSE_CNCL_DVSN_CD": "02",
+            "ORD_QTY": str(int(qty)),
+            "OVRS_ORD_UNPR": "0",
+            "ORD_SVR_DVSN_CD": "0",
+        }
+        hk = self._get_hashkey(body)
+        _throttle(0.6)
+        url = f"{self.base_url}/uapi/overseas-stock/v1/trading/order-rvsecncl"
+        try:
+            r = requests.post(url, headers=self._headers("VTTT1004U", token, hk), json=body, timeout=8)
+            d = r.json()
+            if r.status_code == 200 and d.get("rt_cd") == "0":
+                return {"ok": True, "msg": d.get("msg1", "미체결 취소 완료")}
+            return {"ok": False, "error": d.get("msg1", r.text[:100])}
+        except Exception as e:
+            return {"ok": False, "error": str(e)[:100]}
+
+    def chase_unfilled_us_orders(self) -> list:
+        """
+        Smart Order Chaser: 미체결 미국주식 주문을 자동 감지해 취소 후 최신 시세 기준
+        공격적 지정가(매도 -1.2%, 매수 +0.8%)로 재주문하여 손절·익절 미체결 사고 0% 차단
+        """
+        unfilled = self.get_us_unfilled_orders()
+        actions = []
+        for u in unfilled:
+            c_res = self.cancel_us_order(u["order_no"], u["code"], u["rem_qty"], u["exchange"])
+            if not c_res.get("ok"):
+                actions.append({**u, "status": f"취소실패({c_res.get('error', '')[:30]})"})
+                continue
+            # 최신 시세 조회
+            live_p = u["ord_price"]
+            try:
+                yr = requests.get(
+                    f"https://query1.finance.yahoo.com/v8/finance/chart/{u['code']}?range=1d&interval=1m",
+                    headers={"User-Agent": "Mozilla/5.0"},
+                    timeout=4,
+                )
+                if yr.status_code == 200:
+                    rm = ((yr.json().get("chart") or {}).get("result") or [{}])[0].get("meta") or {}
+                    if rm.get("regularMarketPrice"):
+                        live_p = float(rm["regularMarketPrice"])
+            except Exception:
+                pass
+            new_px = round(live_p * (0.988 if u["side"] == "SELL" else 1.008), 2)
+            re_res = self.place_us_order(u["side"], u["code"], u["rem_qty"], new_px, market=u["exchange"])
+            actions.append({
+                "code": u["code"],
+                "name": u["name"],
+                "side": u["side"],
+                "qty": u["rem_qty"],
+                "old_price": u["ord_price"],
+                "new_price": new_px,
+                "status": "재주문 성공" if re_res.get("ok") else f"재주문 실패({re_res.get('error', '')[:30]})",
+                "order_no": re_res.get("order_no", ""),
+            })
+        return actions

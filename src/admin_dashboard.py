@@ -1184,7 +1184,41 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
     else:
         st.info("아직 실행된 자동매매 / 시뮬레이션 로그가 없습니다. 위 [🔍 지금 시그널 스캔] 버튼으로 바로 테스트해 보세요!")
 
-    # 7. KIS 모의투자 API 키 등록 가이드
+    # 7. 과거 1년 전략 백테스트 (수수료·슬리피지·MDD·샤프지수 객관적 검증)
+    st.markdown("---")
+    with st.expander("📊 과거 1년 전략 백테스트 검증 (수수료·MDD·샤프지수 실측)", expanded=False):
+        st.caption(
+            "현재 설정한 **익절·손절·트레일링 스탑 규칙**을 과거 1년 실제 일봉 데이터에 적용하고, "
+            "실제 **왕복 수수료+슬리피지(미국 0.50% / 국내 0.35%)를 차감**한 순수익률과 최대 낙폭(MDD)을 검증합니다."
+        )
+        if st.button("🧪 현재 전략으로 과거 1년 백테스트 실행", key="kis_run_backtest_btn", use_container_width=True):
+            with st.spinner("과거 1년 실제 일봉 데이터 기반 수수료 차감 백테스트 연산 중..."):
+                from src.backtester import run_strategy_backtest
+                bt_tickers = ["NVDA", "PLTR", "TSLA", "AAPL", "META", "NFLX", "IONQ", "APP"] if is_us_mode else ["005930.KS", "000660.KS", "068270.KS", "035420.KS", "005380.KS", "053800.KQ"]
+                bt_cost = 0.50 if is_us_mode else 0.35
+                bt_res = run_strategy_backtest(
+                    tickers=bt_tickers,
+                    take_profit_pct=float(cfg.get("take_profit_pct", 6.0)),
+                    stop_loss_pct=float(cfg.get("stop_loss_pct", -3.0)),
+                    trailing_activate_pct=float(cfg.get("trailing_activate_pct", 4.0)),
+                    trailing_drop_pct=float(cfg.get("trailing_drop_pct", 2.5)),
+                    round_trip_cost_pct=bt_cost,
+                )
+                st.session_state["kis_last_backtest_res"] = bt_res
+
+        bt_res = st.session_state.get("kis_last_backtest_res")
+        if bt_res:
+            if not bt_res.get("ok"):
+                st.warning(bt_res.get("error", "백테스트 실패"))
+            else:
+                bc1, bc2, bc3, bc4, bc5 = st.columns(5)
+                bc1.metric("순수익률 (수수료 차감)", f"{bt_res['total_return_pct']:+.2f}%", delta=f"총 {bt_res['total_trades']}회 매매")
+                bc2.metric("승률", f"{bt_res['win_rate_pct']}%", delta=f"평균 {bt_res['avg_trade_return_pct']:+.2f}%/회")
+                bc3.metric("최대 낙폭 (MDD)", f"{bt_res['mdd_pct']}%", delta="자산 20% 분할투입 기준", delta_color="off")
+                bc4.metric("손익비 (PF)", f"{bt_res['profit_factor']}", delta="1.3+ 우수", delta_color="off")
+                bc5.metric("샤프지수", f"{bt_res['sharpe_ratio']}", delta=f"왕복비용 {bt_res['cost_deducted_pct']}% 차감", delta_color="off")
+
+    # 8. KIS 모의투자 API 키 등록 가이드
     with st.expander("🔑 한국투자증권 모의투자 API 키([kis_vts]) 등록 방법 (나중에 키 넣으실 때 참고)", expanded=not kis_ready):
         st.markdown(
             """
