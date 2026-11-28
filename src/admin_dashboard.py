@@ -750,10 +750,10 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
         _stale_notice = bal_data.get("stale_notice", "")
         _delay_hint = (
             "<br/><span style='font-size:0.74rem; color:#F59E0B;'>"
-            "💡 <b>안내</b>: 주말(토·일) 또는 평일 <b>17:30~18:00</b> 정산 시간대는 한국투자증권 해외 모의투자(MCI) 서버 점검으로 일시 지연이 잦습니다. "
-            "국내주식 서버와 별개로 운영되며, 정규장 개장 전 자동 복구됩니다."
+            "💡 <b>안내</b>: 주말(토·일) 또는 평일 <b>17:30~18:00</b> 정산 시간대는 한국투자증권 모의투자(MCI) 서버 점검으로 일시 지연이 잦습니다. "
+            "별도 조치 없이 점검 종료 후 자동으로 재연결됩니다."
             "</span>"
-        ) if (kis_ready and not bal_data.get("ok") and ("지연" in _err_raw or is_us_mode)) else ""
+        ) if (kis_ready and not bal_data.get("ok") and ("지연" in _err_raw or "MCI" in _err_raw or is_us_mode)) else ""
         _stale_hint = (
             f"<br/><span style='font-size:0.74rem; color:#F59E0B;'>🕒 {_stale_notice}</span>"
         ) if (kis_ready and bal_data.get("ok") and _stale_notice) else ""

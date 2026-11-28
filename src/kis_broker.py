@@ -196,16 +196,31 @@ class KISVirtualBroker:
             "CTX_AREA_FK100": "",
             "CTX_AREA_NK100": "",
         }
+        kr_cache_path = os.path.join(DATA_DIR, "kis_kr_last_balance.json")
+
+        def _load_kr_cached_fallback(err_msg: str):
+            try:
+                if os.path.exists(kr_cache_path):
+                    with open(kr_cache_path, "r", encoding="utf-8") as cf:
+                        cached = json.load(cf)
+                    if isinstance(cached, dict) and cached.get("summary"):
+                        cached_at = cached.get("cached_at", "")
+                        return {
+                            "ok": True,
+                            "error": "",
+                            "stale_notice": f"한투 국내 모의투자(MCI) 일시 점검 중 — 마지막 정상 잔고 표시 ({cached_at})",
+                            "summary": cached.get("summary", {}),
+                            "holdings": cached.get("holdings", []),
+                        }
+            except Exception:
+                pass
+            return {"ok": False, "error": err_msg, "summary": {}, "holdings": []}
+
         try:
             resp = requests.get(url, headers=self._headers("VTTC8434R", token), params=params, timeout=10)
             data = resp.json()
             if resp.status_code != 200 or data.get("rt_cd") != "0":
-                return {
-                    "ok": False,
-                    "error": f"잔고 조회 오류: {data.get('msg1', resp.text[:100])}",
-                    "summary": {},
-                    "holdings": [],
-                }
+                return _load_kr_cached_fallback(f"잔고 조회 오류: {data.get('msg1', resp.text[:100])}")
             out2 = (data.get("output2") or [{}])[0]
             summary = {
                 "total_eval": int(float(out2.get("tot_evlu_amt", 0))),
@@ -232,9 +247,24 @@ class KISVirtualBroker:
                     "profit_amt": int(float(row.get("evlu_pfls_amt", 0))),
                     "profit_rate": float(row.get("evlu_pfls_rt", 0.0)),
                 })
+            try:
+                os.makedirs(DATA_DIR, exist_ok=True)
+                with open(kr_cache_path, "w", encoding="utf-8") as cf:
+                    json.dump(
+                        {
+                            "cached_at": datetime.now(KST).strftime("%Y-%m-%d %H:%M KST"),
+                            "summary": summary,
+                            "holdings": holdings,
+                        },
+                        cf,
+                        ensure_ascii=False,
+                        indent=2,
+                    )
+            except Exception:
+                pass
             return {"ok": True, "error": "", "summary": summary, "holdings": holdings}
         except Exception as e:
-            return {"ok": False, "error": f"잔고 조회 예외: {str(e)[:120]}", "summary": {}, "holdings": []}
+            return _load_kr_cached_fallback(f"잔고 조회 예외: {str(e)[:120]}")
 
     def place_order(self, side: str, code: str, qty: int, price: int = 0, order_type: str = "01") -> dict:
         """
