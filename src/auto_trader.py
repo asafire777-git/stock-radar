@@ -34,13 +34,23 @@ DEFAULT_AUTOTRADER_CONFIG = {
     "enable_trailing_stop": True,      # 트레일링 스탑 (고점 추적 익절) 활성화
     "enable_partial_tp": True,         # 1차 목표가 도달 시 50% 분할 익절 + 50% 수익 극대화
     "enable_two_strike_sl": True,      # 2회 연속 이탈 확인 손절 (잠깐 흔들림 방어, 1.8배 급락 시 즉시 손절)
+    "enable_ai_committee": True,       # 3자 AI 투자위원회 (차트·뉴스·거시) 합의 엔진
+    "enable_regime_sizing": True,      # VIX·지수 국면 + ATR 변동성 역가중 자동 비중 조절
     "trailing_activate_pct": 4.0,      # 트레일링 스탑 발동 수익률 (%)
     "trailing_drop_pct": 2.5,          # 최고 수익률 대비 하락 이탈 시 전량 익절 (%)
 }
 
 
 def load_hwm_state() -> dict:
-    """보유 종목별 최고 수익률(High-Water Mark) 및 1차 분할익절 여부 로드"""
+    """보유 종목별 최고 수익률(High-Water Mark) 및 2회 연속 손절 카운트 로드 (클라우드 영구 동기화 지원)"""
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        try:
+            from src.state_sync import load_cloud_json
+            cloud = load_cloud_json("data/autotrader_hwm.json")
+            if isinstance(cloud, dict):
+                return cloud
+        except Exception:
+            pass
     try:
         if os.path.exists(HWM_FILE):
             with open(HWM_FILE, "r", encoding="utf-8") as f:
@@ -59,6 +69,12 @@ def save_hwm_state(state: dict):
             json.dump(state, f, ensure_ascii=False, indent=2)
     except Exception:
         pass
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        try:
+            from src.state_sync import save_cloud_json
+            save_cloud_json("data/autotrader_hwm.json", state, "chore(state): persist HWM & 2-strike SL [skip ci]")
+        except Exception:
+            pass
 
 
 def send_telegram_alert(message: str) -> bool:
@@ -349,6 +365,57 @@ def _apply_news_risk_filter(buys: list, is_us: bool = False, enabled: bool = Tru
     return approved, blocked
 
 
+def _apply_regime_and_committee(
+    buys: list,
+    cfg: dict,
+    is_us: bool = False,
+) -> tuple[list, list, dict]:
+    """
+    거시 시장 국면(VIX + 지수 MA20) 자동 비중 조절 + ATR 변동성 역가중 + 3자 AI 투자위원회 합의 심사
+    """
+    from src.market_regime import detect_market_regime, compute_atr_volatility_scale
+    from src.ai_committee import evaluate_three_agent_committee
+
+    regime = detect_market_regime(is_us=is_us)
+    use_regime = bool(cfg.get("enable_regime_sizing", True))
+    use_comm = bool(cfg.get("enable_ai_committee", True))
+
+    approved, committee_blocked = [], []
+    base_budget = float(cfg.get("budget_per_us_stock_usd", 500) if is_us else cfg.get("budget_per_stock", 1000000))
+
+    for b in buys:
+        # 1) 거시 국면 × 종목 변동성(ATR) 리스크 패리티 비중 자동 조절
+        reg_mult = float(regime.get("multiplier", 1.0)) if use_regime else 1.0
+        atr_mult, atr_lbl = compute_atr_volatility_scale(b.get("change_rate", 0.0)) if use_regime else (1.0, "고정비중")
+        eff_budget = base_budget * reg_mult * atr_mult
+        px = float(b.get("price_usd") if is_us else b.get("price", 0))
+        if px > 0 and use_regime:
+            new_qty = max(1, int(eff_budget // px)) if eff_budget >= px else (1 if base_budget >= px else 0)
+            b["qty"] = new_qty
+            if is_us:
+                b["est_amt_usd"] = round(new_qty * px, 2)
+            else:
+                b["est_amt"] = int(new_qty * px)
+        b["sizing_note"] = f"{regime['regime']}({int(reg_mult*100)}%)×{atr_lbl}"
+
+        # 2) 3자 AI 투자위원회 (차트·뉴스·거시) 합의 심사
+        if use_comm:
+            t_res = {"ok": True, "label": b.get("timing_label", "⚪ 통과")}
+            n_res = {"verdict": b.get("news_verdict", "NEUTRAL"), "reason": b.get("news_reason", "")}
+            c_res = evaluate_three_agent_committee(b, t_res, n_res, regime)
+            b["committee_badge"] = c_res["badge"]
+            b["committee_summary"] = c_res["summary"]
+            if not c_res["approved"] or b.get("qty", 0) <= 0:
+                committee_blocked.append(b)
+                continue
+        else:
+            b["committee_badge"] = "미사용"
+            b["committee_summary"] = "-"
+
+        approved.append(b)
+    return approved, committee_blocked, regime
+
+
 def run_trading_cycle(candidates: list, dry_run: bool = True) -> dict:
     """
     1회 자동매매 사이클 실행
@@ -376,7 +443,8 @@ def run_trading_cycle(candidates: list, dry_run: bool = True) -> dict:
     sells = evaluate_exit_signals(holdings, cfg)
     raw_buys = [] if (cfg.get("kill_switch") or blocked_reason) else evaluate_buy_signals(candidates, holdings, cfg)
     timed_buys, timing_blocked = _apply_intraday_timing_filter(raw_buys, is_us=False, enabled=bool(cfg.get("enable_intraday_timing", True)))
-    buys, news_blocked = _apply_news_risk_filter(timed_buys, is_us=False, enabled=bool(cfg.get("enable_news_filter", True)))
+    news_ok_buys, news_blocked = _apply_news_risk_filter(timed_buys, is_us=False, enabled=bool(cfg.get("enable_news_filter", True)))
+    buys, committee_blocked, regime_info = _apply_regime_and_committee(news_ok_buys, cfg, is_us=False)
 
     executed = []
     if not dry_run:
@@ -437,6 +505,8 @@ def run_trading_cycle(candidates: list, dry_run: bool = True) -> dict:
         "buys": buys,
         "timing_blocked": timing_blocked,
         "news_blocked": news_blocked,
+        "committee_blocked": committee_blocked,
+        "regime": regime_info,
         "executed": executed,
     }
 
@@ -526,7 +596,8 @@ def run_us_trading_cycle(candidates: list, dry_run: bool = True) -> dict:
     sells = evaluate_exit_signals(holdings, cfg)
     raw_buys = [] if (cfg.get("kill_switch") or blocked_reason) else evaluate_us_buy_signals(candidates, holdings, cfg)
     timed_buys, timing_blocked = _apply_intraday_timing_filter(raw_buys, is_us=True, enabled=bool(cfg.get("enable_intraday_timing", True)))
-    buys, news_blocked = _apply_news_risk_filter(timed_buys, is_us=True, enabled=bool(cfg.get("enable_news_filter", True)))
+    news_ok_buys, news_blocked = _apply_news_risk_filter(timed_buys, is_us=True, enabled=bool(cfg.get("enable_news_filter", True)))
+    buys, committee_blocked, regime_info = _apply_regime_and_committee(news_ok_buys, cfg, is_us=True)
 
     executed = []
     if not dry_run:
@@ -590,5 +661,7 @@ def run_us_trading_cycle(candidates: list, dry_run: bool = True) -> dict:
         "buys": buys,
         "timing_blocked": timing_blocked,
         "news_blocked": news_blocked,
+        "committee_blocked": committee_blocked,
+        "regime": regime_info,
         "executed": executed,
     }

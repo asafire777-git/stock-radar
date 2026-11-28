@@ -16,6 +16,8 @@ on:
 jobs:
   run-vts-autotrader:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -40,6 +42,7 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           # 기본값은 안전을 위해 Dry-Run. GitHub Secrets에 AUTOTRADER_LIVE_VTS=true 설정 시 실제 모의주문 실행
           AUTOTRADER_LIVE_VTS: ${{ secrets.AUTOTRADER_LIVE_VTS }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [ "${{ github.event.inputs.market }}" = "kr" ]; then
             python autotrader_worker.py --force-kr

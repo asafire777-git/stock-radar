@@ -1089,11 +1089,16 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
             sells = last_res.get("sells", [])
             timing_blocked = last_res.get("timing_blocked", [])
             news_blocked = last_res.get("news_blocked", [])
+            comm_blocked = last_res.get("committee_blocked", [])
+            reg_info = last_res.get("regime") or {}
             scanned_n = last_res.get("scanned_total", len(buys))
+            if reg_info:
+                st.info(f"🌦️ **실시간 거시 국면 AI 판독**: **{reg_info.get('label', '')}** — {reg_info.get('summary', '')}")
             st.success(
-                f"**{mode_tag} 완료** — AI 후보 **{scanned_n}종목** 스캔 → 매수 통과 **{len(buys)}건**"
-                + (f" · ⏱️ 단타 타이밍 보류 **{len(timing_blocked)}건**" if timing_blocked else "")
-                + (f" · 🚨 뉴스 악재 차단 **{len(news_blocked)}건**" if news_blocked else "")
+                f"**{mode_tag} 완료** — AI 후보 **{scanned_n}종목** 스캔 → 3자 AI 합의 통과 **{len(buys)}건**"
+                + (f" · ⏱️ 단타 보류 **{len(timing_blocked)}건**" if timing_blocked else "")
+                + (f" · 🚨 뉴스 차단 **{len(news_blocked)}건**" if news_blocked else "")
+                + (f" · 🧠 위원회 보류 **{len(comm_blocked)}건**" if comm_blocked else "")
                 + f" · 매도(익절/트레일링/손절) **{len(sells)}건**"
             )
             if timing_blocked:
@@ -1102,6 +1107,9 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
             if news_blocked:
                 for nb in news_blocked:
                     st.error(f"🚨 **AI 뉴스 악재 매수 차단**: **{nb['name']} ({nb['code']})** — {nb.get('news_reason', '치명적 악재 감지')}")
+            if comm_blocked:
+                for cb in comm_blocked:
+                    st.warning(f"🧠 **3자 AI 위원회 보류**: **{cb['name']} ({cb['code']})** — {cb.get('committee_badge', '')} ({cb.get('committee_summary', '')})")
             if last_res.get("blocked_reason"):
                 st.warning(f"🚨 {last_res['blocked_reason']}")
             if buys:
@@ -1109,27 +1117,25 @@ def _render_kis_autotrading_panel(is_dark: bool = False):
                     df_b = pd.DataFrame([{
                         "티커": b["code"],
                         "종목명": b["name"],
-                        "AI등급": b["grade"],
-                        "점수": b["score"],
+                        "AI등급": f"{b['grade']} ({b['score']:.0f})",
                         "현재가($)": f"${b['price_usd']:,.2f}",
-                        "주문수량": f"{b['qty']:,}주",
+                        "스마트수량": f"{b['qty']:,}주",
                         "예상매수($)": f"${b['est_amt_usd']:,.2f}",
-                        "단타 타이밍": b.get("timing_label", "⚪ 통과"),
-                        "AI 뉴스 판독": b.get("news_label", "⚪ 중립"),
-                        "뉴스 요약": b.get("news_reason", "-"),
+                        "국면×변동성 비중": b.get("sizing_note", "-"),
+                        "🧠 3자 AI 위원회": b.get("committee_badge", "-"),
+                        "3자 심의 근거": b.get("committee_summary", "-"),
                     } for b in buys])
                 else:
                     df_b = pd.DataFrame([{
                         "종목코드": b["code"],
                         "종목명": b["name"],
-                        "AI등급": b["grade"],
-                        "점수": b["score"],
+                        "AI등급": f"{b['grade']} ({b['score']:.0f})",
                         "현재가(원)": f"{b['price']:,}",
-                        "주문수량": f"{b['qty']:,}주",
+                        "스마트수량": f"{b['qty']:,}주",
                         "예상매수(원)": f"{b['est_amt']:,}",
-                        "단타 타이밍": b.get("timing_label", "⚪ 통과"),
-                        "AI 뉴스 판독": b.get("news_label", "⚪ 중립"),
-                        "뉴스 요약": b.get("news_reason", "-"),
+                        "국면×변동성 비중": b.get("sizing_note", "-"),
+                        "🧠 3자 AI 위원회": b.get("committee_badge", "-"),
+                        "3자 심의 근거": b.get("committee_summary", "-"),
                     } for b in buys])
                 st.dataframe(df_b, use_container_width=True, hide_index=True)
             else:
