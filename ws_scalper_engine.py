@@ -65,6 +65,12 @@ def _log(msg: str):
     line = f"[{ts}][WS-Scalper] {msg}"
     try:
         os.makedirs(os.path.dirname(LOG_OUT_PATH), exist_ok=True)
+        # 2MB 초과 시 자동 로그 로테이션 (PC 디스크 용량 보호)
+        if os.path.exists(LOG_OUT_PATH) and os.path.getsize(LOG_OUT_PATH) > 2 * 1024 * 1024:
+            bak_path = LOG_OUT_PATH + ".1"
+            if os.path.exists(bak_path):
+                os.remove(bak_path)
+            os.replace(LOG_OUT_PATH, bak_path)
         with open(LOG_OUT_PATH, "a", encoding="utf-8") as f:
             f.write(line + "\n")
     except Exception:
@@ -481,16 +487,22 @@ class KISWebSocketScalper:
 
         try:
             if market == "KR":
-                res = self.broker.place_order(code, "SELL", qty, price=0)  # 시장가 즉시 청산
+                res = self.broker.place_order(
+                    side="SELL",
+                    code=code,
+                    qty=qty,
+                    price=0,
+                    order_type="01",  # 시장가 즉시 청산
+                )
             else:
                 # 미국주식 모의투자: 현재가 대비 -0.5% 지정가로 즉시 체결 유도
                 limit_px = round(price * 0.995, 2)
                 res = self.broker.place_us_order(
-                    symbol=code,
                     side="SELL",
+                    ticker=code,
                     qty=qty,
-                    price=limit_px,
-                    exchange=sig.get("exchange", "NASD"),
+                    limit_price_usd=limit_px,
+                    market=sig.get("exchange", "NASD"),
                 )
             ok = bool(res.get("ok"))
             ord_no = res.get("order_no", "-")
@@ -684,7 +696,14 @@ def run_self_test() -> int:
     s_tp = ev.evaluate_tick(h_tsla, 116.5, cfg, now_ts=1000.0)
     assert s_tp is not None and s_tp["action"] == "PARTIAL_TAKE_PROFIT" and s_tp["qty"] == 2, s_tp
 
-    print("✅ ALL 6 SELF-TESTS PASSED (KR/US Tick Parser, 3-Tick SL, 1-Tick Flash Crash SL, Trailing Stop, 50% Partial TP)")
+    # 3. 브로커 주문 메서드 시그니처 호환성 검증 (KR/US 실주문 파라미터 불일치 원천 차단)
+    import inspect
+    kr_params = set(inspect.signature(KISVirtualBroker.place_order).parameters.keys())
+    us_params = set(inspect.signature(KISVirtualBroker.place_us_order).parameters.keys())
+    assert {"side", "code", "qty", "price", "order_type"}.issubset(kr_params), kr_params
+    assert {"side", "ticker", "qty", "limit_price_usd", "market"}.issubset(us_params), us_params
+
+    print("✅ ALL 7 SELF-TESTS PASSED (KR/US Tick Parser, 3-Tick SL, 1-Tick Flash Crash SL, Trailing Stop, 50% Partial TP, Broker Signature Check)")
     return 0
 
 
